@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
@@ -153,7 +153,7 @@ export const workspaceRouter = router({
           and(
             eq(workspaces.status, "active"),
             workspaceIds.length > 0
-              ? workspaces.id.inArray(workspaceIds)
+              ? inArray(workspaces.id, workspaceIds)
               : undefined
           )
         );
