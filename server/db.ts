@@ -90,3 +90,39 @@ export async function getUserByOpenId(openId: string) {
 }
 
 // TODO: add feature queries here as your schema grows.
+
+// ─── New auth helpers ────────────────────────────────────────────────────────
+
+export async function getUserByEmail(email: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(users).where(eq(users.email, email));
+  return result[0] || null;
+}
+
+export async function getUserById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(users).where(eq(users.id, id));
+  return result[0] || null;
+}
+
+export async function createUser(data: { email: string; name: string; passwordHash: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const openId = `local_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  
+  await db.insert(users).values({
+    openId,
+    email: data.email,
+    name: data.name,
+    passwordHash: data.passwordHash,
+    loginMethod: "local",
+    lastSignedIn: new Date(),
+  });
+
+  const user = await getUserByEmail(data.email);
+  if (!user) throw new Error("Failed to create user");
+  return user;
+}
