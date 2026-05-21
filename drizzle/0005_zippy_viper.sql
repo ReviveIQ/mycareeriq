@@ -1,0 +1,22 @@
+CREATE TABLE `companies` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`companyId` varchar(255) NOT NULL,
+	`companyName` varchar(255) NOT NULL,
+	`category` varchar(100),
+	`jobTitle` varchar(255),
+	`jobDescription` text,
+	`jobLink` varchar(500),
+	`contactName` varchar(255),
+	`contactEmail` varchar(320),
+	`linkedinUrl` varchar(500),
+	`remote` boolean DEFAULT false,
+	`salary` varchar(100),
+	`companySize` varchar(50),
+	`priority` enum('High','Medium','Low') NOT NULL DEFAULT 'Medium',
+	`stage` enum('Research','Outreach','Applied','Interviewing','Offer','Rejected') NOT NULL DEFAULT 'Research',
+	`notes` text,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `companies_id` PRIMARY KEY(`id`),
+	CONSTRAINT `companies_companyId_unique` UNIQUE(`companyId`)
+);

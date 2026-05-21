@@ -1,0 +1,45 @@
+{
+  "build_command": "pnpm run build",
+  "capabilities": [
+    "db",
+    "server",
+    "user"
+  ],
+  "dev_command": "pnpm run dev",
+  "env_vars": {
+    "DATABASE_URL": "mysql://3bde3swVJ8BmhEU.root:hNWSpBgtBm13T699gzS5@gateway06.us-east-1.prod.aws.tidbcloud.com:4000/NsYRkzpZ6EDctaoRLphyYX?ssl={\"rejectUnauthorized\":true}"
+  },
+  "experiments": null,
+  "git_remote": {
+    "repo_url": "s3://vida-prod-gitrepo/webdev-git/310519663650118722/NsYRkzpZ6EDctaoRLphyYX",
+    "access_key_id": "ASIAZV3A2ECZM72RULFA",
+    "secret_access_key": "dGmL5FVbXKWprlQUriK97JJHFeOD2QwZXM3nPIoV",
+    "session_token": "IQoJb3JpZ2luX2VjECkaCXVzLWVhc3QtMSJHMEUCIQCoakQPHQwvdPQBlyhDhKUAMxLEOPoQo2CorgA/8y+D3QIgWErbFDlMRaS6BcNFTRXZWN9wQcWqMb8VMTz51oZPA/Qq/wMI8f//////////ARAEGgw2NjUzODYwOTg4NjYiDJqaRzFg0xxa5pX0JSrTA3Bfk4HNEjPo5YkDkBzirht9kwb6yR6DEdI7oS7jPmMEkxFhBE6fDvO2o1SRZEn4liFNlKl7J+mjGZu0DEDW5BueszjBl1Dsgb4PRvoOrczW7dCsQHRLNXnr/T0JCuQkj+LzE/d051ZU2YnUS6KEwhszGKZN1hPEIV8tqWnLqfz7u9QZI6fOOOYhjJgTpu5zu+cbuMsQhAe7AJAz+xzdgSavqZHd6O9G3Y5JF6m9aHYJybSk9Cttow7TlOKLJ6Di5bOh5DXFVGNUcJQMzDJoKtWzT8pHlsAZBUlsudz5HQW10FacG7AJNjexdkJgl9uMzamPJ3q3TQEGQlUM7PgYn50oRe9SRNz5mLcUyV7aiJAKHLNov6JhKzvGVoINI049ofl1zkS47nKfxN72gUxUGhBkNsBpQgJwMZBRnx+BrMDPd/IcBc59AUuGameHIs3646Jgvib/aQaKOWT29YIKNWGENwIn05ZmGvhh5t0ciSAIwF6Pg/LnpS+AeAoknOlvJaNU7k1qVvKcODAecLc+CnVAFOCVm+7UBLRxMgoaYZPo//R72WaPlR9k8WhXeLT7GjUGvzoJQLwFg3u8W6Cg/nVG7NEIhGA1qjG+SEMkh67ZW/BJMPi7t9AGOp0BcnhvFPafxqmVMW5Kk1w3r5xujV6yCkTJLEXkWI71dRBGq3w7c8YONkMOPciBbxD5dTDV+1UZSSkZGocge/GUPLS1dNFLwfeYFUi612+T49cIMMoM18PSAIQqIO4+9biJdK315w/Lh6XHMi2YCDtqDFEXNnzIStvc/y69i827b+AJmN1bAsHxQ9EWOA05WyTin0dKBtp7c21k60Ht6g==",
+    "expiration": "2026-05-21T04:14:48.000Z"
+  },
+  "name": "bryan-pipeline",
+  "path": "/home/ubuntu/bryan-pipeline",
+  "port": 3000,
+  "secrets": {
+    "APIFY_API_KEY": "800d6e26-f120-4033-9c78-bba4944bded8",
+    "BUILT_IN_FORGE_API_KEY": "d5AkNMr9USA5fH7Gz9n9jS",
+    "BUILT_IN_FORGE_API_URL": "https://forge.manus.ai",
+    "GMAIL_APP_PASSWORD": "xjkh mzul qtwp ipnx",
+    "HUNTER_API_KEY": "3a896d6077fc2e8cf28a9070c0a6133069d0fc54",
+    "JWT_SECRET": "fQwer3GdJiEZxXH7NZMnku",
+    "LINKEDIN_PRIMARY_CLIENT_SECRET_KEY": "WPL_AP1.HW9PEN6IpULOYJc4.3OaYlw==",
+    "OAUTH_SERVER_URL": "https://api.manus.im",
+    "OWNER_NAME": "Bryan Greer",
+    "OWNER_OPEN_ID": "VytCCXuCWJuniPGqvsKdwz",
+    "VITE_ANALYTICS_ENDPOINT": "https://manus-analytics.com",
+    "VITE_ANALYTICS_WEBSITE_ID": "cd7aa22e-bf8e-45d1-867e-4d0f3de13101",
+    "VITE_APP_ID": "NsYRkzpZ6EDctaoRLphyYX",
+    "VITE_APP_LOGO": "https://files.manuscdn.com/user_upload_by_module/web_dev_logo/310519663650118722/SBFULoDsRibDmUom.png",
+    "VITE_APP_TITLE": "My Personal — Job Search Pipeline",
+    "VITE_FRONTEND_FORGE_API_KEY": "XqbL5xCfb4UHSDzozRvd9R",
+    "VITE_FRONTEND_FORGE_API_URL": "https://forge.manus.ai",
+    "VITE_OAUTH_PORTAL_URL": "https://manus.im"
+  },
+  "template_id": "web-db-user",
+  "test_command": "pnpm test"
+}

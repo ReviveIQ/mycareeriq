@@ -1,0 +1,21 @@
+CREATE TABLE `applications` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`companyId` varchar(255) NOT NULL,
+	`companyName` varchar(255) NOT NULL,
+	`contactEmail` varchar(320) NOT NULL,
+	`contactName` varchar(255) NOT NULL,
+	`jobTitle` varchar(255) NOT NULL,
+	`coverLetter` text NOT NULL,
+	`tailoredResume` text NOT NULL,
+	`status` enum('draft','scheduled','sent','failed') NOT NULL DEFAULT 'draft',
+	`scheduledSendTime` timestamp NOT NULL,
+	`sentAt` timestamp,
+	`sentToHiringManager` boolean,
+	`sentToUser` boolean,
+	`jobDescription` text,
+	`companyProfile` text,
+	`generatedAt` timestamp NOT NULL DEFAULT (now()),
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `applications_id` PRIMARY KEY(`id`)
+);

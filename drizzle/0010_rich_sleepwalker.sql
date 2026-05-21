@@ -1,0 +1,1 @@
+ALTER TABLE `researchConfig` ADD `targetCompanies` text DEFAULT ('Salesforce,HubSpot,Pipedrive,Zendesk,Intercom,Drift,Outreach,SalesLoft,Apollo,Gong,Revenue.io,Clari,Chorus,Seismic,Highspot,Showpad,Bigtincan,Mediafly,Veeva,Looker,Tableau,Power BI,Sisense,Qlik,Domo,Alteryx,Dataiku,RapidMiner,H2O,Databricks') NOT NULL;

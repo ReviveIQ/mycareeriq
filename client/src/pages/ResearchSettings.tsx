@@ -1,0 +1,260 @@
+import React, { useState, useEffect } from "react";
+import { trpc } from "@/lib/trpc";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Settings, Save, RotateCcw, AlertCircle, CheckCircle, Play } from "lucide-react";
+import { toast } from "sonner";
+
+export default function ResearchSettings() {
+  const [targetRoles, setTargetRoles] = useState("");
+  const [targetCategories, setTargetCategories] = useState("");
+  const [rolesPerDay, setRolesPerDay] = useState(30);
+  const [enabled, setEnabled] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+
+  // Fetch current configuration
+  const { data: config, isLoading } = trpc.researchConfig.get.useQuery();
+  const updateConfig = trpc.researchConfig.update.useMutation();
+  const runResearch = trpc.monitoring.runNow.useMutation();
+
+  // Load config into form when it arrives
+  useEffect(() => {
+    if (config) {
+      setTargetRoles(config.targetRoles);
+      setTargetCategories(config.targetCategories);
+      setRolesPerDay(config.rolesPerDay);
+      setEnabled(config.enabled === 1);
+    }
+  }, [config]);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await updateConfig.mutateAsync({
+        targetRoles,
+        targetCategories,
+        rolesPerDay,
+        enabled: enabled ? 1 : 0,
+      });
+      toast.success("Research settings updated successfully");
+    } catch (error) {
+      console.error("Failed to save settings:", error);
+      toast.error("Failed to save research settings");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleReset = () => {
+    if (config) {
+      setTargetRoles(config.targetRoles);
+      setTargetCategories(config.targetCategories);
+      setRolesPerDay(config.rolesPerDay);
+      setEnabled(config.enabled === 1);
+    }
+  };
+
+  const handleRunNow = async () => {
+    setIsRunning(true);
+    try {
+      const result = await runResearch.mutateAsync();
+      if (result.success) {
+        toast.success(`✅ Research completed! Added ${result.jobsAdded} jobs to your pipeline`);
+      } else {
+        toast.error(`Failed: ${result.message}`);
+      }
+    } catch (error) {
+      console.error("Failed to run research:", error);
+      toast.error("Failed to run job research");
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <div className="animate-pulse space-y-4">
+            <div className="h-4 bg-slate-200 rounded w-1/4"></div>
+            <div className="h-10 bg-slate-200 rounded"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+        <div className="flex items-center gap-3 mb-2">
+          <Settings className="w-6 h-6 text-indigo-600" />
+          <h2 className="text-2xl font-bold text-slate-900">Research Settings</h2>
+        </div>
+        <p className="text-slate-600">Customize the roles and categories researched daily</p>
+      </div>
+
+      {/* Settings Form */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-6">
+        {/* Target Roles */}
+        <div>
+          <label className="block text-sm font-semibold text-slate-900 mb-2">
+            Target Roles
+          </label>
+          <p className="text-xs text-slate-500 mb-3">
+            Enter roles separated by commas (e.g., "Enterprise Account Manager, Account Executive, Sales Manager")
+          </p>
+          <textarea
+            value={targetRoles}
+            onChange={(e) => setTargetRoles(e.target.value)}
+            className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
+            rows={3}
+            placeholder="Enterprise Account Manager, Account Executive, Sales Manager"
+          />
+        </div>
+
+        {/* Target Categories */}
+        <div>
+          <label className="block text-sm font-semibold text-slate-900 mb-2">
+            Target Categories
+          </label>
+          <p className="text-xs text-slate-500 mb-3">
+            Enter categories separated by commas (e.g., "SaaS, Revenue Intelligence, Sales Enablement")
+          </p>
+          <textarea
+            value={targetCategories}
+            onChange={(e) => setTargetCategories(e.target.value)}
+            className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
+            rows={3}
+            placeholder="SaaS, Revenue Intelligence, Sales Enablement"
+          />
+        </div>
+
+        {/* Roles Per Day */}
+        <div>
+          <label className="block text-sm font-semibold text-slate-900 mb-2">
+            Roles to Research Per Day
+          </label>
+          <div className="flex items-center gap-3">
+            <Input
+              type="number"
+              min="1"
+              max="100"
+              value={rolesPerDay}
+              onChange={(e) => setRolesPerDay(parseInt(e.target.value) || 30)}
+              className="w-24"
+            />
+            <span className="text-sm text-slate-600">roles per day (1-100)</span>
+          </div>
+        </div>
+
+        {/* Enable/Disable Toggle */}
+        <div>
+          <label className="block text-sm font-semibold text-slate-900 mb-3">
+            Daily Research Status
+          </label>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setEnabled(!enabled)}
+              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                enabled ? "bg-indigo-600" : "bg-slate-300"
+              }`}
+            >
+              <span
+                className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                  enabled ? "translate-x-7" : "translate-x-1"
+                }`}
+              />
+            </button>
+            <span className={`text-sm font-medium ${enabled ? "text-emerald-600" : "text-slate-600"}`}>
+              {enabled ? "Enabled" : "Disabled"}
+            </span>
+          </div>
+        </div>
+
+        {/* Info Box */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex gap-3">
+          <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-blue-900">
+            <p className="font-medium mb-1">Daily Research Schedule</p>
+            <p>New roles matching your criteria will be researched and added to your pipeline every 24 hours at 8am EST.</p>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-3 pt-4 border-t border-slate-200">
+          <Button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+          >
+            <Save className="w-4 h-4" />
+            {isSaving ? "Saving..." : "Save Settings"}
+          </Button>
+          <Button
+            onClick={handleReset}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Reset
+          </Button>
+          <Button
+            onClick={handleRunNow}
+            disabled={isRunning}
+            className="flex items-center gap-2 ml-auto bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            {isRunning ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Running...
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4" />
+                Run Now
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* Current Settings Summary */}
+      <Card className="bg-slate-50 border-slate-200 p-6">
+        <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+          <CheckCircle className="w-5 h-5 text-emerald-600" />
+          Current Configuration
+        </h3>
+        <div className="space-y-3 text-sm">
+          <div>
+            <p className="text-slate-600 font-medium">Target Roles:</p>
+            <p className="text-slate-900 font-mono text-xs mt-1 bg-white p-2 rounded border border-slate-200">
+              {targetRoles || "Not set"}
+            </p>
+          </div>
+          <div>
+            <p className="text-slate-600 font-medium">Target Categories:</p>
+            <p className="text-slate-900 font-mono text-xs mt-1 bg-white p-2 rounded border border-slate-200">
+              {targetCategories || "Not set"}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-4 pt-2">
+            <div>
+              <p className="text-slate-600 font-medium">Roles Per Day:</p>
+              <p className="text-slate-900 font-semibold">{rolesPerDay}</p>
+            </div>
+            <div>
+              <p className="text-slate-600 font-medium">Status:</p>
+              <p className={`font-semibold ${enabled ? "text-emerald-600" : "text-slate-600"}`}>
+                {enabled ? "Active" : "Paused"}
+              </p>
+            </div>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}

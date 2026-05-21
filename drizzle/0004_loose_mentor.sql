@@ -1,0 +1,1 @@
+ALTER TABLE `applications` ADD `outcome` enum('pending','interviewing','offer','rejected') DEFAULT 'pending' NOT NULL;
