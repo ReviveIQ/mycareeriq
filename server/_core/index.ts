@@ -16,19 +16,79 @@ async function runMigrations() {
   try {
     const db = await getDb();
     if (!db) return;
-    
+
     // Add passwordHash column if it doesn't exist
-    await db.execute(`
-      ALTER TABLE users ADD COLUMN IF NOT EXISTS passwordHash varchar(255)
-    `);
-    console.log("[Migrations] passwordHash column ready ✓");
-  } catch (error: any) {
-    // Column may already exist - that's fine
-    if (error?.message?.includes("Duplicate column")) {
-      console.log("[Migrations] passwordHash column already exists ✓");
-    } else {
-      console.warn("[Migrations] Migration warning:", error?.message);
+    try {
+      await db.execute(`ALTER TABLE users ADD COLUMN passwordHash varchar(255)`);
+      console.log("[Migrations] passwordHash column added ✓");
+    } catch (e: any) {
+      if (e?.message?.includes("Duplicate column") || e?.message?.includes("already exists")) {
+        console.log("[Migrations] passwordHash already exists ✓");
+      } else { console.warn("[Migrations] passwordHash:", e?.message); }
     }
+
+    // Create workspaces table if not exists
+    try {
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS workspaces (
+          id int AUTO_INCREMENT NOT NULL,
+          name varchar(255) NOT NULL,
+          slug varchar(255) NOT NULL,
+          description text,
+          ownerId int NOT NULL,
+          plan enum('free','pro','enterprise') NOT NULL DEFAULT 'free',
+          status enum('active','suspended','deleted') NOT NULL DEFAULT 'active',
+          createdAt timestamp NOT NULL DEFAULT (now()),
+          updatedAt timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+          CONSTRAINT workspaces_id PRIMARY KEY(id),
+          CONSTRAINT workspaces_slug_unique UNIQUE(slug)
+        )
+      `);
+      console.log("[Migrations] workspaces table ready ✓");
+    } catch (e: any) { console.warn("[Migrations] workspaces:", e?.message); }
+
+    // Create workspaceMembers table if not exists
+    try {
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS workspaceMembers (
+          id int AUTO_INCREMENT NOT NULL,
+          workspaceId int NOT NULL,
+          userId int NOT NULL,
+          role enum('owner','manager','member') NOT NULL DEFAULT 'member',
+          invitedBy int,
+          joinedAt timestamp NOT NULL DEFAULT (now()),
+          status enum('active','invited','inactive') NOT NULL DEFAULT 'active',
+          CONSTRAINT workspaceMembers_id PRIMARY KEY(id)
+        )
+      `);
+      console.log("[Migrations] workspaceMembers table ready ✓");
+    } catch (e: any) { console.warn("[Migrations] workspaceMembers:", e?.message); }
+
+    // Create workspaceSettings table if not exists
+    try {
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS workspaceSettings (
+          id int AUTO_INCREMENT NOT NULL,
+          workspaceId int NOT NULL,
+          rolesPerDay int NOT NULL DEFAULT 30,
+          targetRoles text,
+          categories text,
+          remoteOnly boolean NOT NULL DEFAULT false,
+          usHiringOnly boolean NOT NULL DEFAULT true,
+          emailNotifications boolean NOT NULL DEFAULT true,
+          dailyDigest boolean NOT NULL DEFAULT true,
+          createdAt timestamp NOT NULL DEFAULT (now()),
+          updatedAt timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+          CONSTRAINT workspaceSettings_id PRIMARY KEY(id),
+          CONSTRAINT workspaceSettings_workspaceId_unique UNIQUE(workspaceId)
+        )
+      `);
+      console.log("[Migrations] workspaceSettings table ready ✓");
+    } catch (e: any) { console.warn("[Migrations] workspaceSettings:", e?.message); }
+
+    console.log("[Migrations] All migrations complete ✓");
+  } catch (error: any) {
+    console.warn("[Migrations] Error:", error?.message);
   }
 }
 
@@ -48,7 +108,6 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
-  // Run migrations before starting
   await runMigrations();
 
   const app = express();
