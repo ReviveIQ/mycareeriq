@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { DocumentIntake } from "@/components/DocumentIntake";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -76,6 +77,12 @@ export default function ResearchSettings() {
   if (isLoading) {
     return (
       <div className="space-y-6">
+      <div className="bg-white rounded-xl border p-6">
+        <h3 className="font-semibold text-gray-900 mb-1">Import from Resume</h3>
+        <p className="text-sm text-gray-500 mb-4">Upload your resume to auto-configure your target roles and industries.</p>
+        <DocumentIntake onApply={(roles, industries) => { setTargetRoles(roles); setTargetCategories(industries); }} />
+      </div>
+      <div className="border-t pt-4"><p className="text-sm text-gray-400 text-center mb-4">Or configure manually</p></div>
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
           <div className="animate-pulse space-y-4">
             <div className="h-4 bg-slate-200 rounded w-1/4"></div>
@@ -88,6 +95,12 @@ export default function ResearchSettings() {
 
   return (
     <div className="space-y-6">
+      <div className="bg-white rounded-xl border p-6">
+        <h3 className="font-semibold text-gray-900 mb-1">Import from Resume</h3>
+        <p className="text-sm text-gray-500 mb-4">Upload your resume to auto-configure your target roles and industries.</p>
+        <DocumentIntake onApply={(roles, industries) => { setTargetRoles(roles); setTargetCategories(industries); }} />
+      </div>
+      <div className="border-t pt-4"><p className="text-sm text-gray-400 text-center mb-4">Or configure manually</p></div>
       {/* Header */}
       <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
         <div className="flex items-center gap-3 mb-2">
