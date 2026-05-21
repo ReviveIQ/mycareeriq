@@ -10,6 +10,27 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { sendDigestEmailHandler } from "../digestHandler";
 import { jobResearchHandler } from "../jobResearchHandler";
+import { getDb } from "../db";
+
+async function runMigrations() {
+  try {
+    const db = await getDb();
+    if (!db) return;
+    
+    // Add passwordHash column if it doesn't exist
+    await db.execute(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS passwordHash varchar(255)
+    `);
+    console.log("[Migrations] passwordHash column ready ✓");
+  } catch (error: any) {
+    // Column may already exist - that's fine
+    if (error?.message?.includes("Duplicate column")) {
+      console.log("[Migrations] passwordHash column already exists ✓");
+    } else {
+      console.warn("[Migrations] Migration warning:", error?.message);
+    }
+  }
+}
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -27,6 +48,9 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  // Run migrations before starting
+  await runMigrations();
+
   const app = express();
   const server = createServer(app);
 
