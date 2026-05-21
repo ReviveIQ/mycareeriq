@@ -73,7 +73,7 @@ export const workspaceMigrationRouter = router({
       };
 
       const result = await db.insert(workspaces).values(newWorkspace);
-      const workspaceId = result[0];
+      const workspaceId = (result as any).insertId ?? (result[0] as any)?.insertId;
 
       // Add user as owner
       await db.insert(workspaceMembers).values({
