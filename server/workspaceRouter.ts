@@ -66,8 +66,19 @@ export const workspaceRouter = router({
           status: "active",
         };
 
-        const result = await db.insert(workspaces).values(newWorkspace);
-        const workspaceId = result[0];
+        // Drizzle's MySQL insert returns a ResultSetHeader (mysql2). Extract
+        // insertId rather than treating result as an array of rows.
+        const insertResult = await db.insert(workspaces).values(newWorkspace);
+        const header = Array.isArray(insertResult)
+          ? (insertResult[0] as { insertId?: number })
+          : (insertResult as unknown as { insertId?: number });
+        const workspaceId = header?.insertId;
+        if (!workspaceId || typeof workspaceId !== "number") {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to create workspace (no insertId returned)",
+          });
+        }
 
         // Add creator as owner
         await db.insert(workspaceMembers).values({
@@ -152,10 +163,8 @@ export const workspaceRouter = router({
         .where(
           and(
             eq(workspaces.status, "active"),
-            workspaceIds.length > 0
-              ? inArray(workspaces.id, workspaceIds)
-              : undefined
-          )
+            inArray(workspaces.id, workspaceIds),
+          ),
         );
 
       return userWorkspaces;

@@ -25,19 +25,22 @@ import { Plus } from "lucide-react";
 export function WorkspaceSwitcher() {
   const { currentWorkspace, workspaces, switchWorkspace, refreshWorkspaces } =
     useWorkspace();
+  const utils = trpc.useUtils();
   const [isOpen, setIsOpen] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [newWorkspaceSlug, setNewWorkspaceSlug] = useState("");
 
   const createWorkspaceMutation = trpc.workspace.create.useMutation({
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       toast.success(`Workspace "${data.name}" created successfully`);
       setNewWorkspaceName("");
       setNewWorkspaceSlug("");
       setIsOpen(false);
+      // Await the refetch to guarantee the new workspace is in the list
+      // before switching (more reliable than setTimeout)
+      await utils.workspace.list.invalidate();
       refreshWorkspaces();
-      // Small delay to let refetch complete before switching
-      setTimeout(() => switchWorkspace(data.id), 300);
+      switchWorkspace(data.id);
     },
     onError: (error) => {
       toast.error(error.message || "Failed to create workspace");

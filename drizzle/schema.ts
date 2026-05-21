@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean } from "drizzle-orm/mysql-core";
+import { int, json, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -16,7 +16,6 @@ export const users = mysqlTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  passwordHash: varchar("passwordHash", { length: 255 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -128,21 +127,26 @@ export const researchConfig = mysqlTable("researchConfig", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
   
-  // Comma-separated list of roles to research
-  targetRoles: text("targetRoles").notNull().default("Enterprise Account Manager,Account Executive,Sales Manager"),
-  
+  // Comma-separated list of roles to research (defaults provided by app code on insert; TEXT columns can't have DB defaults in TiDB)
+  targetRoles: text("targetRoles").notNull(),
+
   // Comma-separated list of categories to research
-  targetCategories: text("targetCategories").notNull().default("SaaS,Revenue Intelligence,Sales Enablement"),
-  
+  targetCategories: text("targetCategories").notNull(),
+
   // Comma-separated list of target companies to scrape
-  targetCompanies: text("targetCompanies").notNull().default("Salesforce,HubSpot,Pipedrive,Zendesk,Intercom,Drift,Outreach,SalesLoft,Apollo,Gong,Revenue.io,Clari,Chorus,Seismic,Highspot,Showpad,Bigtincan,Mediafly,Veeva,Looker,Tableau,Power BI,Sisense,Qlik,Domo,Alteryx,Dataiku,RapidMiner,H2O,Databricks"),
+  targetCompanies: text("targetCompanies").notNull(),
   
   // Number of roles to research per day
   rolesPerDay: int("rolesPerDay").notNull().default(30),
   
   // Research enabled/disabled toggle
   enabled: int("enabled").notNull().default(1),
-  
+
+  // Document intake fields - generic, supports any document type (resume, prospect brief, etc.)
+  documentType: varchar("documentType", { length: 50 }).notNull().default("resume"),
+  documentFileName: varchar("documentFileName", { length: 255 }),
+  lastDocumentParsed: json("lastDocumentParsed"),
+
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

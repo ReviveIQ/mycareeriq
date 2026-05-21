@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { DocumentIntake } from "@/components/DocumentIntake";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Settings, Save, RotateCcw, AlertCircle, CheckCircle, Play } from "lucide-react";
 import { toast } from "sonner";
+import { DocumentIntake } from "@/components/DocumentIntake";
 
 export default function ResearchSettings() {
   const [targetRoles, setTargetRoles] = useState("");
@@ -77,12 +77,6 @@ export default function ResearchSettings() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-      <div className="bg-white rounded-xl border p-6">
-        <h3 className="font-semibold text-gray-900 mb-1">Import from Resume</h3>
-        <p className="text-sm text-gray-500 mb-4">Upload your resume to auto-configure your target roles and industries.</p>
-        <DocumentIntake onApply={(roles, industries) => { setTargetRoles(roles); setTargetCategories(industries); }} />
-      </div>
-      <div className="border-t pt-4"><p className="text-sm text-gray-400 text-center mb-4">Or configure manually</p></div>
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
           <div className="animate-pulse space-y-4">
             <div className="h-4 bg-slate-200 rounded w-1/4"></div>
@@ -95,12 +89,6 @@ export default function ResearchSettings() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-xl border p-6">
-        <h3 className="font-semibold text-gray-900 mb-1">Import from Resume</h3>
-        <p className="text-sm text-gray-500 mb-4">Upload your resume to auto-configure your target roles and industries.</p>
-        <DocumentIntake onApply={(roles, industries) => { setTargetRoles(roles); setTargetCategories(industries); }} />
-      </div>
-      <div className="border-t pt-4"><p className="text-sm text-gray-400 text-center mb-4">Or configure manually</p></div>
       {/* Header */}
       <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
         <div className="flex items-center gap-3 mb-2">
@@ -108,6 +96,22 @@ export default function ResearchSettings() {
           <h2 className="text-2xl font-bold text-slate-900">Research Settings</h2>
         </div>
         <p className="text-slate-600">Customize the roles and categories researched daily</p>
+      </div>
+
+      {/* Document Intake — auto-configure pipeline from a resume or other document */}
+      <DocumentIntake
+        documentType="resume"
+        title="Auto-configure from Resume"
+        description="Drag & drop a PDF or DOCX. We'll extract target roles and industries and apply them to your pipeline settings."
+      />
+
+      {/* Divider */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-px bg-slate-200" />
+        <span className="text-xs uppercase tracking-wider text-slate-500 font-medium">
+          Or configure manually
+        </span>
+        <div className="flex-1 h-px bg-slate-200" />
       </div>
 
       {/* Settings Form */}

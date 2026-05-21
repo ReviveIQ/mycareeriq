@@ -72,8 +72,19 @@ export const workspaceMigrationRouter = router({
         status: "active",
       };
 
-      const result = await db.insert(workspaces).values(newWorkspace);
-      const workspaceId = (result as any).insertId ?? (result[0] as any)?.insertId;
+      // Drizzle's MySQL insert returns a ResultSetHeader (mysql2). Extract
+      // insertId rather than treating result as an array of rows.
+      const insertResult = await db.insert(workspaces).values(newWorkspace);
+      const header = Array.isArray(insertResult)
+        ? (insertResult[0] as { insertId?: number })
+        : (insertResult as unknown as { insertId?: number });
+      const workspaceId = header?.insertId;
+      if (!workspaceId || typeof workspaceId !== "number") {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to create workspace (no insertId returned)",
+        });
+      }
 
       // Add user as owner
       await db.insert(workspaceMembers).values({
@@ -83,16 +94,15 @@ export const workspaceMigrationRouter = router({
         status: "active",
       });
 
-      // Create workspace settings from user's existing config
+      // Create workspace settings. Only `rolesPerDay` and `targetRoles` carry
+      // over from the legacy researchConfig table; the other fields
+      // (categories, remoteOnly, etc.) are workspace-level defaults that did
+      // not exist on the per-user config and use schema defaults.
       const defaultSettings: InsertWorkspaceSettings = {
         workspaceId,
-        rolesPerDay: userConfig[0]?.rolesPerDay || 30,
-        targetRoles: userConfig[0]?.targetRoles || null,
-        categories: userConfig[0]?.categories || null,
-        remoteOnly: userConfig[0]?.remoteOnly || false,
-        usHiringOnly: userConfig[0]?.usHiringOnly || true,
-        emailNotifications: userConfig[0]?.emailNotifications || true,
-        dailyDigest: userConfig[0]?.dailyDigest || true,
+        rolesPerDay: userConfig[0]?.rolesPerDay ?? 30,
+        targetRoles: userConfig[0]?.targetRoles ?? null,
+        categories: userConfig[0]?.targetCategories ?? null,
       };
 
       await db.insert(workspaceSettings).values(defaultSettings);
