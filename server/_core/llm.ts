@@ -215,7 +215,7 @@ const resolveApiUrl = () =>
     : "https://forge.manus.im/v1/chat/completions";
 
 const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
+  if (!ENV.openAiApiKey && !ENV.forgeApiKey) {
     throw new Error("OPENAI_API_KEY is not configured");
   }
 };
@@ -316,7 +316,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
+      authorization: `Bearer ${ENV.forgeApiKey || ENV.openAiApiKey}`,
     },
     body: JSON.stringify(payload),
   });
