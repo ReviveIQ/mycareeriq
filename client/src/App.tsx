@@ -10,6 +10,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { WorkspaceProvider } from "./contexts/WorkspaceContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Home from "./pages/Home";
+import ResumeIQ from "./pages/ResumeIQ";
 
 function Router() {
   const { user, isLoading, refetch } = useAuth();
@@ -29,6 +30,7 @@ function Router() {
   return (
     <Switch>
       <Route path={"/"} component={Home} />
+      <Route path={"/resumeiq"} component={ResumeIQ} />
       <Route path={"/workspace/settings"} component={WorkspaceSettings} />
       <Route path={"/privacy"} component={PrivacyPolicy} />
       <Route path={"/404"} component={NotFound} />

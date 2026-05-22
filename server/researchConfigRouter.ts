@@ -49,6 +49,7 @@ export const researchConfigRouter = router({
         rolesPerDay: z.number().min(1).max(100).optional(),
         enabled: z.number().optional(),
         remoteOnly: z.boolean().optional(),
+        usHiringOnly: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -74,6 +75,7 @@ export const researchConfigRouter = router({
             rolesPerDay: input.rolesPerDay || 30,
             enabled: input.enabled !== undefined ? input.enabled : 1,
             remoteOnly: input.remoteOnly || false,
+            usHiringOnly: input.usHiringOnly !== undefined ? input.usHiringOnly : true,
           });
         } else {
           // Update existing config
@@ -83,6 +85,7 @@ export const researchConfigRouter = router({
           if (input.rolesPerDay !== undefined) updateData.rolesPerDay = input.rolesPerDay;
           if (input.enabled !== undefined) updateData.enabled = input.enabled;
           if (input.remoteOnly !== undefined) updateData.remoteOnly = input.remoteOnly;
+          if (input.usHiringOnly !== undefined) updateData.usHiringOnly = input.usHiringOnly;
 
           await db
             .update(researchConfig)
