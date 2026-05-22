@@ -1,4 +1,3 @@
-import { invokeLLM } from "./_core/llm";
 import { getDb } from "./db";
 import { companies, researchConfig } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
@@ -58,20 +57,33 @@ For each opportunity return a JSON object with these exact fields:
 
 Return ONLY a valid JSON array. No markdown, no explanation, no preamble. Start with [ and end with ].`;
 
-    const invokeResult = await invokeLLM({
-      messages: [
-        { role: "system", content: "You are a precise job market research assistant. Always return valid JSON arrays only." },
-        { role: "user", content: prompt },
-      ],
+    const apiKey = process.env.OPENAI_API_KEY || process.env.BUILT_IN_FORGE_API_KEY;
+    if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
+
+    const chatRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: "You are a precise job market research assistant. Always return valid JSON arrays only." },
+          { role: "user", content: prompt },
+        ],
+        max_tokens: 4000,
+        temperature: 0.7,
+      }),
     });
 
-    // Extract text content from InvokeResult
-    const rawContent = invokeResult.choices?.[0]?.message?.content;
-    const responseText = typeof rawContent === "string" 
-      ? rawContent 
-      : Array.isArray(rawContent) 
-        ? (rawContent as any[]).map((p: any) => p?.text || "").join("") 
-        : "";
+    if (!chatRes.ok) {
+      const err = await chatRes.text();
+      throw new Error(`OpenAI error: ${err}`);
+    }
+
+    const chatData = await chatRes.json() as any;
+    const responseText = chatData.choices?.[0]?.message?.content || "";
     let jsonStr = responseText.trim();
     if (jsonStr.startsWith("```")) {
       jsonStr = jsonStr.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
