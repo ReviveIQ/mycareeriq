@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
+const TOKEN_KEY = "reviveiq_auth_token";
+
 interface LoginProps {
   onSuccess: () => void;
 }
@@ -40,6 +42,11 @@ export default function Login({ onSuccess }: LoginProps) {
         return;
       }
 
+      // Store token in localStorage for reliable auth across Railway proxy
+      if (data.token) {
+        localStorage.setItem(TOKEN_KEY, data.token);
+      }
+
       toast.success(mode === "login" ? "Welcome back!" : "Account created!");
       onSuccess();
     } catch {
@@ -73,7 +80,6 @@ export default function Login({ onSuccess }: LoginProps) {
               />
             </div>
           )}
-
           <div>
             <Label htmlFor="email">Email</Label>
             <Input
@@ -85,7 +91,6 @@ export default function Login({ onSuccess }: LoginProps) {
               onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
             />
           </div>
-
           <div>
             <Label htmlFor="password">Password</Label>
             <Input
@@ -97,40 +102,19 @@ export default function Login({ onSuccess }: LoginProps) {
               onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
             />
           </div>
-
-          <Button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="w-full"
-          >
-            {loading
-              ? "Please wait..."
-              : mode === "login"
-              ? "Sign In"
-              : "Create Account"}
+          <Button onClick={handleSubmit} disabled={loading} className="w-full">
+            {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
           </Button>
         </div>
 
         <p className="text-center text-sm text-gray-500 mt-6">
           {mode === "login" ? (
-            <>
-              Don't have an account?{" "}
-              <button
-                onClick={() => setMode("register")}
-                className="text-blue-600 hover:underline font-medium"
-              >
-                Sign up
-              </button>
+            <>Don't have an account?{" "}
+              <button onClick={() => setMode("register")} className="text-blue-600 hover:underline font-medium">Sign up</button>
             </>
           ) : (
-            <>
-              Already have an account?{" "}
-              <button
-                onClick={() => setMode("login")}
-                className="text-blue-600 hover:underline font-medium"
-              >
-                Sign in
-              </button>
+            <>Already have an account?{" "}
+              <button onClick={() => setMode("login")} className="text-blue-600 hover:underline font-medium">Sign in</button>
             </>
           )}
         </p>
