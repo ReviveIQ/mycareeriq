@@ -350,7 +350,7 @@ export default function Home() {
                   onValueChange={(v) => setStageFilter(v as PipelineStage | "All")}
                 >
                   <SelectTrigger className="h-9 w-[140px] text-sm border-slate-200">
-                    <SelectValue placeholder="Stage" />
+                    <SelectValue placeholder="All Stages" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="All">All Stages</SelectItem>
@@ -366,7 +366,7 @@ export default function Home() {
                   onValueChange={(v) => setCategoryFilter(v as CompanyCategory | "All")}
                 >
                   <SelectTrigger className="h-9 w-[180px] text-sm border-slate-200">
-                    <SelectValue placeholder="Category" />
+                    <SelectValue placeholder="All Categories" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="All">All Categories</SelectItem>
@@ -382,7 +382,7 @@ export default function Home() {
                   onValueChange={(v) => setPriorityFilter(v as "High" | "Medium" | "Low" | "All")}
                 >
                   <SelectTrigger className="h-9 w-[130px] text-sm border-slate-200">
-                    <SelectValue placeholder="Priority" />
+                    <SelectValue placeholder="All Priorities" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="All">All Priorities</SelectItem>
