@@ -127,6 +127,7 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
           careersPage = `${jobUrl.protocol}//${jobUrl.hostname}/careers`;
         } catch {}
 
+        console.log(`[JobResearchService] Job URL for ${companyName}: ${(job.redirect_url || "").slice(0, 100)}`);
         jobs.push({
           companyName,
           companyId: `${slugify(companyName)}-${Date.now()}-${Math.random().toString(36).slice(2,5)}`,
