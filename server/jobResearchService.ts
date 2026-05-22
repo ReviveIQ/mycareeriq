@@ -99,21 +99,34 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
             const hunterData = await getDomainInfo(domain);
             
             // Find the most senior sales/revenue contact
-            const seniorTitles = ["vp", "vice president", "director", "head of", "chief"];
-            const salesKeywords = ["sales", "revenue", "business development", "account", "growth"];
+            const seniorTitles = ["vp", "vice president", "director", "head of", "chief", "svp", "evp"];
+            const salesKeywords = ["sales", "revenue", "business development", "account", "growth", "commercial", "partnerships"];
             
             const contacts = hunterData?.emails || [];
+            
+            // Only use contact if they specifically match sales/revenue criteria
             const bestContact = contacts.find((c: any) => {
               const pos = (c.position || "").toLowerCase();
-              return seniorTitles.some(t => pos.includes(t)) && 
-                     salesKeywords.some(k => pos.includes(k));
-            }) || contacts[0];
+              const isSenior = seniorTitles.some(t => pos.includes(t));
+              const isSales = salesKeywords.some(k => pos.includes(k));
+              return isSenior && isSales;
+            });
             
-            if (bestContact) {
-              contactName = `${bestContact.first_name || ""} ${bestContact.last_name || ""}`.trim();
-              contactEmail = bestContact.email || "";
-              contactTitle = bestContact.position || "";
+            // If no exact match, try just sales keywords at any level
+            const fallbackContact = !bestContact ? contacts.find((c: any) => {
+              const pos = (c.position || "").toLowerCase();
+              return salesKeywords.some(k => pos.includes(k));
+            }) : null;
+            
+            const selectedContact = bestContact || fallbackContact;
+            
+            if (selectedContact) {
+              contactName = `${selectedContact.first_name || ""} ${selectedContact.last_name || ""}`.trim();
+              contactEmail = selectedContact.email || "";
+              contactTitle = selectedContact.position || "";
               console.log(`[JobResearchService] Found contact at ${companyName}: ${contactName} (${contactTitle})`);
+            } else {
+              console.log(`[JobResearchService] No sales contact found at ${companyName} - skipping`);
             }
           } catch (err) {
             // Hunter lookup failed silently - not critical
