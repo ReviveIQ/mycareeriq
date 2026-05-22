@@ -80,6 +80,33 @@ async function runMigrations() {
       // Expand jobLink column size for long Adzuna URLs
       `ALTER TABLE companies MODIFY COLUMN jobLink varchar(2000) DEFAULT ''`,
 
+      // applications table
+      `CREATE TABLE IF NOT EXISTS applications (
+        id int AUTO_INCREMENT NOT NULL,
+        userId int NOT NULL,
+        companyId varchar(255) DEFAULT '',
+        companyName varchar(255) NOT NULL DEFAULT '',
+        contactEmail varchar(320) DEFAULT '',
+        contactName varchar(255) NOT NULL DEFAULT '',
+        jobTitle varchar(255) NOT NULL DEFAULT '',
+        coverLetter text NOT NULL,
+        tailoredResume text NOT NULL,
+        status enum('draft','scheduled','sent','failed') NOT NULL DEFAULT 'draft',
+        outcome enum('pending','interviewing','offer','rejected') NOT NULL DEFAULT 'pending',
+        scheduledSendTime timestamp NULL,
+        sentAt timestamp NULL,
+        sentToHiringManager boolean DEFAULT false,
+        sentToUser boolean DEFAULT false,
+        coverLetterPdfKey varchar(512),
+        resumePdfKey varchar(512),
+        jobDescription text,
+        companyProfile text,
+        generatedAt timestamp NOT NULL DEFAULT (now()),
+        createdAt timestamp NOT NULL DEFAULT (now()),
+        updatedAt timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT applications_id PRIMARY KEY(id)
+      )`,
+
       // workspaces table
       `CREATE TABLE IF NOT EXISTS workspaces (
         id int AUTO_INCREMENT NOT NULL,
