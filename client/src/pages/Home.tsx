@@ -198,7 +198,7 @@ export default function Home() {
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
         <div className="max-w-screen-xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/placeholder-logo.png" alt="My Personal Logo" className="w-9 h-9 rounded-lg object-cover" />
+            <img src="/logo.jpg" alt="My Personal Logo" className="w-9 h-9 rounded-lg object-cover" />
             <div>
               <h1 className="text-[15px] font-bold text-slate-900 leading-tight tracking-tight">
                 My Personal - Job Search Pipeline
