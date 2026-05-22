@@ -53,26 +53,31 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
     if (jobs.length >= requestedCount) break;
 
     const query = encodeURIComponent(`${role} B2B SaaS`);
-    const url = `https://jsearch.p.rapidapi.com/search-v2?query=${query}&num_pages=1&country=us&date_posted=month&remote_jobs_only=false`;
+    const url = `https://jsearch.p.rapidapi.com/search?query=${query}&num_pages=1&country=us&date_posted=month`;
 
     console.log(`[JobResearchService] Searching JSearch for: ${role}`);
 
     try {
       const res = await fetch(url, {
+        method: "GET",
         headers: {
           "x-rapidapi-host": "jsearch.p.rapidapi.com",
           "x-rapidapi-key": rapidApiKey,
-          "Content-Type": "application/json",
         },
       });
 
+      const responseText = await res.text();
+      console.log(`[JobResearchService] JSearch status: ${res.status}, response: ${responseText.slice(0, 200)}`);
+
       if (!res.ok) {
-        console.error(`[JobResearchService] JSearch error: ${res.status}`);
+        console.error(`[JobResearchService] JSearch error: ${res.status} - ${responseText}`);
         continue;
       }
 
-      const data = await res.json() as any;
-      const results = data?.data || [];
+      const data = JSON.parse(responseText) as any;
+      const results = Array.isArray(data?.data) ? data.data : 
+                      Array.isArray(data?.jobs) ? data.jobs :
+                      Array.isArray(data) ? data : [];
 
       console.log(`[JobResearchService] Found ${results.length} real jobs for: ${role}`);
 
