@@ -32,7 +32,7 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
 
     const targetRoles = config?.targetRoles?.toString() || "Account Executive, Enterprise Account Executive, Sales Manager";
     const targetCategories = config?.targetCategories?.toString() || "B2B SaaS, Revenue Intelligence, Sales Enablement";
-    const requestedCount = count || config?.rolesPerDay || 10;
+    const requestedCount = Math.min(count || 5, 5); // Keep small to avoid JSON truncation
 
     console.log(`[JobResearchService] Researching ${requestedCount} opportunities via OpenAI for roles: ${targetRoles}`);
 
@@ -69,10 +69,10 @@ Return ONLY a valid JSON array. No markdown, no explanation, no preamble. Start 
       body: JSON.stringify({
         model: "gpt-4o",
         messages: [
-          { role: "system", content: "You are a precise job market research assistant. Always return valid JSON arrays only." },
+          { role: "system", content: "You are a precise job market research assistant. Always return valid JSON arrays only. Return exactly 5 companies, no more." },
           { role: "user", content: prompt },
         ],
-        max_tokens: 4000,
+        max_tokens: 8000,
         temperature: 0.7,
       }),
     });
@@ -87,6 +87,19 @@ Return ONLY a valid JSON array. No markdown, no explanation, no preamble. Start 
     let jsonStr = responseText.trim();
     if (jsonStr.startsWith("```")) {
       jsonStr = jsonStr.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    }
+
+    // Try to repair truncated JSON by finding the last complete object
+    if (!jsonStr.endsWith("]")) {
+      const lastComplete = jsonStr.lastIndexOf("},");
+      if (lastComplete > 0) {
+        jsonStr = jsonStr.slice(0, lastComplete + 1) + "]";
+      } else {
+        const lastObj = jsonStr.lastIndexOf("}");
+        if (lastObj > 0) {
+          jsonStr = jsonStr.slice(0, lastObj + 1) + "]";
+        }
+      }
     }
 
     const parsed = JSON.parse(jsonStr);
