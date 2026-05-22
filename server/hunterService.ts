@@ -59,17 +59,19 @@ export async function searchEmailsWithHunter(
   }
 
   try {
+    // Hunter.io authenticates via the `api_key` query parameter, NOT a Bearer
+    // token. https://hunter.io/api-documentation/v2#authentication
     const params = new URLSearchParams({
       domain,
       first_name: firstName,
       last_name: lastName,
       limit: "10",
+      api_key: apiKey,
     });
 
     const response = await fetch(`https://api.hunter.io/v2/email-finder?${params}`, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       signal: AbortSignal.timeout(AXIOS_TIMEOUT_MS),
@@ -113,12 +115,12 @@ export async function getDomainInfo(domain: string) {
   try {
     const params = new URLSearchParams({
       domain,
+      api_key: apiKey,
     });
 
     const response = await fetch(`https://api.hunter.io/v2/domain-search?${params}`, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       signal: AbortSignal.timeout(AXIOS_TIMEOUT_MS),
@@ -150,12 +152,12 @@ export async function verifyEmail(email: string) {
   try {
     const params = new URLSearchParams({
       email,
+      api_key: apiKey,
     });
 
     const response = await fetch(`https://api.hunter.io/v2/email-verifier?${params}`, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       signal: AbortSignal.timeout(AXIOS_TIMEOUT_MS),

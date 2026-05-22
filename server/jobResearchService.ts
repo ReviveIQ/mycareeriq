@@ -1,4 +1,5 @@
 import { getDb } from "./db";
+import { domainSearch, extractDomain } from "./hunterService";
 import { companies, researchConfig } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 
@@ -84,14 +85,56 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
         if (jobs.length >= requestedCount) break;
 
         const companyName = job.company?.display_name || "Unknown Company";
+        
+        // Try to find a real contact at this company via Hunter.io
+        let contactName = "";
+        let contactEmail = "";
+        let contactTitle = "";
+        let companyDomain = "";
+        
+        if (process.env.HUNTER_API_KEY) {
+          try {
+            const domain = extractDomain(companyName);
+            companyDomain = domain;
+            const hunterData = await domainSearch(domain);
+            
+            // Find the most senior sales/revenue contact
+            const seniorTitles = ["vp", "vice president", "director", "head of", "chief"];
+            const salesKeywords = ["sales", "revenue", "business development", "account", "growth"];
+            
+            const contacts = hunterData?.emails || [];
+            const bestContact = contacts.find((c: any) => {
+              const pos = (c.position || "").toLowerCase();
+              return seniorTitles.some(t => pos.includes(t)) && 
+                     salesKeywords.some(k => pos.includes(k));
+            }) || contacts[0];
+            
+            if (bestContact) {
+              contactName = `${bestContact.first_name || ""} ${bestContact.last_name || ""}`.trim();
+              contactEmail = bestContact.email || "";
+              contactTitle = bestContact.position || "";
+              console.log(`[JobResearchService] Found contact at ${companyName}: ${contactName} (${contactTitle})`);
+            }
+          } catch (err) {
+            // Hunter lookup failed silently - not critical
+          }
+        }
+
+        // Derive careers page URL from job link domain
+        let careersPage = "";
+        try {
+          const jobUrl = new URL(job.redirect_url || "");
+          careersPage = `${jobUrl.protocol}//${jobUrl.hostname}/careers`;
+        } catch {}
+
         jobs.push({
           companyName,
           companyId: `${slugify(companyName)}-${Date.now()}-${Math.random().toString(36).slice(2,5)}`,
           jobTitle: job.title || role,
           category: job.category?.label || "B2B SaaS",
-          contactName: "",
-          contactEmail: "",
-          linkedinUrl: "",
+          contactName,
+          contactEmail,
+          linkedinUrl: companyDomain ? `https://www.linkedin.com/company/${slugify(companyName)}` : "",
           jobDescription: job.description?.slice(0, 500) || "",
           jobLink: job.redirect_url || "",
           salary: formatSalary(job),
