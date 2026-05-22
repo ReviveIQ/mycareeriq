@@ -59,9 +59,10 @@ For each opportunity return a JSON object with these exact fields:
 Return ONLY a valid JSON array. No markdown, no explanation, no preamble. Start with [ and end with ].`;
 
     const invokeResult = await invokeLLM({
-      system: "You are a precise job market research assistant. Always return valid JSON arrays only.",
-      prompt,
-      max_tokens: 4000,
+      messages: [
+        { role: "system", content: "You are a precise job market research assistant. Always return valid JSON arrays only." },
+        { role: "user", content: prompt },
+      ],
     });
 
     // Extract text content from InvokeResult
