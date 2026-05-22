@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Settings, Save, RotateCcw, AlertCircle, CheckCircle, Play } from "lucide-react";
 import { toast } from "sonner";
 import { DocumentIntake } from "@/components/DocumentIntake";
+import { RoleSelector } from "@/components/RoleSelector";
 
 export default function ResearchSettings() {
   const [targetRoles, setTargetRoles] = useState("");
@@ -122,14 +123,11 @@ export default function ResearchSettings() {
             Target Roles
           </label>
           <p className="text-xs text-slate-500 mb-3">
-            Enter roles separated by commas (e.g., "Enterprise Account Manager, Account Executive, Sales Manager")
+            Select the roles you want to search for. These will be used to find matching job postings.
           </p>
-          <textarea
-            value={targetRoles}
-            onChange={(e) => setTargetRoles(e.target.value)}
-            className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
-            rows={3}
-            placeholder="Enterprise Account Manager, Account Executive, Sales Manager"
+          <RoleSelector
+            selectedRoles={targetRoles ? targetRoles.split(",").map(r => r.trim()).filter(Boolean) : []}
+            onChange={(roles) => setTargetRoles(roles.join(", "))}
           />
         </div>
 
