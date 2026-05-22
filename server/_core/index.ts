@@ -18,7 +18,64 @@ async function runMigrations() {
     if (!db) return;
 
     const migrations = [
-      // passwordHash column
+      // Core users table
+      `CREATE TABLE IF NOT EXISTS users (
+        id int AUTO_INCREMENT NOT NULL,
+        openId varchar(64) NOT NULL,
+        name text,
+        email varchar(320),
+        passwordHash varchar(255),
+        loginMethod varchar(64),
+        role enum('user','admin') NOT NULL DEFAULT 'user',
+        createdAt timestamp NOT NULL DEFAULT (now()),
+        updatedAt timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+        lastSignedIn timestamp NOT NULL DEFAULT (now()),
+        CONSTRAINT users_id PRIMARY KEY(id),
+        CONSTRAINT users_openId_unique UNIQUE(openId)
+      )`,
+
+      // researchConfig table
+      `CREATE TABLE IF NOT EXISTS researchConfig (
+        id int AUTO_INCREMENT NOT NULL,
+        userId int NOT NULL,
+        targetRoles text,
+        targetCategories text,
+        targetCompanies text,
+        rolesPerDay int NOT NULL DEFAULT 30,
+        enabled tinyint NOT NULL DEFAULT 1,
+        documentType varchar(50) DEFAULT 'resume',
+        documentFileName varchar(255),
+        lastDocumentParsed json,
+        createdAt timestamp NOT NULL DEFAULT (now()),
+        updatedAt timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT researchConfig_id PRIMARY KEY(id)
+      )`,
+
+      // companies table
+      `CREATE TABLE IF NOT EXISTS companies (
+        id int AUTO_INCREMENT NOT NULL,
+        userId int NOT NULL,
+        companyId varchar(255) NOT NULL,
+        companyName varchar(255) NOT NULL,
+        category varchar(255) DEFAULT '',
+        jobTitle varchar(255) DEFAULT '',
+        jobDescription text,
+        jobLink varchar(500) DEFAULT '',
+        contactName varchar(255) DEFAULT '',
+        contactEmail varchar(320) DEFAULT '',
+        linkedinUrl varchar(500) DEFAULT '',
+        remote boolean DEFAULT false,
+        salary varchar(255) DEFAULT '',
+        companySize varchar(100) DEFAULT '',
+        priority enum('High','Medium','Low') DEFAULT 'Medium',
+        stage varchar(100) DEFAULT 'Research',
+        notes text,
+        createdAt timestamp NOT NULL DEFAULT (now()),
+        updatedAt timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT companies_id PRIMARY KEY(id)
+      )`,
+
+      // passwordHash column (for existing databases)
       `ALTER TABLE users ADD COLUMN passwordHash varchar(255)`,
 
       // workspaces table
