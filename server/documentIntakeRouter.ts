@@ -141,6 +141,13 @@ export const documentIntakeRouter = router({
         });
       }
 
+      // Use logged-in user's name if parser couldn't identify it
+      if (!extracted.candidateName || 
+          extracted.candidateName === "John Doe" || 
+          extracted.candidateName === "Unknown") {
+        extracted.candidateName = ctx.user.name || ctx.user.email || "You";
+      }
+      
       console.log(`[DocumentIntake] Successfully parsed for: ${extracted.candidateName}`);
 
       // Persist to researchConfig
