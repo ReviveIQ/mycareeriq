@@ -56,6 +56,7 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
     throw new Error("ADZUNA_APP_ID and ADZUNA_APP_KEY are required");
   }
 
+  const remoteOnly = config?.remoteOnly || false;
   const roles = targetRoles.split(",").map(r => r.trim()).slice(0, 3);
   const jobs: GeneratedJob[] = [];
 
@@ -63,7 +64,8 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
     if (jobs.length >= requestedCount) break;
 
     const query = encodeURIComponent(role);
-    const url = `https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=${adzunaAppId}&app_key=${adzunaAppKey}&what=${query}&results_per_page=5&sort_by=date&max_days_old=30&content-type=application/json`;
+    const remoteParam = remoteOnly ? "&where=remote" : "";
+    const url = `https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=${adzunaAppId}&app_key=${adzunaAppKey}&what=${query}&results_per_page=5&sort_by=date&max_days_old=30${remoteParam}&content-type=application/json`;
 
     console.log(`[JobResearchService] Searching Adzuna for: ${role}`);
 

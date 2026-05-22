@@ -10,6 +10,7 @@ import { RoleSelector } from "@/components/RoleSelector";
 
 export default function ResearchSettings() {
   const [targetRoles, setTargetRoles] = useState("");
+  const [remoteOnly, setRemoteOnly] = useState(false);
   const [targetCategories, setTargetCategories] = useState("");
   const [rolesPerDay, setRolesPerDay] = useState(30);
   const [enabled, setEnabled] = useState(true);
@@ -25,6 +26,7 @@ export default function ResearchSettings() {
   useEffect(() => {
     if (config) {
       setTargetRoles(config.targetRoles);
+      setRemoteOnly(config.remoteOnly || false);
       setTargetCategories(config.targetCategories);
       setRolesPerDay(config.rolesPerDay);
       setEnabled(config.enabled === 1);
@@ -36,6 +38,7 @@ export default function ResearchSettings() {
     try {
       await updateConfig.mutateAsync({
         targetRoles,
+        remoteOnly,
         targetCategories,
         rolesPerDay,
         enabled: enabled ? 1 : 0,
