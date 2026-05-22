@@ -21,7 +21,7 @@ import {
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-const SUPPORTED_MIMES = ["application/pdf"];
+const SUPPORTED_MIMES = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword"];
 const SUPPORTED_LABEL = "PDF";
 
 export interface DocumentIntakeProps {
@@ -117,7 +117,7 @@ export function DocumentIntake({
     if (!SUPPORTED_MIMES.includes(selected.type)) {
       // Some browsers report an empty MIME; fall back to extension check.
       const lower = selected.name.toLowerCase();
-      if (!lower.endsWith(".pdf")) {
+      if (!lower.endsWith(".pdf") && !lower.endsWith(".docx") && !lower.endsWith(".doc")) {
         toast.error(`Unsupported file type. Please upload a ${SUPPORTED_LABEL}.`);
         return;
       }
@@ -157,7 +157,7 @@ export function DocumentIntake({
     if (!file) return;
     try {
       const base64 = await readFileAsBase64(file);
-      const mimeType = file.type || "application/pdf";
+      const mimeType = file.type || (file.name.endsWith(".docx") ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : "application/pdf");
 
       const result = await parseMutation.mutateAsync({
         fileBase64: base64,
@@ -277,7 +277,7 @@ export function DocumentIntake({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,application/pdf"
+            accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             onChange={onFileInputChange}
             className="hidden"
           />
