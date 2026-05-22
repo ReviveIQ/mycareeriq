@@ -15,126 +15,98 @@ export interface GeneratedJob {
   salary: string;
   remote: boolean;
   priority: "High" | "Medium" | "Low";
-  source: "AIResearch";
+  source: string;
   hiringManagerName?: string;
   hiringManagerTitle?: string;
-  hiringManagerLinkedInUrl?: string;
+}
+
+function slugify(str: string): string {
+  return str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function getPriority(job: any): "High" | "Medium" | "Low" {
+  const title = (job.job_title || "").toLowerCase();
+  const isRemote = job.job_is_remote;
+  if (title.includes("senior") || title.includes("vp") || title.includes("director") || isRemote) return "High";
+  if (title.includes("manager") || title.includes("lead")) return "Medium";
+  return "Low";
 }
 
 export async function researchNewJobs(count?: number, userId: number = 1): Promise<GeneratedJob[]> {
-  try {
-    const db = await getDb();
-    if (!db) throw new Error("Database not available");
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
 
-    // Fetch user's research configuration
-    const configs = await db.select().from(researchConfig).where(eq(researchConfig.userId, userId));
-    const config = configs[0];
+  const configs = await db.select().from(researchConfig).where(eq(researchConfig.userId, userId));
+  const config = configs[0];
 
-    const targetRoles = config?.targetRoles?.toString() || "Account Executive, Enterprise Account Executive, Sales Manager";
-    const targetCategories = config?.targetCategories?.toString() || "B2B SaaS, Revenue Intelligence, Sales Enablement";
-    const requestedCount = Math.min(count || 5, 5); // Keep small to avoid JSON truncation
+  const targetRoles = config?.targetRoles?.toString() || "Account Executive";
+  const requestedCount = Math.min(count || 10, 10);
+  const rapidApiKey = process.env.RAPIDAPI_KEY || process.env.JSEARCH_API_KEY;
 
-    console.log(`[JobResearchService] Researching ${requestedCount} opportunities via OpenAI for roles: ${targetRoles}`);
+  if (!rapidApiKey) throw new Error("RAPIDAPI_KEY is not configured");
 
-    const prompt = `You are a B2B sales intelligence researcher with deep knowledge of the tech industry hiring landscape.
+  // Build search queries from target roles
+  const roles = targetRoles.split(",").map(r => r.trim()).slice(0, 3);
+  const jobs: GeneratedJob[] = [];
 
-Research and generate ${requestedCount} realistic job opportunities for someone targeting these roles: ${targetRoles}
-In these industries: ${targetCategories}
+  for (const role of roles) {
+    if (jobs.length >= requestedCount) break;
 
-For each opportunity return a JSON object with these exact fields:
-- companyName: real, well-known company name that hires for these roles
-- jobTitle: realistic job title matching the target roles
-- category: one of the target industries
-- contactName: realistic full name of a VP or Director level hiring manager
-- contactTitle: their realistic title (e.g. "VP of Sales", "Director of Revenue")
-- linkedinUrl: realistic LinkedIn profile URL format (https://linkedin.com/in/firstname-lastname)
-- jobDescription: 2-3 sentences describing the role responsibilities and requirements
-- salary: realistic compensation range (e.g. "$120,000 - $160,000 + commission")
-- remote: true or false (mix of both)
-- priority: "High" for fast-growing companies, "Medium" for established, "Low" for others
-- estimatedCompanySize: "Startup", "Mid-Market", or "Enterprise"
-- jobLink: realistic careers page URL for the company
+    const query = encodeURIComponent(`${role} B2B SaaS`);
+    const url = `https://jsearch.p.rapidapi.com/search-v2?query=${query}&num_pages=1&country=us&date_posted=month&remote_jobs_only=false`;
 
-Return ONLY a valid JSON array. No markdown, no explanation, no preamble. Start with [ and end with ].`;
+    console.log(`[JobResearchService] Searching JSearch for: ${role}`);
 
-    const apiKey = process.env.OPENAI_API_KEY || process.env.BUILT_IN_FORGE_API_KEY;
-    if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
+    try {
+      const res = await fetch(url, {
+        headers: {
+          "x-rapidapi-host": "jsearch.p.rapidapi.com",
+          "x-rapidapi-key": rapidApiKey,
+          "Content-Type": "application/json",
+        },
+      });
 
-    const chatRes = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: "You are a precise job market research assistant. Always return valid JSON arrays only. Return exactly 5 companies, no more." },
-          { role: "user", content: prompt },
-        ],
-        max_tokens: 8000,
-        temperature: 0.7,
-      }),
-    });
-
-    if (!chatRes.ok) {
-      const err = await chatRes.text();
-      throw new Error(`OpenAI error: ${err}`);
-    }
-
-    const chatData = await chatRes.json() as any;
-    const responseText = chatData.choices?.[0]?.message?.content || "";
-    let jsonStr = responseText.trim();
-    if (jsonStr.startsWith("```")) {
-      jsonStr = jsonStr.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    }
-
-    // Try to repair truncated JSON by finding the last complete object
-    if (!jsonStr.endsWith("]")) {
-      const lastComplete = jsonStr.lastIndexOf("},");
-      if (lastComplete > 0) {
-        jsonStr = jsonStr.slice(0, lastComplete + 1) + "]";
-      } else {
-        const lastObj = jsonStr.lastIndexOf("}");
-        if (lastObj > 0) {
-          jsonStr = jsonStr.slice(0, lastObj + 1) + "]";
-        }
+      if (!res.ok) {
+        console.error(`[JobResearchService] JSearch error: ${res.status}`);
+        continue;
       }
+
+      const data = await res.json() as any;
+      const results = data?.data || [];
+
+      console.log(`[JobResearchService] Found ${results.length} real jobs for: ${role}`);
+
+      for (const job of results) {
+        if (jobs.length >= requestedCount) break;
+
+        const companyName = job.employer_name || "Unknown Company";
+        jobs.push({
+          companyName,
+          companyId: slugify(companyName),
+          jobTitle: job.job_title || role,
+          category: "B2B SaaS",
+          contactName: "",
+          contactEmail: "",
+          linkedinUrl: job.employer_linkedin || "",
+          jobDescription: job.job_description?.slice(0, 500) || "",
+          jobLink: job.job_apply_link || job.job_google_link || "",
+          salary: job.job_min_salary && job.job_max_salary
+            ? `$${Math.round(job.job_min_salary / 1000)}k - $${Math.round(job.job_max_salary / 1000)}k`
+            : job.job_salary_period ? `${job.job_salary_currency || "$"}${job.job_min_salary || ""}/${job.job_salary_period}` : "Competitive",
+          remote: job.job_is_remote || false,
+          priority: getPriority(job),
+          source: "JSearch",
+          hiringManagerName: "",
+          hiringManagerTitle: "",
+        });
+      }
+    } catch (err) {
+      console.error(`[JobResearchService] Error fetching jobs for ${role}:`, err);
     }
-
-    const parsed = JSON.parse(jsonStr);
-
-    if (!Array.isArray(parsed)) {
-      throw new Error("OpenAI did not return an array");
-    }
-
-    // Map to GeneratedJob format
-    const jobs: GeneratedJob[] = parsed.map((item: any) => ({
-      companyName: item.companyName || "Unknown Company",
-      companyId: (item.companyName || "unknown").toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
-      jobTitle: item.jobTitle || targetRoles.split(",")[0].trim(),
-      category: item.category || targetCategories.split(",")[0].trim(),
-      contactName: item.contactName || "Hiring Manager",
-      contactEmail: "",
-      linkedinUrl: item.linkedinUrl || "",
-      jobDescription: item.jobDescription || "",
-      jobLink: item.jobLink || `https://${(item.companyName || "company").toLowerCase().replace(/\s+/g, "")}.com/careers`,
-      salary: item.salary || "Competitive",
-      remote: item.remote === true,
-      priority: ["High", "Medium", "Low"].includes(item.priority) ? item.priority : "Medium",
-      source: "AIResearch",
-      hiringManagerName: item.contactName,
-      hiringManagerTitle: item.contactTitle,
-      hiringManagerLinkedInUrl: item.linkedinUrl,
-    }));
-
-    console.log(`[JobResearchService] Successfully researched ${jobs.length} opportunities`);
-    return jobs;
-
-  } catch (error) {
-    console.error("[JobResearchService] Error researching jobs:", error);
-    throw error;
   }
+
+  console.log(`[JobResearchService] Total real jobs found: ${jobs.length}`);
+  return jobs;
 }
 
 export async function addJobsToPipeline(jobs: GeneratedJob[], userId: number = 1): Promise<number> {
@@ -147,7 +119,7 @@ export async function addJobsToPipeline(jobs: GeneratedJob[], userId: number = 1
     try {
       await db.insert(companies).values({
         userId,
-        companyId: job.companyId,
+        companyId: `${job.companyId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         companyName: job.companyName,
         category: job.category,
         jobTitle: job.jobTitle,
@@ -161,7 +133,7 @@ export async function addJobsToPipeline(jobs: GeneratedJob[], userId: number = 1
         companySize: "",
         priority: job.priority,
         stage: "Research",
-        notes: job.hiringManagerName ? `Hiring Manager: ${job.hiringManagerName} (${job.hiringManagerTitle})` : "",
+        notes: job.source === "JSearch" ? "Live job posting via JSearch" : "",
       });
       addedCount++;
     } catch (err) {
@@ -169,7 +141,6 @@ export async function addJobsToPipeline(jobs: GeneratedJob[], userId: number = 1
     }
   }
 
-  console.log(`[JobResearchService] Added ${addedCount} jobs to pipeline`);
+  console.log(`[JobResearchService] Added ${addedCount} real jobs to pipeline`);
   return addedCount;
 }
-// Build: Fri May 22 00:51:37 UTC 2026
