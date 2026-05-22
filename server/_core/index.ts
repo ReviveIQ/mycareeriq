@@ -17,70 +17,101 @@ async function runMigrations() {
     const db = await getDb();
     if (!db) return;
 
-    try {
-      await db.execute(`ALTER TABLE users ADD COLUMN passwordHash varchar(255)`);
-      console.log("[Migrations] passwordHash column added ✓");
-    } catch (e: any) {
-      if (e?.message?.includes("Duplicate column") || e?.message?.includes("already exists")) {
-        console.log("[Migrations] passwordHash already exists ✓");
-      } else { console.warn("[Migrations] passwordHash:", e?.message); }
+    const migrations = [
+      // passwordHash column
+      `ALTER TABLE users ADD COLUMN passwordHash varchar(255)`,
+
+      // workspaces table
+      `CREATE TABLE IF NOT EXISTS workspaces (
+        id int AUTO_INCREMENT NOT NULL,
+        name varchar(255) NOT NULL,
+        slug varchar(255) NOT NULL,
+        description text,
+        ownerId int NOT NULL,
+        plan enum('free','pro','enterprise') NOT NULL DEFAULT 'free',
+        status enum('active','suspended','deleted') NOT NULL DEFAULT 'active',
+        createdAt timestamp NOT NULL DEFAULT (now()),
+        updatedAt timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT workspaces_id PRIMARY KEY(id),
+        CONSTRAINT workspaces_slug_unique UNIQUE(slug)
+      )`,
+
+      // workspaceMembers table
+      `CREATE TABLE IF NOT EXISTS workspaceMembers (
+        id int AUTO_INCREMENT NOT NULL,
+        workspaceId int NOT NULL,
+        userId int NOT NULL,
+        role enum('owner','manager','member') NOT NULL DEFAULT 'member',
+        invitedBy int,
+        joinedAt timestamp NOT NULL DEFAULT (now()),
+        status enum('active','invited','inactive') NOT NULL DEFAULT 'active',
+        CONSTRAINT workspaceMembers_id PRIMARY KEY(id)
+      )`,
+
+      // workspaceSettings table
+      `CREATE TABLE IF NOT EXISTS workspaceSettings (
+        id int AUTO_INCREMENT NOT NULL,
+        workspaceId int NOT NULL,
+        rolesPerDay int NOT NULL DEFAULT 30,
+        targetRoles text,
+        categories text,
+        remoteOnly boolean NOT NULL DEFAULT false,
+        usHiringOnly boolean NOT NULL DEFAULT true,
+        emailNotifications boolean NOT NULL DEFAULT true,
+        dailyDigest boolean NOT NULL DEFAULT true,
+        createdAt timestamp NOT NULL DEFAULT (now()),
+        updatedAt timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT workspaceSettings_id PRIMARY KEY(id),
+        CONSTRAINT workspaceSettings_workspaceId_unique UNIQUE(workspaceId)
+      )`,
+
+      // subscriptions table
+      `CREATE TABLE IF NOT EXISTS subscriptions (
+        id int AUTO_INCREMENT NOT NULL,
+        workspaceId int NOT NULL,
+        stripeCustomerId varchar(255),
+        stripeSubscriptionId varchar(255),
+        plan enum('free','pro','enterprise') NOT NULL DEFAULT 'free',
+        status enum('active','past_due','canceled','unpaid') NOT NULL DEFAULT 'active',
+        currentPeriodStart timestamp,
+        currentPeriodEnd timestamp,
+        canceledAt timestamp,
+        createdAt timestamp NOT NULL DEFAULT (now()),
+        updatedAt timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT subscriptions_id PRIMARY KEY(id),
+        CONSTRAINT subscriptions_workspaceId_unique UNIQUE(workspaceId)
+      )`,
+
+      // workspaceInvitations table
+      `CREATE TABLE IF NOT EXISTS workspaceInvitations (
+        id int AUTO_INCREMENT NOT NULL,
+        workspaceId int NOT NULL,
+        email varchar(320) NOT NULL,
+        role enum('manager','member') NOT NULL DEFAULT 'member',
+        token varchar(255) NOT NULL,
+        invitedBy int NOT NULL,
+        expiresAt timestamp NOT NULL,
+        acceptedAt timestamp,
+        createdAt timestamp NOT NULL DEFAULT (now()),
+        CONSTRAINT workspaceInvitations_id PRIMARY KEY(id),
+        CONSTRAINT workspaceInvitations_token_unique UNIQUE(token)
+      )`,
+    ];
+
+    for (const sql of migrations) {
+      try {
+        await db.execute(sql);
+        const tableName = sql.match(/TABLE(?:\s+IF NOT EXISTS)?\s+(\w+)/i)?.[1] || 
+                          sql.match(/COLUMN\s+(\w+)/i)?.[1] || "unknown";
+        console.log(`[Migrations] ${tableName} ready ✓`);
+      } catch (e: any) {
+        const isDuplicate = e?.message?.includes("Duplicate") || 
+                           e?.message?.includes("already exists");
+        if (!isDuplicate) {
+          console.warn(`[Migrations] Warning:`, e?.message?.slice(0, 100));
+        }
+      }
     }
-
-    try {
-      await db.execute(`
-        CREATE TABLE IF NOT EXISTS workspaces (
-          id int AUTO_INCREMENT NOT NULL,
-          name varchar(255) NOT NULL,
-          slug varchar(255) NOT NULL,
-          description text,
-          ownerId int NOT NULL,
-          plan enum('free','pro','enterprise') NOT NULL DEFAULT 'free',
-          status enum('active','suspended','deleted') NOT NULL DEFAULT 'active',
-          createdAt timestamp NOT NULL DEFAULT (now()),
-          updatedAt timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
-          CONSTRAINT workspaces_id PRIMARY KEY(id),
-          CONSTRAINT workspaces_slug_unique UNIQUE(slug)
-        )
-      `);
-      console.log("[Migrations] workspaces table ready ✓");
-    } catch (e: any) { console.warn("[Migrations] workspaces:", e?.message); }
-
-    try {
-      await db.execute(`
-        CREATE TABLE IF NOT EXISTS workspaceMembers (
-          id int AUTO_INCREMENT NOT NULL,
-          workspaceId int NOT NULL,
-          userId int NOT NULL,
-          role enum('owner','manager','member') NOT NULL DEFAULT 'member',
-          invitedBy int,
-          joinedAt timestamp NOT NULL DEFAULT (now()),
-          status enum('active','invited','inactive') NOT NULL DEFAULT 'active',
-          CONSTRAINT workspaceMembers_id PRIMARY KEY(id)
-        )
-      `);
-      console.log("[Migrations] workspaceMembers table ready ✓");
-    } catch (e: any) { console.warn("[Migrations] workspaceMembers:", e?.message); }
-
-    try {
-      await db.execute(`
-        CREATE TABLE IF NOT EXISTS workspaceSettings (
-          id int AUTO_INCREMENT NOT NULL,
-          workspaceId int NOT NULL,
-          rolesPerDay int NOT NULL DEFAULT 30,
-          targetRoles text,
-          categories text,
-          remoteOnly boolean NOT NULL DEFAULT false,
-          usHiringOnly boolean NOT NULL DEFAULT true,
-          emailNotifications boolean NOT NULL DEFAULT true,
-          dailyDigest boolean NOT NULL DEFAULT true,
-          createdAt timestamp NOT NULL DEFAULT (now()),
-          updatedAt timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
-          CONSTRAINT workspaceSettings_id PRIMARY KEY(id),
-          CONSTRAINT workspaceSettings_workspaceId_unique UNIQUE(workspaceId)
-        )
-      `);
-      console.log("[Migrations] workspaceSettings table ready ✓");
-    } catch (e: any) { console.warn("[Migrations] workspaceSettings:", e?.message); }
 
     console.log("[Migrations] All migrations complete ✓");
   } catch (error: any) {
@@ -109,9 +140,7 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
-  // Trust Railway's proxy so secure cookies work correctly
   app.set("trust proxy", 1);
-
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
