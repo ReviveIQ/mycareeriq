@@ -1,7 +1,7 @@
 /**
  * Document Intake Router
- * Parses uploaded documents (PDF/DOCX) using OpenAI directly.
- * No external storage required - content sent directly to LLM.
+ * Parses uploaded documents using OpenAI directly.
+ * Extracts text from the buffer and sends to GPT-4o.
  */
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -12,24 +12,22 @@ import { getDb } from "./db";
 import { TRPCError } from "@trpc/server";
 
 function getSystemPrompt(documentType: string): string {
-  const type = documentType.toLowerCase();
+  if (documentType === "resume" || documentType === "cv") {
+    return `You are a resume parser. Extract structured data from this resume text.
 
-  if (type === "resume" || type === "cv") {
-    return `You are a resume parser. Extract structured data from this resume.
-
-Extract these fields:
+Return a JSON object with:
 - candidateName: full name
-- targetRoles: array of 4-6 REAL, job-board-searchable titles (e.g. "Enterprise Account Executive", "Strategic Account Manager", "VP of Sales") - NO made-up titles
-- targetIndustries: array of 3-5 real industries (e.g. "B2B SaaS", "Revenue Intelligence", "Sales Enablement", "EdTech")
+- targetRoles: array of 4-6 REAL searchable job titles (e.g. "Enterprise Account Executive", "Strategic Account Manager", "VP of Sales", "Director of Business Development")
+- targetIndustries: array of 3-5 industries (e.g. "B2B SaaS", "Revenue Intelligence", "Sales Enablement", "EdTech", "CRM")  
 - skills: array of top 8 skills
-- seniorityLevel: one of "entry", "mid", "senior", "executive"
+- seniorityLevel: "entry", "mid", "senior", or "executive"
 - yearsOfExperience: number
 - summary: 2 sentence professional summary
 
-Return ONLY valid JSON. No markdown, no preamble.`;
+IMPORTANT: targetRoles must be real job titles recruiters actually post. No made-up titles.
+Return ONLY valid JSON. No markdown, no explanation.`;
   }
-
-  return `You are a document intelligence system. Parse this ${documentType} and extract the most relevant structured data as JSON. Return ONLY valid JSON.`;
+  return `Parse this ${documentType} document and extract structured data as JSON. Return ONLY valid JSON.`;
 }
 
 function stripJsonFences(raw: string): string {
@@ -38,6 +36,22 @@ function stripJsonFences(raw: string): string {
     text = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
   }
   return text.trim();
+}
+
+function extractTextFromBuffer(buffer: Buffer, mimeType: string): string {
+  // Extract readable text from the buffer
+  // For PDFs, try to get UTF-8 text content
+  // For DOCX, extract what we can
+  const raw = buffer.toString("utf-8");
+  
+  // Remove non-printable characters but keep spaces, newlines, tabs
+  const cleaned = raw
+    .replace(/[^\x20-\x7E\n\r\t]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  
+  // Return up to 8000 chars to stay within token limits
+  return cleaned.slice(0, 8000);
 }
 
 export const documentIntakeRouter = router({
@@ -64,119 +78,84 @@ export const documentIntakeRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Uploaded file is empty" });
       }
 
-      let extractedText = "";
-
-      // For PDFs, use OpenAI's file upload API
-      if (input.mimeType === "application/pdf") {
-        try {
-          // Upload file to OpenAI Files API
-          const FormData = (await import("form-data")).default;
-          const form = new FormData();
-          form.append("file", buffer, {
-            filename: input.fileName,
-            contentType: "application/pdf",
-          });
-          form.append("purpose", "assistants");
-
-          const uploadRes = await fetch("https://api.openai.com/v1/files", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-              ...form.getHeaders(),
-            },
-            body: form as any,
-          });
-
-          if (uploadRes.ok) {
-            const fileData = await uploadRes.json() as any;
-            const fileId = fileData.id;
-
-            // Use the file with GPT-4
-            const chatRes = await fetch("https://api.openai.com/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${apiKey}`,
-              },
-              body: JSON.stringify({
-                model: "gpt-4o",
-                messages: [
-                  { role: "system", content: getSystemPrompt(input.documentType) },
-                  {
-                    role: "user",
-                    content: [
-                      { type: "text", text: `Parse this ${input.documentType} and return structured JSON.` },
-                      { type: "file", file: { file_id: fileId } },
-                    ],
-                  },
-                ],
-                max_tokens: 1000,
-              }),
-            });
-
-            if (chatRes.ok) {
-              const chatData = await chatRes.json() as any;
-              extractedText = chatData.choices?.[0]?.message?.content || "";
-            }
-
-            // Clean up the file
-            fetch(`https://api.openai.com/v1/files/${fileId}`, {
-              method: "DELETE",
-              headers: { Authorization: `Bearer ${apiKey}` },
-            }).catch(() => {});
-          }
-        } catch (e) {
-          console.warn("[DocumentIntake] File upload failed, falling back to text extraction:", e);
-        }
-      }
-
-      // Fallback: extract text from buffer and send as text
-      if (!extractedText) {
-        const textContent = buffer.toString("utf-8").replace(/[^\x20-\x7E\n\r\t]/g, " ").replace(/\s+/g, " ").trim().slice(0, 8000);
-
-        const chatRes = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model: "gpt-4o",
-            messages: [
-              { role: "system", content: getSystemPrompt(input.documentType) },
-              { role: "user", content: `Parse this ${input.documentType} document:\n\n${textContent}` },
-            ],
-            max_tokens: 1000,
-          }),
+      // Extract text content from the document
+      const textContent = extractTextFromBuffer(buffer, input.mimeType);
+      
+      if (!textContent || textContent.length < 50) {
+        throw new TRPCError({ 
+          code: "BAD_REQUEST", 
+          message: "Could not extract text from document. Please ensure it is a text-based PDF or Word document." 
         });
-
-        if (!chatRes.ok) {
-          const err = await chatRes.text();
-          console.error("[DocumentIntake] OpenAI error:", err);
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to analyze document" });
-        }
-
-        const chatData = await chatRes.json() as any;
-        extractedText = chatData.choices?.[0]?.message?.content || "";
       }
 
-      if (!extractedText) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Document analysis returned empty response" });
+      console.log(`[DocumentIntake] Analyzing ${input.fileName} (${textContent.length} chars)`);
+
+      // Send to OpenAI
+      const chatRes = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: [
+            { role: "system", content: getSystemPrompt(input.documentType) },
+            { 
+              role: "user", 
+              content: `Parse this ${input.documentType}:\n\n${textContent}` 
+            },
+          ],
+          max_tokens: 1000,
+          temperature: 0.1,
+        }),
+      });
+
+      if (!chatRes.ok) {
+        const err = await chatRes.text();
+        console.error("[DocumentIntake] OpenAI error:", err);
+        throw new TRPCError({ 
+          code: "INTERNAL_SERVER_ERROR", 
+          message: "Failed to analyze document - OpenAI error" 
+        });
+      }
+
+      const chatData = await chatRes.json() as any;
+      const rawText = chatData.choices?.[0]?.message?.content || "";
+
+      if (!rawText) {
+        throw new TRPCError({ 
+          code: "INTERNAL_SERVER_ERROR", 
+          message: "Document analysis returned empty response" 
+        });
       }
 
       let extracted: Record<string, unknown>;
       try {
-        extracted = JSON.parse(stripJsonFences(extractedText));
+        extracted = JSON.parse(stripJsonFences(rawText));
       } catch {
-        console.error("[DocumentIntake] JSON parse failed:", extractedText);
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to parse document analysis results" });
+        console.error("[DocumentIntake] JSON parse failed:", rawText);
+        throw new TRPCError({ 
+          code: "INTERNAL_SERVER_ERROR", 
+          message: "Failed to parse document analysis results" 
+        });
       }
+
+      console.log(`[DocumentIntake] Successfully parsed for: ${extracted.candidateName}`);
 
       // Persist to researchConfig
       const db = await getDb();
       if (db) {
         try {
-          const existing = await db.select().from(researchConfig).where(eq(researchConfig.userId, ctx.user.id)).limit(1);
+          const existing = await db.select().from(researchConfig)
+            .where(eq(researchConfig.userId, ctx.user.id)).limit(1);
+          
+          const parsedDoc = { 
+            documentType: input.documentType, 
+            parsedAt: new Date().toISOString(), 
+            extracted 
+          };
+
           if (existing.length === 0) {
             await db.insert(researchConfig).values({
               userId: ctx.user.id,
@@ -187,13 +166,13 @@ export const documentIntakeRouter = router({
               enabled: 1,
               documentType: input.documentType,
               documentFileName: input.fileName,
-              lastDocumentParsed: { documentType: input.documentType, parsedAt: new Date().toISOString(), extracted } as any,
+              lastDocumentParsed: parsedDoc as any,
             });
           } else {
             await db.update(researchConfig).set({
               documentType: input.documentType,
               documentFileName: input.fileName,
-              lastDocumentParsed: { documentType: input.documentType, parsedAt: new Date().toISOString(), extracted } as any,
+              lastDocumentParsed: parsedDoc as any,
             }).where(eq(researchConfig.userId, ctx.user.id));
           }
         } catch (err) {
@@ -219,8 +198,12 @@ export const documentIntakeRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
-      const existing = await db.select().from(researchConfig).where(eq(researchConfig.userId, ctx.user.id)).limit(1);
-      if (existing.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "No research config found. Parse a document first." });
+      const existing = await db.select().from(researchConfig)
+        .where(eq(researchConfig.userId, ctx.user.id)).limit(1);
+      
+      if (existing.length === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "No research config found. Parse a document first." });
+      }
 
       const last = existing[0].lastDocumentParsed as any;
       const rolesArr = input?.targetRoles || (last?.extracted?.targetRoles as string[]) || [];
@@ -230,9 +213,14 @@ export const documentIntakeRouter = router({
       if (rolesArr.length) updateData.targetRoles = rolesArr.join(",");
       if (catsArr.length) updateData.targetCategories = catsArr.join(",");
 
-      await db.update(researchConfig).set(updateData).where(eq(researchConfig.userId, ctx.user.id));
+      await db.update(researchConfig).set(updateData)
+        .where(eq(researchConfig.userId, ctx.user.id));
 
-      return { success: true as const, appliedTargetRoles: rolesArr, appliedTargetCategories: catsArr };
+      return { 
+        success: true as const, 
+        appliedTargetRoles: rolesArr, 
+        appliedTargetCategories: catsArr 
+      };
     }),
 
   getLastParsed: protectedProcedure.query(async ({ ctx }) => {
@@ -244,7 +232,8 @@ export const documentIntakeRouter = router({
       documentFileName: researchConfig.documentFileName,
       lastDocumentParsed: researchConfig.lastDocumentParsed,
       updatedAt: researchConfig.updatedAt,
-    }).from(researchConfig).where(eq(researchConfig.userId, ctx.user.id)).limit(1);
+    }).from(researchConfig)
+      .where(eq(researchConfig.userId, ctx.user.id)).limit(1);
 
     if (rows.length === 0 || !rows[0].lastDocumentParsed) return null;
 
