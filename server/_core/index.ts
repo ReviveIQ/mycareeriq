@@ -17,7 +17,6 @@ async function runMigrations() {
     const db = await getDb();
     if (!db) return;
 
-    // Add passwordHash column if it doesn't exist
     try {
       await db.execute(`ALTER TABLE users ADD COLUMN passwordHash varchar(255)`);
       console.log("[Migrations] passwordHash column added ✓");
@@ -27,7 +26,6 @@ async function runMigrations() {
       } else { console.warn("[Migrations] passwordHash:", e?.message); }
     }
 
-    // Create workspaces table if not exists
     try {
       await db.execute(`
         CREATE TABLE IF NOT EXISTS workspaces (
@@ -47,7 +45,6 @@ async function runMigrations() {
       console.log("[Migrations] workspaces table ready ✓");
     } catch (e: any) { console.warn("[Migrations] workspaces:", e?.message); }
 
-    // Create workspaceMembers table if not exists
     try {
       await db.execute(`
         CREATE TABLE IF NOT EXISTS workspaceMembers (
@@ -64,7 +61,6 @@ async function runMigrations() {
       console.log("[Migrations] workspaceMembers table ready ✓");
     } catch (e: any) { console.warn("[Migrations] workspaceMembers:", e?.message); }
 
-    // Create workspaceSettings table if not exists
     try {
       await db.execute(`
         CREATE TABLE IF NOT EXISTS workspaceSettings (
@@ -112,6 +108,9 @@ async function startServer() {
 
   const app = express();
   const server = createServer(app);
+
+  // Trust Railway's proxy so secure cookies work correctly
+  app.set("trust proxy", 1);
 
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
