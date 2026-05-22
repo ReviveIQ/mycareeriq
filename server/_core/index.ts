@@ -82,6 +82,11 @@ async function runMigrations() {
         CONSTRAINT subscriptions_workspaceId_unique UNIQUE(workspaceId)
       )`,
 
+      
+      // researchConfig document columns (migration 0012)
+      `ALTER TABLE researchConfig ADD COLUMN documentType varchar(50) DEFAULT 'resume'`,
+      `ALTER TABLE researchConfig ADD COLUMN documentFileName varchar(255)`,
+      `ALTER TABLE researchConfig ADD COLUMN lastDocumentParsed json`,
       // workspaceInvitations table
       `CREATE TABLE IF NOT EXISTS workspaceInvitations (
         id int AUTO_INCREMENT NOT NULL,
