@@ -22,12 +22,19 @@ function slugify(str: string): string {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
-function stripJsonFences(raw: string): string {
-  let text = raw.trim();
-  if (text.startsWith("```")) {
-    text = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
-  }
-  return text.trim();
+function getPriority(job: any): "High" | "Medium" | "Low" {
+  const title = (job.title || "").toLowerCase();
+  if (title.includes("vp") || title.includes("director") || title.includes("senior")) return "High";
+  if (title.includes("manager") || title.includes("lead")) return "Medium";
+  return "Low";
+}
+
+function formatSalary(job: any): string {
+  const min = job.salary_min;
+  const max = job.salary_max;
+  if (min && max) return `$${Math.round(min / 1000)}k - $${Math.round(max / 1000)}k`;
+  if (min) return `From $${Math.round(min / 1000)}k`;
+  return "Competitive";
 }
 
 export async function researchNewJobs(count?: number, userId: number = 1): Promise<GeneratedJob[]> {
@@ -38,118 +45,81 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
   const config = configs[0];
 
   const targetRoles = config?.targetRoles?.toString() || "Account Executive";
-  const targetCategories = config?.targetCategories?.toString() || "B2B SaaS";
   const requestedCount = Math.min(count || 10, 10);
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
+  const adzunaAppId = process.env.ADZUNA_APP_ID;
+  const adzunaAppKey = process.env.ADZUNA_APP_KEY;
 
-  console.log(`[JobResearchService] Researching ${requestedCount} real jobs via OpenAI web search`);
-
-  const prompt = `Search for ${requestedCount} REAL, currently open job postings for these roles: ${targetRoles}
-In these industries: ${targetCategories}
-
-For each real job you find, return:
-- companyName: the actual company name
-- jobTitle: the actual job title from the posting  
-- category: the industry
-- jobDescription: 2-3 sentences from the actual job description
-- jobLink: the real URL to apply (LinkedIn, company careers page, Indeed, etc)
-- salary: compensation range if listed, otherwise "Competitive"
-- remote: true or false
-- priority: "High" for Fortune 500 or fast-growing SaaS, "Medium" for mid-market, "Low" for others
-- hiringCompanyLinkedIn: company LinkedIn URL
-
-Focus on companies that are well-known in B2B SaaS, Revenue Intelligence, Sales Enablement.
-Only include jobs posted in the last 30 days.
-
-Return ONLY a valid JSON array of ${requestedCount} jobs. No markdown, no explanation.`;
-
-  const chatRes = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-search-preview",
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      max_tokens: 4000,
-    }),
-  });
-
-  if (!chatRes.ok) {
-    const err = await chatRes.text();
-    console.error("[JobResearchService] OpenAI error:", err);
-    
-    // Fallback to gpt-4o without web search if search-preview not available
-    return researchJobsWithGpt4o(targetRoles, targetCategories, requestedCount, apiKey);
+  if (!adzunaAppId || !adzunaAppKey) {
+    throw new Error("ADZUNA_APP_ID and ADZUNA_APP_KEY are required");
   }
 
-  const chatData = await chatRes.json() as any;
-  const rawText = chatData.choices?.[0]?.message?.content || "";
+  const roles = targetRoles.split(",").map(r => r.trim()).slice(0, 3);
+  const jobs: GeneratedJob[] = [];
 
-  if (!rawText) {
-    return researchJobsWithGpt4o(targetRoles, targetCategories, requestedCount, apiKey);
+  for (const role of roles) {
+    if (jobs.length >= requestedCount) break;
+
+    const query = encodeURIComponent(role);
+    const url = `https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=${adzunaAppId}&app_key=${adzunaAppKey}&what=${query}&results_per_page=5&sort_by=date&max_days_old=30&content-type=application/json`;
+
+    console.log(`[JobResearchService] Searching Adzuna for: ${role}`);
+
+    try {
+      const res = await fetch(url);
+      const responseText = await res.text();
+      console.log(`[JobResearchService] Adzuna status: ${res.status}, preview: ${responseText.slice(0, 100)}`);
+
+      if (!res.ok) {
+        console.error(`[JobResearchService] Adzuna error: ${res.status} - ${responseText}`);
+        continue;
+      }
+
+      const data = JSON.parse(responseText) as any;
+      const results = data?.results || [];
+
+      console.log(`[JobResearchService] Found ${results.length} real jobs for: ${role}`);
+
+      for (const job of results) {
+        if (jobs.length >= requestedCount) break;
+
+        const companyName = job.company?.display_name || "Unknown Company";
+        jobs.push({
+          companyName,
+          companyId: `${slugify(companyName)}-${Date.now()}-${Math.random().toString(36).slice(2,5)}`,
+          jobTitle: job.title || role,
+          category: job.category?.label || "B2B SaaS",
+          contactName: "",
+          contactEmail: "",
+          linkedinUrl: "",
+          jobDescription: job.description?.slice(0, 500) || "",
+          jobLink: job.redirect_url || "",
+          salary: formatSalary(job),
+          remote: (job.title || "").toLowerCase().includes("remote") || 
+                  (job.description || "").toLowerCase().includes("remote"),
+          priority: getPriority(job),
+          source: "Adzuna",
+        });
+      }
+    } catch (err) {
+      console.error(`[JobResearchService] Error fetching from Adzuna for ${role}:`, err);
+    }
   }
 
-  try {
-    const parsed = JSON.parse(stripJsonFences(rawText));
-    const jobs = Array.isArray(parsed) ? parsed : [];
-    
-    console.log(`[JobResearchService] Found ${jobs.length} jobs via web search`);
-    
-    return jobs.map((job: any) => ({
-      companyName: job.companyName || "Unknown Company",
-      companyId: slugify(job.companyName || "company"),
-      jobTitle: job.jobTitle || targetRoles.split(",")[0],
-      category: job.category || targetCategories.split(",")[0],
-      contactName: "",
-      contactEmail: "",
-      linkedinUrl: job.hiringCompanyLinkedIn || "",
-      jobDescription: job.jobDescription || "",
-      jobLink: job.jobLink || "",
-      salary: job.salary || "Competitive",
-      remote: job.remote === true,
-      priority: ["High", "Medium", "Low"].includes(job.priority) ? job.priority : "Medium",
-      source: "OpenAI Web Search",
-    }));
-  } catch {
-    return researchJobsWithGpt4o(targetRoles, targetCategories, requestedCount, apiKey);
+  console.log(`[JobResearchService] Total real jobs found: ${jobs.length}`);
+
+  // If Adzuna returned nothing, fall back to AI-generated with real companies
+  if (jobs.length === 0) {
+    console.log("[JobResearchService] No Adzuna results, falling back to AI research");
+    return fallbackAiResearch(targetRoles, requestedCount);
   }
+
+  return jobs;
 }
 
-// Fallback: use gpt-4o without web search for well-known companies
-async function researchJobsWithGpt4o(
-  targetRoles: string,
-  targetCategories: string,
-  count: number,
-  apiKey: string
-): Promise<GeneratedJob[]> {
-  console.log("[JobResearchService] Falling back to gpt-4o research");
-
-  const prompt = `Generate ${count} realistic job opportunities for someone targeting these roles: ${targetRoles}
-In these industries: ${targetCategories}
-
-Use ONLY real, well-known companies that actively hire for these roles (e.g. Salesforce, HubSpot, Gong, Outreach, Clari, Salesloft, ZoomInfo, Seismic, Highspot, Mindtickle, Chorus.ai, Revenue.io, Drift, 6sense, Demandbase, Gainsight, ChurnZero, Totango).
-
-For each job return:
-- companyName: real company name
-- jobTitle: realistic title matching target roles
-- category: industry
-- jobDescription: 2-3 sentences describing the role
-- jobLink: real careers page URL (e.g. https://salesforce.com/careers)
-- salary: realistic range (e.g. "$120,000 - $160,000 + commission")
-- remote: true or false
-- priority: "High", "Medium", or "Low"
-- hiringCompanyLinkedIn: real LinkedIn company URL
-
-Return ONLY a valid JSON array. No markdown, no preamble.`;
+async function fallbackAiResearch(targetRoles: string, count: number): Promise<GeneratedJob[]> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY not configured");
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -160,47 +130,35 @@ Return ONLY a valid JSON array. No markdown, no preamble.`;
     body: JSON.stringify({
       model: "gpt-4o",
       messages: [
-        { role: "system", content: "You are a job market research assistant. Return only valid JSON arrays." },
-        { role: "user", content: prompt },
+        { role: "system", content: "Return only valid JSON arrays." },
+        { role: "user", content: `Generate ${count} realistic job opportunities for: ${targetRoles}. Use only real companies: Salesforce, HubSpot, Gong, Outreach, Clari, Salesloft, ZoomInfo, Seismic, Highspot, 6sense, Demandbase, Gainsight, Drift, Chorus.ai. Return JSON array with: companyName, jobTitle, category, jobDescription (2 sentences), jobLink (real careers URL), salary, remote (bool), priority (High/Medium/Low). No markdown.` },
       ],
-      max_tokens: 4000,
+      max_tokens: 3000,
       temperature: 0.3,
     }),
   });
 
   if (!res.ok) throw new Error(`OpenAI error: ${await res.text()}`);
-
   const data = await res.json() as any;
-  const rawText = data.choices?.[0]?.message?.content || "";
-
-  // Repair truncated JSON
-  let jsonStr = rawText.trim();
-  if (jsonStr.startsWith("```")) {
-    jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
-  }
-  if (!jsonStr.endsWith("]")) {
-    const last = jsonStr.lastIndexOf("}");
-    if (last > 0) jsonStr = jsonStr.slice(0, last + 1) + "]";
+  let text = (data.choices?.[0]?.message?.content || "").trim();
+  if (text.startsWith("```")) text = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
+  if (!text.endsWith("]")) {
+    const last = text.lastIndexOf("}");
+    if (last > 0) text = text.slice(0, last + 1) + "]";
   }
 
-  const parsed = JSON.parse(jsonStr);
-  const jobs = Array.isArray(parsed) ? parsed : [];
-
-  console.log(`[JobResearchService] Generated ${jobs.length} jobs via gpt-4o`);
-
-  return jobs.map((job: any) => ({
-    companyName: job.companyName || "Unknown Company",
-    companyId: `${slugify(job.companyName || "company")}-${Date.now()}`,
-    jobTitle: job.jobTitle || targetRoles.split(",")[0],
-    category: job.category || targetCategories.split(",")[0],
-    contactName: "",
-    contactEmail: "",
-    linkedinUrl: job.hiringCompanyLinkedIn || "",
-    jobDescription: job.jobDescription || "",
-    jobLink: job.jobLink || "",
-    salary: job.salary || "Competitive",
-    remote: job.remote === true,
-    priority: ["High", "Medium", "Low"].includes(job.priority) ? job.priority : "Medium",
+  const parsed = JSON.parse(text);
+  return (Array.isArray(parsed) ? parsed : []).map((j: any) => ({
+    companyName: j.companyName || "Unknown",
+    companyId: `${slugify(j.companyName || "co")}-${Date.now()}`,
+    jobTitle: j.jobTitle || targetRoles.split(",")[0],
+    category: j.category || "B2B SaaS",
+    contactName: "", contactEmail: "", linkedinUrl: "",
+    jobDescription: j.jobDescription || "",
+    jobLink: j.jobLink || "",
+    salary: j.salary || "Competitive",
+    remote: j.remote === true,
+    priority: ["High","Medium","Low"].includes(j.priority) ? j.priority : "Medium",
     source: "AI Research",
   }));
 }
@@ -210,12 +168,11 @@ export async function addJobsToPipeline(jobs: GeneratedJob[], userId: number = 1
   if (!db) throw new Error("Database not available");
 
   let addedCount = 0;
-
   for (const job of jobs) {
     try {
       await db.insert(companies).values({
         userId,
-        companyId: `${job.companyId}-${Math.random().toString(36).slice(2, 6)}`,
+        companyId: job.companyId,
         companyName: job.companyName,
         category: job.category,
         jobTitle: job.jobTitle,
