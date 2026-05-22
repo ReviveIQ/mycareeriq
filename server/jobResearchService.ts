@@ -58,14 +58,20 @@ For each opportunity return a JSON object with these exact fields:
 
 Return ONLY a valid JSON array. No markdown, no explanation, no preamble. Start with [ and end with ].`;
 
-    const response = await invokeLLM({
+    const invokeResult = await invokeLLM({
       system: "You are a precise job market research assistant. Always return valid JSON arrays only.",
       prompt,
       max_tokens: 4000,
     });
 
-    // Clean and parse response
-    let jsonStr = response.trim();
+    // Extract text content from InvokeResult
+    const rawContent = invokeResult.choices?.[0]?.message?.content;
+    const responseText = typeof rawContent === "string" 
+      ? rawContent 
+      : Array.isArray(rawContent) 
+        ? (rawContent as any[]).map((p: any) => p?.text || "").join("") 
+        : "";
+    let jsonStr = responseText.trim();
     if (jsonStr.startsWith("```")) {
       jsonStr = jsonStr.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     }
