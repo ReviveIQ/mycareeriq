@@ -1,4 +1,5 @@
 import { getDb } from "./db";
+import { buildLinkedInUrl, findCompanyLinkedIn } from "./linkedinService";
 import { getDomainInfo, extractDomain } from "./hunterService";
 import { companies, researchConfig } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
@@ -148,7 +149,7 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
           category: job.category?.label || "B2B SaaS",
           contactName,
           contactEmail,
-          linkedinUrl: companyDomain ? `https://www.linkedin.com/company/${slugify(companyName)}` : "",
+          linkedinUrl: await findCompanyLinkedIn(companyName),
           jobDescription: job.description?.slice(0, 500) || "",
           jobLink: job.redirect_url || "",
           salary: formatSalary(job),
