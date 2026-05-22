@@ -1,5 +1,5 @@
 import { getDb } from "./db";
-import { domainSearch, extractDomain } from "./hunterService";
+import { getDomainInfo, extractDomain } from "./hunterService";
 import { companies, researchConfig } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 
@@ -96,7 +96,7 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
           try {
             const domain = extractDomain(companyName);
             companyDomain = domain;
-            const hunterData = await domainSearch(domain);
+            const hunterData = await getDomainInfo(domain);
             
             // Find the most senior sales/revenue contact
             const seniorTitles = ["vp", "vice president", "director", "head of", "chief"];

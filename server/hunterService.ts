@@ -180,28 +180,57 @@ export async function verifyEmail(email: string) {
  * @param companyName Company name or domain
  * @returns Domain (e.g., "gong.io")
  */
+// Known company domains for accurate Hunter lookups
+const KNOWN_DOMAINS: Record<string, string> = {
+  "salesforce": "salesforce.com",
+  "hubspot": "hubspot.com",
+  "gong": "gong.io",
+  "outreach": "outreach.io",
+  "clari": "clari.com",
+  "salesloft": "salesloft.com",
+  "zoominfo": "zoominfo.com",
+  "seismic": "seismic.com",
+  "highspot": "highspot.com",
+  "6sense": "6sense.com",
+  "demandbase": "demandbase.com",
+  "gainsight": "gainsight.com",
+  "drift": "drift.com",
+  "chorus": "chorus.ai",
+  "mindtickle": "mindtickle.com",
+  "revenue": "revenue.io",
+  "churnzero": "churnzero.com",
+  "totango": "totango.com",
+  "rocket software": "rocketsoftware.com",
+  "ey": "ey.com",
+  "ernst & young": "ey.com",
+  "deloitte": "deloitte.com",
+  "pwc": "pwc.com",
+  "oracle": "oracle.com",
+  "sap": "sap.com",
+  "microsoft": "microsoft.com",
+  "google": "google.com",
+  "amazon": "amazon.com",
+  "linkedin": "linkedin.com",
+};
+
 export function extractDomain(companyName: string): string {
-  // If it looks like a domain, return it
   if (companyName.includes(".")) {
     return companyName.toLowerCase();
   }
 
-  // Otherwise, try to convert company name to domain
-  // This is a simple heuristic and may not always work
-  const normalized = companyName
-    .toLowerCase()
-    .replace(/\s+/g, "")
-    .replace(/[&/]/g, "");
-
-  // Common domain extensions
-  const extensions = ["io", "com", "co", "ai", "app"];
-
-  for (const ext of extensions) {
-    // Try the most common extension first
-    if (ext === "io" || ext === "com") {
-      return `${normalized}.${ext}`;
+  // Check known domains first
+  const normalized = companyName.toLowerCase().trim();
+  for (const [key, domain] of Object.entries(KNOWN_DOMAINS)) {
+    if (normalized.includes(key) || key.includes(normalized)) {
+      return domain;
     }
   }
 
-  return `${normalized}.com`;
+  // Fall back to simple heuristic
+  const cleaned = normalized
+    .replace(/\s+/g, "")
+    .replace(/[&,./]/g, "")
+    .replace(/inc$|llc$|corp$|ltd$/, "");
+
+  return `${cleaned}.com`;
 }
