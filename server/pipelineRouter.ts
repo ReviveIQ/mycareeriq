@@ -3,6 +3,20 @@ import { getDb } from "./db";
 import { companies as companiesTable } from "../drizzle/schema";
 import { eq, desc } from "drizzle-orm";
 
+
+// Map Adzuna/external categories to pipeline categories
+function mapCategory(raw: string): string {
+  const cat = (raw || "").toLowerCase();
+  if (cat.includes("sales") || cat.includes("account")) return "Sales Enablement";
+  if (cat.includes("revenue") || cat.includes("finance")) return "Revenue Intelligence";
+  if (cat.includes("customer") || cat.includes("success")) return "Customer Success";
+  if (cat.includes("marketing")) return "Marketing Automation";
+  if (cat.includes("hr") || cat.includes("recruit") || cat.includes("talent")) return "HR / Workforce Tech";
+  if (cat.includes("tech") || cat.includes("software") || cat.includes("saas")) return "Sales Enablement";
+  if (cat.includes("edtech") || cat.includes("education")) return "EdTech SaaS";
+  return "Sales Enablement"; // Default
+}
+
 export const pipelineRouter = router({
   // Get all researched companies for the user's pipeline
   getCompanies: protectedProcedure.query(async ({ ctx }) => {
@@ -23,7 +37,7 @@ export const pipelineRouter = router({
       const companies = jobs.map((job) => ({
         id: job.id,
         name: job.companyName,
-        category: job.category as any,
+        category: mapCategory(job.category || "") as any,
         stage: job.stage as "Research" | "Outreach" | "Applied" | "Interviewing" | "Offer" | "Rejected",
         role: job.jobTitle || "",
         jobLink: job.jobLink || "",
