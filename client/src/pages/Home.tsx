@@ -181,6 +181,10 @@ export default function Home() {
 
   const handleRunNow = async () => {
     setIsRunning(true);
+    setActiveTab("pipeline"); // Switch to pipeline tab immediately
+    setStageFilter("All");    // Reset filters
+    setCategoryFilter("All");
+    setPriorityFilter("All");
     try {
       const result = await runResearch.mutateAsync();
       if (result.success) {
