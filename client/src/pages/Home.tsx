@@ -764,7 +764,7 @@ export default function Home() {
           <ApplicationHistory />
         )}
 
-        {activeTab === "settings" && <ResearchSettings />}
+        {activeTab === "settings" && <ResearchSettings onRunComplete={() => { setActiveTab("pipeline"); setStageFilter("All"); setCategoryFilter("All"); setPriorityFilter("All"); }} />}
       </main>
 
       {/* Company Detail Modal */}

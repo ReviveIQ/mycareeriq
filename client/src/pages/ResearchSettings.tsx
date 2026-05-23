@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { DocumentIntake } from "@/components/DocumentIntake";
 import { RoleSelector } from "@/components/RoleSelector";
 
-export default function ResearchSettings() {
+export default function ResearchSettings({ onRunComplete }: { onRunComplete?: () => void } = {}) {
   const [targetRoles, setTargetRoles] = useState("");
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [usHiringOnly, setUsHiringOnly] = useState(true);
@@ -70,6 +70,7 @@ export default function ResearchSettings() {
       const result = await runResearch.mutateAsync();
       if (result.success) {
         toast.success(`✅ Research completed! Added ${result.jobsAdded} jobs to your pipeline`);
+        onRunComplete?.();
       } else {
         toast.error(`Failed: ${result.message}`);
       }
