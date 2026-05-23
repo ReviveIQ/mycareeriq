@@ -57,6 +57,7 @@ import { toast } from "sonner";
 import GenerateApplication from "./GenerateApplication";
 import ApplicationHistory from "./ApplicationHistory";
 import ResearchSettings from "./ResearchSettings";
+import { StageSelector } from "@/components/StageSelector";
 import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
 import { useLocation } from "wouter";
 
@@ -79,10 +80,17 @@ export default function Home() {
   const [, navigate] = useLocation();
 
   // Fetch pipeline data from tRPC
-  const { data: pipelineData = [], isLoading } = trpc.pipeline.getCompanies.useQuery();
-  const { data: companyCount = 0 } = trpc.pipeline.getCompanyCount.useQuery();
-  const { data: highPriorityCount = 0 } = trpc.pipeline.getHighPriority.useQuery();
-  const { data: remoteCount = 0 } = trpc.pipeline.getRemoteCount.useQuery();
+  const { data: pipelineData = [], isLoading, refetch: refetchPipeline } = trpc.pipeline.getCompanies.useQuery(
+    undefined,
+    { 
+      refetchOnMount: true,
+      refetchOnWindowFocus: true,
+      staleTime: 0,
+    }
+  );
+  const { data: companyCount = 0 } = trpc.pipeline.getCompanyCount.useQuery(undefined, { staleTime: 0 });
+  const { data: highPriorityCount = 0 } = trpc.pipeline.getHighPriority.useQuery(undefined, { staleTime: 0 });
+  const { data: remoteCount = 0 } = trpc.pipeline.getRemoteCount.useQuery(undefined, { staleTime: 0 });
   const runResearch = trpc.monitoring.runNow.useMutation();
   const utils = trpc.useUtils();
 
@@ -472,13 +480,10 @@ export default function Home() {
                           <span className="line-clamp-2 text-xs leading-relaxed">{company.role}</span>
                         </td>
                         <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border ${
-                              stageColors[company.stage]
-                            }`}
-                          >
-                            {company.stage}
-                          </span>
+                          <StageSelector
+                            companyId={company.id}
+                            currentStage={(company.stage || "Research") as any}
+                          />
                         </td>
                         <td className="px-4 py-3">
                           <span
