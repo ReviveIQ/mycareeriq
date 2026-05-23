@@ -131,7 +131,9 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
               contactName = `${selectedContact.first_name || ""} ${selectedContact.last_name || ""}`.trim();
               contactEmail = selectedContact.email || "";
               contactTitle = selectedContact.position || "";
-              contactLinkedInUrl = buildContactLinkedIn(selectedContact.first_name || "", selectedContact.last_name || "");
+              // Use Hunter's verified LinkedIn URL if available, otherwise construct one
+              contactLinkedInUrl = selectedContact.linkedin_url || 
+                buildContactLinkedIn(selectedContact.first_name || "", selectedContact.last_name || "");
               console.log(`[JobResearchService] Found contact at ${companyName}: ${contactName} (${contactTitle})`);
             } else {
               console.log(`[JobResearchService] No sales contact found at ${companyName} - skipping`);
