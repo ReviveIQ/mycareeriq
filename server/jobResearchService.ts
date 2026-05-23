@@ -1,5 +1,5 @@
 import { getDb } from "./db";
-import { buildLinkedInUrl, findCompanyLinkedIn } from "./linkedinService";
+import { buildLinkedInUrl, findCompanyLinkedIn, buildContactLinkedIn } from "./linkedinService";
 import { getDomainInfo, extractDomain } from "./hunterService";
 import { companies, researchConfig } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
@@ -18,6 +18,7 @@ export interface GeneratedJob {
   remote: boolean;
   priority: "High" | "Medium" | "Low";
   source: string;
+  contactLinkedIn: string;
 }
 
 function slugify(str: string): string {
@@ -96,6 +97,7 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
         let contactEmail = "";
         let contactTitle = "";
         let companyDomain = "";
+        let contactLinkedInUrl = "";
         
         if (process.env.HUNTER_API_KEY) {
           try {
@@ -129,6 +131,7 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
               contactName = `${selectedContact.first_name || ""} ${selectedContact.last_name || ""}`.trim();
               contactEmail = selectedContact.email || "";
               contactTitle = selectedContact.position || "";
+              contactLinkedInUrl = buildContactLinkedIn(selectedContact.first_name || "", selectedContact.last_name || "");
               console.log(`[JobResearchService] Found contact at ${companyName}: ${contactName} (${contactTitle})`);
             } else {
               console.log(`[JobResearchService] No sales contact found at ${companyName} - skipping`);
@@ -154,6 +157,7 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
           contactName,
           contactEmail,
           linkedinUrl: await findCompanyLinkedIn(companyName),
+          contactLinkedIn: contactLinkedInUrl,
           jobDescription: job.description?.slice(0, 500) || "",
           jobLink: job.redirect_url || "",
           salary: formatSalary(job),
@@ -243,6 +247,7 @@ export async function addJobsToPipeline(jobs: GeneratedJob[], userId: number = 1
         contactName: job.contactName,
         contactEmail: job.contactEmail,
         linkedinUrl: job.linkedinUrl,
+        contactLinkedIn: (job as any).contactLinkedIn || "",
         remote: job.remote,
         salary: job.salary,
         companySize: "",

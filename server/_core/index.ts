@@ -65,6 +65,7 @@ async function runMigrations() {
         contactName varchar(255) DEFAULT '',
         contactEmail varchar(320) DEFAULT '',
         linkedinUrl varchar(500) DEFAULT '',
+        contactLinkedIn varchar(500) DEFAULT '',
         remote boolean DEFAULT false,
         salary varchar(255) DEFAULT '',
         companySize varchar(100) DEFAULT '',
@@ -78,6 +79,8 @@ async function runMigrations() {
 
       // passwordHash column (for existing databases)
       `ALTER TABLE users ADD COLUMN passwordHash varchar(255)`,
+      // Add contactLinkedIn column
+      `ALTER TABLE companies ADD COLUMN contactLinkedIn varchar(500) DEFAULT ''`,
       // Expand jobLink column size for long Adzuna URLs
       `ALTER TABLE companies MODIFY COLUMN jobLink varchar(2000) DEFAULT ''`,
 

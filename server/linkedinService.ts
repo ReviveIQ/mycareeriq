@@ -105,4 +105,14 @@ function buildLinkedInUrl(companyName: string): string {
   return `https://www.linkedin.com/company/${slug}`;
 }
 
+export function buildContactLinkedIn(firstName: string, lastName: string): string {
+  if (!firstName && !lastName) return "";
+  const slug = `${firstName}-${lastName}`
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  return `https://www.linkedin.com/in/${slug}`;
+}
+
 export { buildLinkedInUrl };
