@@ -101,6 +101,14 @@ export default function Home() {
     return cats.sort();
   }, [pipelineData]);
 
+  // Auto-switch from Research to All if no Research results but data exists
+  useEffect(() => {
+    if (!isLoading && pipelineData.length > 0 && stageFilter === "Research") {
+      const hasResearch = pipelineData.some((c: any) => c.stage === "Research");
+      if (!hasResearch) setStageFilter("All");
+    }
+  }, [pipelineData, isLoading]);
+
   const filtered = useMemo(() => {
     let data = [...pipelineData];
     if (search) {
@@ -555,8 +563,37 @@ export default function Home() {
                     ))}
                     {filtered.length === 0 && (
                       <tr>
-                        <td colSpan={10} className="px-4 py-12 text-center text-slate-400 text-sm">
-                          No companies match your filters.
+                        <td colSpan={10} className="px-6 py-16 text-center">
+                          {isLoading ? (
+                            <div className="flex flex-col items-center gap-3">
+                              <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                              <p className="text-slate-400 text-sm">Loading your pipeline...</p>
+                            </div>
+                          ) : pipelineData.length === 0 ? (
+                            <div className="flex flex-col items-center gap-3">
+                              <div className="text-4xl">🚀</div>
+                              <p className="text-slate-700 font-medium">Your pipeline is empty</p>
+                              <p className="text-slate-400 text-sm max-w-xs">Go to Settings to configure your target roles, then click <strong>Run Now</strong> to find matching jobs.</p>
+                              <button
+                                onClick={() => setActiveTab("settings")}
+                                className="mt-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                              >
+                                Go to Settings →
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center gap-3">
+                              <div className="text-4xl">🔍</div>
+                              <p className="text-slate-700 font-medium">No companies match your filters</p>
+                              <p className="text-slate-400 text-sm">Try changing the stage or category filter above.</p>
+                              <button
+                                onClick={() => { setStageFilter("All"); setCategoryFilter("All"); setPriorityFilter("All"); }}
+                                className="mt-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
+                              >
+                                Clear all filters
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     )}
