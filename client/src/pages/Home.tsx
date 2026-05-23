@@ -58,6 +58,7 @@ import GenerateApplication from "./GenerateApplication";
 import ApplicationHistory from "./ApplicationHistory";
 import ResearchSettings from "./ResearchSettings";
 import { StageSelector } from "@/components/StageSelector";
+import { CompanyJobsModal } from "@/components/CompanyJobsModal";
 import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
 import { useLocation } from "wouter";
 
@@ -77,6 +78,7 @@ export default function Home() {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [activeTab, setActiveTab] = useState<"pipeline" | "analytics" | "generate" | "history" | "settings">("pipeline");
   const [isRunning, setIsRunning] = useState(false);
+  const [companyJobsModal, setCompanyJobsModal] = useState<string | null>(null);
   const [, navigate] = useLocation();
 
   // Fetch pipeline data from tRPC
@@ -767,6 +769,14 @@ export default function Home() {
 
         {activeTab === "settings" && <ResearchSettings onRunComplete={() => { setActiveTab("pipeline"); setStageFilter("Research"); setCategoryFilter("All"); setPriorityFilter("All"); setTimeout(() => refetchPipeline(), 800); }} />}
       </main>
+
+      {/* Company Jobs Modal */}
+      {companyJobsModal && (
+        <CompanyJobsModal
+          companyName={companyJobsModal}
+          onClose={() => setCompanyJobsModal(null)}
+        />
+      )}
 
       {/* Company Detail Modal */}
       <Dialog open={!!selectedCompany} onOpenChange={() => setSelectedCompany(null)}>

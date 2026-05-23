@@ -1,3 +1,4 @@
+import { fetchCompanyJobs } from "./companyJobsService";
 import { z } from "zod";
 import { protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
@@ -156,6 +157,18 @@ export const pipelineRouter = router({
       } catch (error) {
         console.error("[PipelineRouter] Error updating notes:", error);
         throw error;
+      }
+    }),
+
+  getCompanyJobs: protectedProcedure
+    .input(z.object({ companyName: z.string() }))
+    .query(async ({ input }) => {
+      try {
+        const jobs = await fetchCompanyJobs(input.companyName);
+        return { jobs, found: jobs.length > 0 };
+      } catch (error) {
+        console.error("[PipelineRouter] Error fetching company jobs:", error);
+        return { jobs: [], found: false };
       }
     }),
 
