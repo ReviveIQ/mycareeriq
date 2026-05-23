@@ -28,15 +28,18 @@ async function parseResume(fileBase64: string, fileName: string): Promise<any> {
       model: "gpt-4o",
       messages: [
         { role: "system", content: "You are an expert resume parser. Extract ALL content thoroughly and return structured JSON only." },
-        { role: "user", content: `Parse this resume completely. Return JSON:
+        { role: "user", content: `You are parsing a resume document. The text may be imperfectly extracted from a PDF — ignore any garbled characters and focus on the readable content.
+
+Extract everything you can find and return this exact JSON structure (use empty strings or arrays for anything you cannot find — NEVER apologize or explain, ALWAYS return JSON):
+
 {
-  "name": "Full Name",
-  "email": "email",
-  "phone": "phone",
-  "location": "City, State",
-  "linkedin": "linkedin URL or empty",
-  "title": "Most Recent/Target Job Title",
-  "summary": "Professional summary (2-3 sentences, polished)",
+  "name": "Full Name or Unknown",
+  "email": "email or empty string",
+  "phone": "phone or empty string",
+  "location": "City, State or empty string",
+  "linkedin": "linkedin URL or empty string",
+  "title": "Most recent job title or inferred target title",
+  "summary": "Write a polished 2-3 sentence professional summary based on what you can read",
   "experience": [
     {
       "title": "Job Title",
@@ -45,7 +48,7 @@ async function parseResume(fileBase64: string, fileName: string): Promise<any> {
       "startDate": "MM/YYYY",
       "endDate": "MM/YYYY or Present",
       "description": "One sentence company context",
-      "bullets": ["strong action-verb bullet 1", "bullet 2", "bullet 3", "bullet 4"],
+      "bullets": ["Rewrite as strong action-verb bullet with metrics", "bullet 2", "bullet 3", "bullet 4"],
       "achievements": ["award or recognition if any"]
     }
   ],
@@ -55,18 +58,18 @@ async function parseResume(fileBase64: string, fileName: string): Promise<any> {
     ]
   },
   "education": [
-    { "degree": "Degree", "school": "School Name", "location": "City, State", "year": "YYYY" }
+    { "degree": "Degree Name", "school": "School Name", "location": "City, State", "year": "YYYY" }
   ],
   "certifications": [],
-  "seniorityLevel": "entry|mid|senior|executive",
-  "yearsOfExperience": 0,
-  "topMetrics": ["quantified achievement 1", "achievement 2", "achievement 3"]
+  "seniorityLevel": "entry or mid or senior or executive",
+  "yearsOfExperience": 10,
+  "topMetrics": ["best quantified achievement", "second achievement", "third achievement"]
 }
 
-For bullets: rewrite each to start with a strong action verb and include metrics where possible.
-Resume text: ${textContent}
+CRITICAL: Return ONLY the JSON object. No explanation, no apology, no markdown. Start with { and end with }.
 
-Return ONLY valid JSON. No markdown.` }
+Resume text to parse:
+${textContent}` }
       ],
       max_tokens: 4000, temperature: 0.1,
     }),
