@@ -6,11 +6,13 @@ WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
 
+# Copy patches folder needed by pnpm
+COPY patches/ ./patches/
+
 RUN pnpm install --no-frozen-lockfile
 
 COPY . .
 
-# Force rebuild timestamp
 ARG BUILD_DATE
 RUN echo "Build: $BUILD_DATE"
 
