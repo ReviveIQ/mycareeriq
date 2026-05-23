@@ -8,14 +8,16 @@ import { eq, desc } from "drizzle-orm";
 // Map Adzuna/external categories to pipeline categories
 function mapCategory(raw: string): string {
   const cat = (raw || "").toLowerCase();
-  if (cat.includes("sales") || cat.includes("account")) return "Sales Enablement";
-  if (cat.includes("revenue") || cat.includes("finance")) return "Revenue Intelligence";
-  if (cat.includes("customer") || cat.includes("success")) return "Customer Success";
-  if (cat.includes("marketing")) return "Marketing Automation";
-  if (cat.includes("hr") || cat.includes("recruit") || cat.includes("talent")) return "HR / Workforce Tech";
-  if (cat.includes("tech") || cat.includes("software") || cat.includes("saas")) return "Sales Enablement";
   if (cat.includes("edtech") || cat.includes("education")) return "EdTech SaaS";
-  return "Sales Enablement"; // Default
+  if (cat.includes("customer success") || cat.includes("customer service")) return "Customer Success";
+  if (cat.includes("revenue intelligence") || cat.includes("revenue operations")) return "Revenue Intelligence";
+  if (cat.includes("marketing")) return "Marketing Automation";
+  if (cat.includes("hr") || cat.includes("recruit") || cat.includes("talent") || cat.includes("workforce")) return "HR / Workforce Tech";
+  if (cat.includes("sales enablement") || cat.includes("enablement")) return "Sales Enablement";
+  if (cat.includes("account") || cat.includes("sales")) return "Sales Enablement";
+  if (cat.includes("it ") || cat.includes("software") || cat.includes("tech")) return "Sales Enablement";
+  // Keep the original Adzuna category label if it doesn't map cleanly
+  return raw || "Sales Enablement";
 }
 
 export const pipelineRouter = router({

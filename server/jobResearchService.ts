@@ -76,7 +76,7 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
   const config = configs[0];
 
   const targetRoles = config?.targetRoles?.toString() || "Account Executive";
-  const requestedCount = Math.min(count || 10, 10);
+  const requestedCount = count || config?.rolesPerDay || 30;
 
   const adzunaAppId = process.env.ADZUNA_APP_ID;
   const adzunaAppKey = process.env.ADZUNA_APP_KEY;
@@ -87,7 +87,7 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
 
   const remoteOnly = config?.remoteOnly || false;
   const usHiringOnly = config?.usHiringOnly !== false;
-  const roles = targetRoles.split(",").map(r => r.trim()).slice(0, 3);
+  const roles = targetRoles.split(",").map(r => r.trim()).slice(0, 6);
   const jobs: GeneratedJob[] = [];
 
   for (const role of roles) {
@@ -96,7 +96,7 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
     const query = encodeURIComponent(role);
     const remoteParam = remoteOnly ? "&where=remote" : "";
     const country = usHiringOnly ? "us" : "us"; // Future: support other countries
-    const url = `https://api.adzuna.com/v1/api/jobs/${country}/search/1?app_id=${adzunaAppId}&app_key=${adzunaAppKey}&what=${query}&results_per_page=5&sort_by=date&max_days_old=30${remoteParam}&content-type=application/json`;
+    const url = `https://api.adzuna.com/v1/api/jobs/${country}/search/1?app_id=${adzunaAppId}&app_key=${adzunaAppKey}&what=${query}&results_per_page=10&sort_by=date&max_days_old=30${remoteParam}&content-type=application/json`;
 
     console.log(`[JobResearchService] Searching Adzuna for: ${role}`);
 
