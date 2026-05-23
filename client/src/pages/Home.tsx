@@ -69,7 +69,7 @@ const CATEGORY_CHART_COLORS = ["#6366f1", "#8b5cf6", "#14b8a6", "#ec4899", "#f97
 
 export default function Home() {
   const [search, setSearch] = useState("");
-  const [stageFilter, setStageFilter] = useState<PipelineStage | "All">("All");
+  const [stageFilter, setStageFilter] = useState<PipelineStage | "All" | "">("All");
   const [categoryFilter, setCategoryFilter] = useState<CompanyCategory | "All">("All");
   const [priorityFilter, setPriorityFilter] = useState<"High" | "Medium" | "Low" | "All">("All");
   const [sortField, setSortField] = useState<SortField>("priority");
@@ -111,7 +111,7 @@ export default function Home() {
           c.category.toLowerCase().includes(q)
       );
     }
-    if (stageFilter !== "All") data = data.filter((c) => c.stage === stageFilter);
+    if (stageFilter !== "All" && stageFilter !== "") data = data.filter((c) => c.stage === stageFilter);
     if (categoryFilter !== "All") data = data.filter((c) => c.category === categoryFilter);
     if (priorityFilter !== "All") data = data.filter((c) => c.priority === priorityFilter);
 
@@ -185,10 +185,16 @@ export default function Home() {
       const result = await runResearch.mutateAsync();
       if (result.success) {
         toast.success(`Research completed! Added ${result.jobsAdded} jobs to your pipeline`);
+        // Reset stage filter to show all results
+        setStageFilter("All");
+        setCategoryFilter("All");
+        setPriorityFilter("All");
+        // Invalidate and refetch all pipeline queries
         await utils.pipeline.getCompanies.invalidate();
         await utils.pipeline.getCompanyCount.invalidate();
         await utils.pipeline.getHighPriority.invalidate();
         await utils.pipeline.getRemoteCount.invalidate();
+        await refetchPipeline();
       } else {
         toast.error(`Failed: ${result.message}`);
       }
