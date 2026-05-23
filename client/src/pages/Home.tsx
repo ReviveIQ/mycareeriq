@@ -2,7 +2,7 @@
 // DM Sans (headers) + Inter (body), off-white background, deep indigo accent
 // CRM-like interface with status badges, filter chips, and sortable columns
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { stageColors, priorityColors, categoryColors, stageOrder, exportToCSV, type PipelineStage, type Company, type CompanyCategory } from "@/lib/pipelineData";
 import { Badge } from "@/components/ui/badge";
