@@ -820,6 +820,7 @@ export default function Home() {
       {companyJobsModal && (
         <CompanyJobsModal
           companyName={companyJobsModal}
+          targetRole={pipelineData.find((c: any) => c.name === companyJobsModal)?.role}
           onClose={() => setCompanyJobsModal(null)}
         />
       )}
