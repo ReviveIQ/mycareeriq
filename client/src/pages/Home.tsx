@@ -182,23 +182,24 @@ export default function Home() {
   const handleRunNow = async () => {
     setIsRunning(true);
     setActiveTab("pipeline"); // Switch to pipeline tab immediately
-    setStageFilter("All");    // Reset filters
+    setStageFilter("Research"); // Show research results
     setCategoryFilter("All");
     setPriorityFilter("All");
     try {
       const result = await runResearch.mutateAsync();
       if (result.success) {
         toast.success(`Research completed! Added ${result.jobsAdded} jobs to your pipeline`);
-        // Reset stage filter to show all results
-        setStageFilter("All");
+        // Set filter to Research to show new results
+        setStageFilter("Research");
         setCategoryFilter("All");
         setPriorityFilter("All");
-        // Invalidate and refetch all pipeline queries
+        // Invalidate cache and refetch
         await utils.pipeline.getCompanies.invalidate();
         await utils.pipeline.getCompanyCount.invalidate();
         await utils.pipeline.getHighPriority.invalidate();
         await utils.pipeline.getRemoteCount.invalidate();
-        await refetchPipeline();
+        // Small delay then refetch to ensure DB is ready
+        setTimeout(() => refetchPipeline(), 500);
       } else {
         toast.error(`Failed: ${result.message}`);
       }
@@ -764,7 +765,7 @@ export default function Home() {
           <ApplicationHistory />
         )}
 
-        {activeTab === "settings" && <ResearchSettings onRunComplete={() => { setActiveTab("pipeline"); setStageFilter("All"); setCategoryFilter("All"); setPriorityFilter("All"); }} />}
+        {activeTab === "settings" && <ResearchSettings onRunComplete={() => { setActiveTab("pipeline"); setStageFilter("Research"); setCategoryFilter("All"); setPriorityFilter("All"); setTimeout(() => refetchPipeline(), 800); }} />}
       </main>
 
       {/* Company Detail Modal */}
