@@ -205,6 +205,48 @@ export default function ResearchSettings() {
           </div>
         </div>
 
+        {/* Remote Only Toggle */}
+        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-slate-900">Remote Roles Only</h3>
+              <p className="text-sm text-slate-500 mt-1">Only show remote-friendly job postings in your pipeline research.</p>
+            </div>
+            <button
+              onClick={() => setRemoteOnly(!remoteOnly)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${remoteOnly ? "bg-indigo-600" : "bg-slate-200"}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${remoteOnly ? "translate-x-6" : "translate-x-1"}`} />
+            </button>
+          </div>
+          {remoteOnly && (
+            <div className="mt-3 flex items-center gap-2 text-sm text-indigo-600 bg-indigo-50 rounded-lg px-3 py-2">
+              <span>✓</span><span>Only remote positions will be researched.</span>
+            </div>
+          )}
+        </div>
+
+        {/* US Only Toggle */}
+        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-slate-900">US-Based Roles Only</h3>
+              <p className="text-sm text-slate-500 mt-1">Only show US-based job postings in your pipeline research.</p>
+            </div>
+            <button
+              onClick={() => setUsHiringOnly(!usHiringOnly)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${usHiringOnly ? "bg-indigo-600" : "bg-slate-200"}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${usHiringOnly ? "translate-x-6" : "translate-x-1"}`} />
+            </button>
+          </div>
+          {!usHiringOnly && (
+            <div className="mt-3 flex items-center gap-2 text-sm text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+              <span>⚠</span><span>International roles will be included in results.</span>
+            </div>
+          )}
+        </div>
+
         {/* Action Buttons */}
         <div className="flex gap-3 pt-4 border-t border-slate-200">
           <Button
