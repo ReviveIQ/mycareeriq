@@ -59,6 +59,7 @@ import ApplicationHistory from "./ApplicationHistory";
 import ResearchSettings from "./ResearchSettings";
 import { StageSelector } from "@/components/StageSelector";
 import { CompanyJobsModal } from "@/components/CompanyJobsModal";
+import { WishlistTab } from "@/components/WishlistTab";
 import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
 import { useLocation } from "wouter";
 
@@ -76,7 +77,7 @@ export default function Home() {
   const [sortField, setSortField] = useState<SortField>("priority");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-  const [activeTab, setActiveTab] = useState<"pipeline" | "analytics" | "generate" | "history" | "settings">("pipeline");
+  const [activeTab, setActiveTab] = useState<"pipeline" | "analytics" | "generate" | "history" | "settings" | "wishlist">("pipeline");
   const [isRunning, setIsRunning] = useState(false);
   const [companyJobsModal, setCompanyJobsModal] = useState<string | null>(null);
   const [, navigate] = useLocation();
@@ -94,6 +95,9 @@ export default function Home() {
   const { data: highPriorityCount = 0 } = trpc.pipeline.getHighPriority.useQuery(undefined, { staleTime: 0 });
   const { data: remoteCount = 0 } = trpc.pipeline.getRemoteCount.useQuery(undefined, { staleTime: 0 });
   const runResearch = trpc.monitoring.runNow.useMutation();
+  const toggleWishlist = trpc.pipeline.toggleWishlist.useMutation({
+    onSuccess: () => utils.pipeline.getCompanies.invalidate(),
+  });
   const utils = trpc.useUtils();
 
   const categories = useMemo(() => {
@@ -331,7 +335,7 @@ export default function Home() {
 
         {/* Tab Navigation */}
         <div className="flex gap-1 bg-slate-100 p-1 rounded-lg w-fit">
-          {(["pipeline", "analytics", "generate", "history", "settings"] as const).map((tab) => (
+          {(["pipeline", "analytics", "generate", "history", "wishlist", "settings"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -803,6 +807,8 @@ export default function Home() {
         {activeTab === "history" && (
           <ApplicationHistory />
         )}
+
+        {activeTab === "wishlist" && <WishlistTab />}
 
         {activeTab === "settings" && <ResearchSettings onRunComplete={() => { setActiveTab("pipeline"); setStageFilter("Research"); setCategoryFilter("All"); setPriorityFilter("All"); setTimeout(() => refetchPipeline(), 800); }} />}
       </main>

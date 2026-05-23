@@ -71,6 +71,7 @@ async function runMigrations() {
         companySize varchar(100) DEFAULT '',
         priority enum('High','Medium','Low') DEFAULT 'Medium',
         stage varchar(100) DEFAULT 'Research',
+        wishlisted tinyint DEFAULT 0,
         notes text,
         createdAt timestamp NOT NULL DEFAULT (now()),
         updatedAt timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
@@ -81,6 +82,8 @@ async function runMigrations() {
       `ALTER TABLE users ADD COLUMN passwordHash varchar(255)`,
       // Add contactLinkedIn column
       `ALTER TABLE companies ADD COLUMN contactLinkedIn varchar(500) DEFAULT ''`,
+      // Add wishlisted column
+      `ALTER TABLE companies ADD COLUMN wishlisted tinyint DEFAULT 0`,
       // Expand jobLink column size for long Adzuna URLs
       `ALTER TABLE companies MODIFY COLUMN jobLink varchar(2000) DEFAULT ''`,
 

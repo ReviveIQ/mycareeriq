@@ -172,6 +172,22 @@ export const pipelineRouter = router({
       }
     }),
 
+  toggleWishlist: protectedProcedure
+    .input(z.object({ id: z.number(), wishlisted: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        await db.update(companiesTable)
+          .set({ wishlisted: input.wishlisted ? 1 : 0, updatedAt: new Date() })
+          .where(and(eq(companiesTable.id, input.id), eq(companiesTable.userId, ctx.user.id)));
+        return { success: true };
+      } catch (error) {
+        console.error("[PipelineRouter] Error toggling wishlist:", error);
+        throw error;
+      }
+    }),
+
   deleteCompany: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
