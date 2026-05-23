@@ -1,5 +1,6 @@
 import { getDb } from "./db";
 import { buildLinkedInUrl, findCompanyLinkedIn, buildContactLinkedIn } from "./linkedinService";
+import { fetchCompanyJobs } from "./companyJobsService";
 import { searchContacts } from "./apolloService";
 import { extractDomain } from "./hunterService"; // Keep for domain extraction
 import { companies, researchConfig } from "../drizzle/schema";
@@ -189,7 +190,24 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
           careersPage = `${jobUrl.protocol}//${jobUrl.hostname}/careers`;
         } catch {}
 
-        console.log(`[JobResearchService] Job URL for ${companyName}: ${(job.redirect_url || "").slice(0, 100)}`);
+        // Try to find a direct job link from Greenhouse/Lever
+        let directJobLink = "";
+        try {
+          const companyJobs = await fetchCompanyJobs(companyName);
+          if (companyJobs.length > 0) {
+            // Find the most relevant job matching our search role
+            const roleKeywords = role.toLowerCase().split(" ");
+            const matchingJob = companyJobs.find((j: any) => {
+              const title = j.title.toLowerCase();
+              return roleKeywords.some((k: string) => k.length > 3 && title.includes(k));
+            }) || companyJobs[0];
+            directJobLink = matchingJob.applyUrl;
+            console.log(`[JobResearchService] Direct job link for ${companyName}: ${directJobLink.slice(0, 80)}`);
+          }
+        } catch { }
+
+        const finalJobLink = directJobLink || job.redirect_url || "";
+        console.log(`[JobResearchService] Job URL for ${companyName}: ${finalJobLink.slice(0, 100)}`);
         jobs.push({
           companyName,
           companyId: `${slugify(companyName)}-${Date.now()}-${Math.random().toString(36).slice(2,5)}`,
@@ -200,7 +218,7 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
           linkedinUrl: await findCompanyLinkedIn(companyName),
           contactLinkedIn: contactLinkedInUrl,
           jobDescription: job.description?.slice(0, 500) || "",
-          jobLink: job.redirect_url || "",
+          jobLink: finalJobLink,
           salary: formatSalary(job),
           remote: (job.title || "").toLowerCase().includes("remote") || 
                   (job.description || "").toLowerCase().includes("remote"),
