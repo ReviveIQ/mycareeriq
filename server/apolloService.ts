@@ -1,7 +1,7 @@
 /**
- * Apollo.io Contact Enrichment Service
- * Replaces Hunter.io - 20x more credits for same price
- * Apollo API: https://apolloio.github.io/apollo-api-docs/
+ * Apollo.io Contact Service
+ * Step 1: Search (free, no credits) - finds person ID
+ * Step 2: Enrich (costs credits) - gets verified email
  */
 
 export interface ApolloContact {
@@ -11,29 +11,26 @@ export interface ApolloContact {
   title: string;
   linkedin_url: string;
   seniority: string;
-  departments: string[];
 }
 
-export async function searchContacts(
-  companyName: string,
-  domain: string
-): Promise<ApolloContact | null> {
+export async function searchContacts(companyName: string, domain: string): Promise<ApolloContact | null> {
   const apiKey = process.env.APOLLO_API_KEY;
   if (!apiKey) {
-    console.log("[Apollo] No API key configured, skipping contact lookup");
+    console.log("[Apollo] No API key configured");
     return null;
   }
 
   try {
-    const res = await fetch("https://api.apollo.io/v1/mixed_people/search", {
+    // Step 1: Search for people (no credits consumed)
+    const searchRes = await fetch("https://api.apollo.io/api/v1/mixed_people/api_search", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Cache-Control": "no-cache",
-        "X-Api-Key": apiKey,
+        "x-api-key": apiKey,
       },
       body: JSON.stringify({
-        q_organization_name: companyName,
+        q_organization_domains_list: [domain],
         person_titles: [
           "VP of Sales",
           "Vice President of Sales",
@@ -43,87 +40,75 @@ export async function searchContacts(
           "VP of Revenue",
           "Director of Business Development",
           "Sales Manager",
-          "Regional Sales Director",
         ],
-        page: 1,
+        person_seniorities: ["vp", "director", "c_suite", "head", "manager"],
         per_page: 5,
+        page: 1,
       }),
     });
 
-    if (!res.ok) {
-      console.error(`[Apollo] Search failed: ${res.status}`);
+    if (!searchRes.ok) {
+      const err = await searchRes.text();
+      console.error(`[Apollo] Search failed ${searchRes.status}: ${err.slice(0, 200)}`);
       return null;
     }
 
-    const data = await res.json() as any;
-    const people = data?.people || [];
+    const searchData = await searchRes.json() as any;
+    const people = searchData?.people || [];
 
     if (people.length === 0) {
       console.log(`[Apollo] No contacts found for ${companyName}`);
       return null;
     }
 
-    // Pick the most senior person
-    const seniorityOrder = ["c_suite", "vp", "director", "manager", "senior", "entry"];
-    const sorted = people.sort((a: any, b: any) => {
-      const aIdx = seniorityOrder.indexOf(a.seniority || "entry");
-      const bIdx = seniorityOrder.indexOf(b.seniority || "entry");
-      return aIdx - bIdx;
-    });
+    // Pick the best match - prefer has_email = true
+    const withEmail = people.filter((p: any) => p.has_email);
+    const best = withEmail[0] || people[0];
 
-    const best = sorted[0];
-    console.log(`[Apollo] Found contact at ${companyName}: ${best.first_name} ${best.last_name} (${best.title})`);
+    console.log(`[Apollo] Found candidate at ${companyName}: ${best.first_name} ${best.last_name_obfuscated} (${best.title})`);
 
-    return {
-      first_name: best.first_name || "",
-      last_name: best.last_name || "",
-      email: best.email || "",
-      title: best.title || "",
-      linkedin_url: best.linkedin_url || "",
-      seniority: best.seniority || "",
-      departments: best.departments || [],
-    };
-  } catch (err) {
-    console.error(`[Apollo] Error searching contacts for ${companyName}:`, err);
-    return null;
-  }
-}
-
-export async function enrichByDomain(domain: string): Promise<ApolloContact | null> {
-  const apiKey = process.env.APOLLO_API_KEY;
-  if (!apiKey) return null;
-
-  try {
-    const res = await fetch("https://api.apollo.io/v1/mixed_people/search", {
+    // Step 2: Enrich to get full details including email (costs 1 credit)
+    const enrichRes = await fetch("https://api.apollo.io/api/v1/people/match", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Api-Key": apiKey,
+        "x-api-key": apiKey,
       },
       body: JSON.stringify({
-        q_organization_domains: [domain],
-        person_titles: ["VP of Sales", "Director of Sales", "Chief Revenue Officer", "Head of Sales"],
-        page: 1,
-        per_page: 3,
+        id: best.id,
+        reveal_personal_emails: false,
+        reveal_phone_number: false,
       }),
     });
 
-    if (!res.ok) return null;
-    const data = await res.json() as any;
-    const people = data?.people || [];
-    if (!people.length) return null;
+    if (!enrichRes.ok) {
+      // Enrichment failed - return basic info without email
+      console.warn(`[Apollo] Enrichment failed for ${best.first_name}, returning basic info`);
+      return {
+        first_name: best.first_name || "",
+        last_name: best.last_name_obfuscated?.replace(/\*/g, "") || "",
+        email: "",
+        title: best.title || "",
+        linkedin_url: "",
+        seniority: best.seniority || "",
+      };
+    }
 
-    const best = people[0];
+    const enrichData = await enrichRes.json() as any;
+    const person = enrichData?.person || enrichData;
+
+    console.log(`[Apollo] Enriched: ${person.first_name} ${person.last_name} <${person.email}>`);
+
     return {
-      first_name: best.first_name || "",
-      last_name: best.last_name || "",
-      email: best.email || "",
-      title: best.title || "",
-      linkedin_url: best.linkedin_url || "",
-      seniority: best.seniority || "",
-      departments: best.departments || [],
+      first_name: person.first_name || best.first_name || "",
+      last_name: person.last_name || "",
+      email: person.email || "",
+      title: person.title || best.title || "",
+      linkedin_url: person.linkedin_url || "",
+      seniority: person.seniority || "",
     };
-  } catch {
+  } catch (err) {
+    console.error(`[Apollo] Error for ${companyName}:`, err);
     return null;
   }
 }
