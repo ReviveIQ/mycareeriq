@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import { companies as companiesTable } from "../drizzle/schema";
@@ -118,4 +119,56 @@ export const pipelineRouter = router({
       throw error;
     }
   }),
+  updateStage: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      stage: z.enum(["Research", "Outreach", "Applied", "Interviewing", "Offer", "Rejected"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        await db.update(companiesTable)
+          .set({ stage: input.stage, updatedAt: new Date() })
+          .where(and(eq(companiesTable.id, input.id), eq(companiesTable.userId, ctx.user.id)));
+        return { success: true };
+      } catch (error) {
+        console.error("[PipelineRouter] Error updating stage:", error);
+        throw error;
+      }
+    }),
+
+  updateNotes: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      notes: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        await db.update(companiesTable)
+          .set({ notes: input.notes, updatedAt: new Date() })
+          .where(and(eq(companiesTable.id, input.id), eq(companiesTable.userId, ctx.user.id)));
+        return { success: true };
+      } catch (error) {
+        console.error("[PipelineRouter] Error updating notes:", error);
+        throw error;
+      }
+    }),
+
+  deleteCompany: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        await db.delete(companiesTable)
+          .where(and(eq(companiesTable.id, input.id), eq(companiesTable.userId, ctx.user.id)));
+        return { success: true };
+      } catch (error) {
+        console.error("[PipelineRouter] Error deleting company:", error);
+        throw error;
+      }
+    }),
 });

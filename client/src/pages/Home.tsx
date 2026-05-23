@@ -69,7 +69,7 @@ const CATEGORY_CHART_COLORS = ["#6366f1", "#8b5cf6", "#14b8a6", "#ec4899", "#f97
 
 export default function Home() {
   const [search, setSearch] = useState("");
-  const [stageFilter, setStageFilter] = useState<PipelineStage | "All" | "">("All");
+  const [stageFilter, setStageFilter] = useState<PipelineStage | "All" | "">("Research");
   const [categoryFilter, setCategoryFilter] = useState<CompanyCategory | "All">("All");
   const [priorityFilter, setPriorityFilter] = useState<"High" | "Medium" | "Low" | "All">("All");
   const [sortField, setSortField] = useState<SortField>("priority");
