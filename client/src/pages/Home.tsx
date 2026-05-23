@@ -105,15 +105,10 @@ export default function Home() {
     return cats.sort();
   }, [pipelineData]);
 
-  // Auto-switch from Research to All if no Research results but data exists
+  // Refetch when component mounts to ensure fresh data
   useEffect(() => {
-    if (!isLoading && pipelineData.length > 0 && stageFilter === "Research") {
-      const hasResearch = pipelineData.some((c: any) => (c.stage || "Research") === "Research");
-      if (!hasResearch) {
-        setStageFilter("All");
-      }
-    }
-  }, [pipelineData, isLoading, stageFilter]);
+    refetchPipeline();
+  }, []);
 
   const filtered = useMemo(() => {
     let data = [...pipelineData];
@@ -391,7 +386,7 @@ export default function Home() {
                   onValueChange={(v) => setStageFilter(v as PipelineStage | "All")}
                 >
                   <SelectTrigger className="h-9 w-[140px] text-sm border-slate-200">
-                    <SelectValue placeholder="All Stages" />
+                    <SelectValue>{stageFilter === "All" ? "All Stages" : stageFilter}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="All">All Stages</SelectItem>
