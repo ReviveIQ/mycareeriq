@@ -108,10 +108,12 @@ export default function Home() {
   // Auto-switch from Research to All if no Research results but data exists
   useEffect(() => {
     if (!isLoading && pipelineData.length > 0 && stageFilter === "Research") {
-      const hasResearch = pipelineData.some((c: any) => c.stage === "Research");
-      if (!hasResearch) setStageFilter("All");
+      const hasResearch = pipelineData.some((c: any) => (c.stage || "Research") === "Research");
+      if (!hasResearch) {
+        setStageFilter("All");
+      }
     }
-  }, [pipelineData, isLoading]);
+  }, [pipelineData, isLoading, stageFilter]);
 
   const filtered = useMemo(() => {
     let data = [...pipelineData];
@@ -354,6 +356,12 @@ export default function Home() {
                 </>
               )}
               {tab === "history" && "History"}
+              {tab === "wishlist" && (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill={activeTab === "wishlist" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  Wishlist
+                </>
+              )}
               {tab === "settings" && (
                 <>
                   <Settings className="w-4 h-4" />
