@@ -1,6 +1,7 @@
 import { getDb } from "./db";
 import { buildLinkedInUrl, findCompanyLinkedIn, buildContactLinkedIn } from "./linkedinService";
-import { getDomainInfo, extractDomain } from "./hunterService";
+import { searchContacts } from "./apolloService";
+import { extractDomain } from "./hunterService"; // Keep for domain extraction
 import { companies, researchConfig } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 
