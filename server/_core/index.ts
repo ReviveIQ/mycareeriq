@@ -229,6 +229,15 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
+const ALLOWED_ORIGINS = [
+  "https://mycareeriq.reviveiqi.com",
+  "https://resumeiq.reviveiqi.com",
+  "https://claude.ai",
+  "https://www.claude.ai",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
 async function startServer() {
   await runMigrations();
 
@@ -236,6 +245,20 @@ async function startServer() {
   const server = createServer(app);
 
   app.set("trust proxy", 1);
+
+  // CORS
+  app.use((req: any, res: any, next: any) => {
+    const origin = req.headers.origin as string | undefined;
+    if (origin && ALLOWED_ORIGINS.includes(origin)) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+    }
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    if (req.method === "OPTIONS") { res.sendStatus(204); return; }
+    next();
+  });
+
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
@@ -245,6 +268,16 @@ async function startServer() {
 
   app.post("/api/scheduled/sendDigest", sendDigestEmailHandler);
   app.post("/api/scheduled/jobResearch", jobResearchHandler);
+
+  // Serve S3 storage files via signed URL redirect
+  app.get("/api/storage/:key(*)", async (req: any, res: any) => {
+    try {
+      const { storageGetSignedUrl } = await import("../storage");
+      const url = await storageGetSignedUrl(req.params.key);
+      if (!url) { res.status(404).send("File not found"); return; }
+      res.redirect(307, url);
+    } catch { res.status(502).send("Storage error"); }
+  });
 
   app.use(
     "/api/trpc",
@@ -261,6 +294,23 @@ async function startServer() {
   server.listen(port, "0.0.0.0", () => {
     console.log(`[Server] Running on port ${port}`);
   });
+
+  // Daily job research cron — 8:00 AM EST (13:00 UTC)
+  try {
+    const cron = await import("node-cron");
+    cron.default.schedule("0 13 * * *", async () => {
+      console.log("[Cron] Starting daily job research");
+      try {
+        const { runDailyJobResearch } = await import("../jobResearchCron");
+        await runDailyJobResearch(1);
+      } catch (err) {
+        console.error("[Cron] Job research failed:", err);
+      }
+    }, { timezone: "UTC" });
+    console.log("[Cron] Daily job research scheduled at 8:00 AM EST");
+  } catch (err: any) {
+    console.warn("[Cron] node-cron not available:", err.message);
+  }
 }
 
 startServer().catch(console.error);
