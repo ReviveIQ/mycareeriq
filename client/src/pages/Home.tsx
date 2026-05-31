@@ -223,13 +223,30 @@ export default function Home() {
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
         <div className="max-w-screen-xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/logo.jpg" alt="My Personal Logo" className="w-9 h-9 rounded-lg object-cover" />
+            <svg viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width:"34px",height:"34px",flexShrink:0}}>
+              <defs>
+                <linearGradient id="h-lg1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#60a5fa"/><stop offset="100%" stopColor="#2563eb"/></linearGradient>
+                <linearGradient id="h-lg2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#93c5fd"/><stop offset="100%" stopColor="#3b82f6"/></linearGradient>
+                <linearGradient id="h-lg3" x1="100%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor="#1d4ed8"/><stop offset="100%" stopColor="#1e3a5f"/></linearGradient>
+                <filter id="h-glow"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              </defs>
+              <polygon points="36,4 68,36 36,68 4,36" fill="url(#h-lg3)" opacity="0.35"/>
+              <polygon points="36,4 20,20 36,36 52,20" fill="url(#h-lg2)" opacity="0.9"/>
+              <polygon points="36,4 52,20 68,36 36,36" fill="url(#h-lg1)" opacity="0.65"/>
+              <polygon points="4,36 20,20 36,36 20,52" fill="url(#h-lg1)" opacity="0.5"/>
+              <polygon points="68,36 52,20 36,36 52,52" fill="url(#h-lg2)" opacity="0.75"/>
+              <polygon points="36,68 20,52 36,36 52,52" fill="url(#h-lg3)" opacity="0.95"/>
+              <circle cx="36" cy="36" r="10" fill="none" stroke="rgba(147,197,253,0.3)" strokeWidth="1"/>
+              <circle cx="36" cy="36" r="6" fill="white" opacity="0.95" filter="url(#h-glow)"/>
+              <circle cx="36" cy="36" r="3" fill="#93c5fd"/>
+            </svg>
             <div>
-              <h1 className="text-[15px] font-bold text-slate-900 leading-tight tracking-tight">
-                My Personal - Job Search Pipeline
+              <h1 className="text-[15px] leading-tight tracking-tight" style={{fontFamily:"'Syne',sans-serif",fontWeight:800}}>
+                <span style={{color:"#0f172a"}}>MyCareer</span><span style={{color:"#2563eb"}}>IQ</span>
+                <span style={{color:"#64748b",fontWeight:500,fontSize:"13px"}}> — Job Search Pipeline</span>
               </h1>
-              <p className="text-xs text-slate-500 leading-tight">
-                AI-Powered Application Automation · Track & Manage Your Job Search
+              <p className="text-xs leading-tight" style={{color:"#64748b",fontFamily:"'DM Sans',sans-serif"}}>
+                by ReviveIQI · AI-Powered · Track & Apply
               </p>
             </div>
           </div>
