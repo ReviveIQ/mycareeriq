@@ -84,6 +84,25 @@ export default function Home() {
   const { data: highPriorityCount = 0 } = trpc.pipeline.getHighPriority.useQuery();
   const { data: remoteCount = 0 } = trpc.pipeline.getRemoteCount.useQuery();
   const runResearch = trpc.monitoring.runNow.useMutation();
+  const updateStage = trpc.pipeline.updateStage.useMutation();
+  const deleteCompany = trpc.pipeline.deleteCompany.useMutation();
+
+  const handleAddToPipeline = async (company: Company) => {
+    if (!company.id) return;
+    await updateStage.mutateAsync({ id: company.id as number, stage: "Outreach" });
+    await utils.pipeline.getCompanies.invalidate();
+    toast.success(`${company.name} added to pipeline — ready for outreach`);
+    setSelectedCompany(null);
+  };
+
+  const handleDismiss = async (company: Company) => {
+    if (!company.id) return;
+    await deleteCompany.mutateAsync({ id: company.id as number });
+    await utils.pipeline.getCompanies.invalidate();
+    await utils.pipeline.getCompanyCount.invalidate();
+    toast.success(`${company.name} dismissed`);
+    setSelectedCompany(null);
+  };
   const utils = trpc.useUtils();
 
   const categories = useMemo(() => {
@@ -852,6 +871,51 @@ export default function Home() {
               </div>
             </>
           )}
+            {/* Action buttons — only show for Research stage */}
+            {selectedCompany && (
+              <div className="flex gap-3 pt-4 border-t border-slate-200 mt-4">
+                {selectedCompany.stage === "Research" ? (
+                  <>
+                    <button
+                      onClick={() => handleAddToPipeline(selectedCompany)}
+                      disabled={updateStage.isPending}
+                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {updateStage.isPending ? "Adding..." : "✓ Add to Pipeline"}
+                    </button>
+                    <button
+                      onClick={() => handleDismiss(selectedCompany)}
+                      disabled={deleteCompany.isPending}
+                      className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {deleteCompany.isPending ? "Removing..." : "✕ Dismiss"}
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex gap-2 flex-wrap">
+                    {["Outreach", "Applied", "Interviewing", "Offer", "Rejected"].map((s) => (
+                      <button
+                        key={s}
+                        onClick={async () => {
+                          await updateStage.mutateAsync({ id: selectedCompany.id as number, stage: s });
+                          await utils.pipeline.getCompanies.invalidate();
+                          toast.success(`Moved to ${s}`);
+                          setSelectedCompany(null);
+                        }}
+                        disabled={selectedCompany.stage === s || updateStage.isPending}
+                        className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${
+                          selectedCompany.stage === s
+                            ? "bg-indigo-100 text-indigo-700 cursor-default"
+                            : "bg-slate-100 hover:bg-slate-200 text-slate-600"
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
         </DialogContent>
       </Dialog>
 
