@@ -58,6 +58,7 @@ import GenerateApplication from "./GenerateApplication";
 import ApplicationHistory from "./ApplicationHistory";
 import ResearchSettings from "./ResearchSettings";
 import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 
 type SortField = "name" | "category" | "stage" | "priority" | "role";
@@ -69,6 +70,12 @@ const CATEGORY_CHART_COLORS = ["#6366f1", "#8b5cf6", "#14b8a6", "#ec4899", "#f97
 export default function Home() {
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<PipelineStage | "All">("All");
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const { user, logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+  };
   const [categoryFilter, setCategoryFilter] = useState<CompanyCategory | "All">("All");
   const [priorityFilter, setPriorityFilter] = useState<"High" | "Medium" | "Low" | "All">("All");
   const [sortField, setSortField] = useState<SortField>("priority");
