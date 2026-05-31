@@ -14,11 +14,13 @@ export const pipelineRouter = router({
       }
 
       // Fetch all researched companies for the user
+      console.log("[PipelineRouter] getCompanies for userId:", ctx.user.id);
       const jobs = await db
         .select()
         .from(companiesTable)
         .where(eq(companiesTable.userId, ctx.user.id))
         .orderBy(desc(companiesTable.createdAt));
+      console.log("[PipelineRouter] getCompanies found:", jobs.length, "companies");
 
       // Transform to pipeline format
       const companies = jobs.map((job) => ({
