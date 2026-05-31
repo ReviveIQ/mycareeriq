@@ -139,4 +139,137 @@ export function registerAuthRoutes(app: Express) {
     }
     res.json({ id: user.id, email: user.email, name: user.name });
   });
+
+  // ── LinkedIn OAuth ────────────────────────────────────────────────────────
+  // Step 1: Redirect to LinkedIn authorization page
+  app.get("/api/auth/linkedin", (req: Request, res: Response) => {
+    const clientId = process.env.LINKEDIN_CLIENT_ID;
+    if (!clientId) {
+      res.status(500).json({ error: "LinkedIn OAuth not configured" });
+      return;
+    }
+
+    const redirectUri = `${req.protocol}://${req.get("host")}/api/auth/linkedin/callback`;
+    const scope = "openid profile email";
+    const state = crypto.randomBytes(16).toString("hex");
+
+    // Store state in cookie for CSRF protection
+    res.cookie("linkedin_oauth_state", state, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 10 * 60 * 1000, // 10 minutes
+      sameSite: "lax",
+    });
+
+    const authUrl = new URL("https://www.linkedin.com/oauth/v2/authorization");
+    authUrl.searchParams.set("response_type", "code");
+    authUrl.searchParams.set("client_id", clientId);
+    authUrl.searchParams.set("redirect_uri", redirectUri);
+    authUrl.searchParams.set("scope", scope);
+    authUrl.searchParams.set("state", state);
+
+    res.redirect(authUrl.toString());
+  });
+
+  // Step 2: Handle LinkedIn callback
+  app.get("/api/auth/linkedin/callback", async (req: Request, res: Response) => {
+    const { code, state, error } = req.query as Record<string, string>;
+
+    const frontendUrl = process.env.NODE_ENV === "production"
+      ? "https://mycareeriq.reviveiqi.com"
+      : "http://localhost:5173";
+
+    if (error) {
+      console.error("[LinkedIn OAuth] Error:", error);
+      res.redirect(`${frontendUrl}/?auth_error=linkedin_denied`);
+      return;
+    }
+
+    // Validate state
+    const cookieHeader = req.headers.cookie || "";
+    const cookies: Record<string, string> = {};
+    cookieHeader.split(";").forEach((c) => {
+      const [k, ...v] = c.trim().split("=");
+      if (k) cookies[k.trim()] = decodeURIComponent(v.join("="));
+    });
+
+    if (!state || cookies["linkedin_oauth_state"] !== state) {
+      res.redirect(`${frontendUrl}/?auth_error=state_mismatch`);
+      return;
+    }
+
+    const clientId = process.env.LINKEDIN_CLIENT_ID!;
+    const clientSecret = process.env.LINKEDIN_CLIENT_SECRET!;
+    const redirectUri = `${req.protocol}://${req.get("host")}/api/auth/linkedin/callback`;
+
+    try {
+      // Exchange code for access token
+      const tokenRes = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          code,
+          redirect_uri: redirectUri,
+          client_id: clientId,
+          client_secret: clientSecret,
+        }).toString(),
+      });
+
+      if (!tokenRes.ok) {
+        const err = await tokenRes.text();
+        console.error("[LinkedIn OAuth] Token exchange failed:", err);
+        res.redirect(`${frontendUrl}/?auth_error=token_failed`);
+        return;
+      }
+
+      const tokenData = await tokenRes.json() as any;
+      const accessToken = tokenData.access_token;
+
+      // Get user profile via OpenID Connect userinfo endpoint
+      const userRes = await fetch("https://api.linkedin.com/v2/userinfo", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (!userRes.ok) {
+        console.error("[LinkedIn OAuth] Profile fetch failed:", userRes.status);
+        res.redirect(`${frontendUrl}/?auth_error=profile_failed`);
+        return;
+      }
+
+      const profile = await userRes.json() as any;
+      const email = profile.email;
+      const name = profile.name || `${profile.given_name || ""} ${profile.family_name || ""}`.trim();
+
+      if (!email) {
+        res.redirect(`${frontendUrl}/?auth_error=no_email`);
+        return;
+      }
+
+      // Find or create user
+      let user = await db.getUserByEmail(email);
+      if (!user) {
+        user = await db.createUser({
+          email,
+          name: name || email.split("@")[0],
+          passwordHash: crypto.randomBytes(32).toString("hex"), // random password — LinkedIn users login via OAuth
+        });
+        console.log(`[LinkedIn OAuth] Created new user: ${email}`);
+      } else {
+        console.log(`[LinkedIn OAuth] Existing user logged in: ${email}`);
+      }
+
+      // Create session token
+      const token = await createSessionToken(user.id, user.email!, user.name!);
+      const cookieOptions = getSessionCookieOptions(req);
+      res.clearCookie("linkedin_oauth_state");
+      res.cookie("reviveiq_session", token, { ...cookieOptions, maxAge: 365 * 24 * 60 * 60 * 1000 });
+
+      // Redirect to frontend with token in URL so client can store it
+      res.redirect(`${frontendUrl}/?linkedin_token=${encodeURIComponent(token)}`);
+    } catch (err) {
+      console.error("[LinkedIn OAuth] Callback error:", err);
+      res.redirect(`${frontendUrl}/?auth_error=server_error`);
+    }
+  });
 }
