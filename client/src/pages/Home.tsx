@@ -173,21 +173,27 @@ export default function Home() {
 
   const handleRunNow = async () => {
     setIsRunning(true);
+    setActiveTab("pipeline");
     try {
-      const result = await runResearch.mutateAsync();
-      if (result.success) {
-        toast.success(`Research completed! Added ${result.jobsAdded} jobs to your pipeline`);
+      await runResearch.mutateAsync();
+      toast.success("Job research started — your pipeline will update in 20-30 seconds");
+
+      // Poll every 5 seconds for 60 seconds to catch when results arrive
+      let polls = 0;
+      const poll = setInterval(async () => {
+        polls++;
         await utils.pipeline.getCompanies.invalidate();
         await utils.pipeline.getCompanyCount.invalidate();
         await utils.pipeline.getHighPriority.invalidate();
         await utils.pipeline.getRemoteCount.invalidate();
-      } else {
-        toast.error(`Failed: ${result.message}`);
-      }
+        if (polls >= 12) {
+          clearInterval(poll);
+          setIsRunning(false);
+        }
+      }, 5000);
     } catch (error) {
       console.error("Failed to run research:", error);
-      toast.error("Failed to run job research");
-    } finally {
+      toast.error("Failed to start job research");
       setIsRunning(false);
     }
   };
