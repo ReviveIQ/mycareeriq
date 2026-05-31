@@ -567,6 +567,8 @@ export default function Home() {
                                 href={company.contactLinkedIn}
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="text-blue-600 hover:text-blue-800 transition-colors"
                                 title="Contact on LinkedIn"
                               >
@@ -863,6 +865,8 @@ export default function Home() {
                     href={selectedCompany.jobLink}
                     target="_blank"
                     rel="noopener noreferrer"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="flex-1"
                   >
                     <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm h-9 gap-2">
@@ -872,6 +876,8 @@ export default function Home() {
                   </a>
                   <a
                     href={selectedCompany.contactLinkedIn}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex-1"
