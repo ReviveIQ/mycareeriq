@@ -53,34 +53,28 @@ export const monitoringRouter = router({
    * Manually trigger job research (for testing/on-demand)
    */
   runNow: protectedProcedure.mutation(async ({ ctx }) => {
-    try {
-      const startTime = Date.now();
-      
-      // Research new jobs
-      const jobs = await researchNewJobs(undefined, ctx.user.id);
-      
-      // Add to pipeline
-      const addedCount = await addJobsToPipeline(jobs, ctx.user.id);
-      
-      const executionTime = Date.now() - startTime;
-      
-      return {
-        success: true,
-        jobsResearched: jobs.length,
-        jobsAdded: addedCount,
-        executionTimeMs: executionTime,
-        message: `Successfully researched and added ${addedCount} jobs to your pipeline`,
-      };
-    } catch (error) {
-      console.error("[MonitoringRouter] Manual run failed:", error);
-      return {
-        success: false,
-        jobsResearched: 0,
-        jobsAdded: 0,
-        executionTimeMs: 0,
-        message: `Failed to run job research: ${error instanceof Error ? error.message : "Unknown error"}`,
-      };
-    }
+    const userId = ctx.user.id;
+
+    // Fire research in background — don't await so we return before timeout
+    (async () => {
+      try {
+        console.log("[MonitoringRouter] Background job research started for user:", userId);
+        const jobs = await researchNewJobs(undefined, userId);
+        const addedCount = await addJobsToPipeline(jobs, userId);
+        console.log(`[MonitoringRouter] Background research complete: ${addedCount} jobs added`);
+      } catch (err) {
+        console.error("[MonitoringRouter] Background research failed:", err);
+      }
+    })();
+
+    // Return immediately — client polls pipeline table to see results
+    return {
+      success: true,
+      jobsResearched: 0,
+      jobsAdded: 0,
+      executionTimeMs: 0,
+      message: "Job research started — your pipeline will update in 20-30 seconds",
+    };
   }),
 
   /**
