@@ -50,23 +50,29 @@ async function discoverTargetCompanies(
         { role: "system", content: "Return only valid JSON arrays. No markdown, no explanation." },
         {
           role: "user",
-          content: `Generate a list of ${count} real companies that are actively hiring for these roles: ${targetRoles}
+          content: `Generate a list of ${count} real companies actively hiring for: ${targetRoles}
 
-Focus on companies in these categories: ${targetCategories}
+Focus on: ${targetCategories}
 
 Requirements:
-- Must be real, well-known companies with active hiring
-- Mix of enterprise (Salesforce, HubSpot) and growth-stage (Gong, Outreach, Clari)
-- US-based or US hiring
-- Vary the companies each time — don't always return the same list
+- Real companies with ACTIVE job listings right now
+- Mix of enterprise and growth-stage B2B SaaS companies
+- US-based or US remote hiring
+- Vary companies each run — avoid repeating the same list
+
+CRITICAL — careersUrl must be the DIRECT job listings page, not the homepage:
+- Use job board URLs like: https://jobs.lever.co/company, https://boards.greenhouse.io/company, https://company.jobs.workday.com/...
+- Or direct search URLs like: https://salesforce.com/company/careers/search/?keyword=account+executive
+- Or ATS listing pages that show MULTIPLE open roles
+- NOT generic pages like /careers or /about/careers that just describe the company
 
 Return a JSON array where each object has:
 - name: company name (string)
-- domain: company website domain only, e.g. "salesforce.com" (string)  
-- careersUrl: direct URL to their careers/jobs page, e.g. "https://salesforce.com/careers" (string)
-- category: one of the target categories above (string)
+- domain: domain only e.g. "salesforce.com" (string)
+- careersUrl: DIRECT link to job listings page (string)
+- category: industry category (string)
 
-Return ONLY the JSON array.`
+Return ONLY the JSON array. No markdown.`
         }
       ],
       max_tokens: 2000,
@@ -147,19 +153,27 @@ async function scrapeCareerPage(
           { role: "system", content: "Extract job postings from career page content. Return only valid JSON. No markdown." },
           {
             role: "user",
-            content: `From this career page content, extract job postings that match these roles: ${targetRoles}
+            content: `Extract job postings from this career page that match: ${targetRoles}
 
-Career page content:
+Page content:
 ${pageContent.slice(0, 12000)}
 
-Return a JSON array of matching jobs. Each object must have:
-- title: exact job title as listed (string)
-- description: 2-3 sentence summary of the role (string)
-- url: direct application link if found, otherwise empty string (string)
-- salary: salary range if mentioned, otherwise empty string (string)
-- remote: true if remote or hybrid is mentioned, false otherwise (boolean)
+Instructions:
+- Be INCLUSIVE — if a job title is related to the target roles, include it
+- Account Executive, AE, Enterprise AE, Commercial AE, Strategic AE → all match "Account Executive"
+- Business Development, BD Manager, BDR, SDR in BD roles → match "Business Development"
+- VP Sales, Director of Sales, Sales Manager → match senior sales roles
+- When in doubt, include the role
 
-Only include roles that genuinely match the target roles. If no matches, return [].
+Return a JSON array. Each object must have:
+- title: exact job title from the page (string)
+- description: 2-3 sentences about the role (string)
+- url: application link if visible, otherwise "" (string)
+- salary: salary if mentioned, otherwise "" (string)
+- remote: true if remote/hybrid mentioned, false otherwise (boolean)
+
+If the page shows NO job listings (just a careers marketing page), return [].
+If it shows job titles, extract ALL that are related to the target roles.
 Return ONLY the JSON array.`
           }
         ],
@@ -267,10 +281,10 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
 
   // If Apify found fewer than expected, supplement with GPT research
   if (jobs.length === 0) {
-    console.warn("[JobResearch] Apify found 0 jobs — falling back to GPT research for all roles");
+    console.warn("[JobResearch] Firecrawl found 0 matching jobs — falling back to GPT research for all roles");
     return fallbackGptResearch(targetRoles, targetCategories, requestedCount);
   } else if (jobs.length < requestedCount) {
-    console.log(`[JobResearch] Apify found ${jobs.length}/${requestedCount} — supplementing with GPT`);
+    console.log(`[JobResearch] Firecrawl found ${jobs.length}/${requestedCount} — supplementing with GPT`);
     const remaining = requestedCount - jobs.length;
     const supplement = await fallbackGptResearch(targetRoles, targetCategories, remaining);
     jobs.push(...supplement);
