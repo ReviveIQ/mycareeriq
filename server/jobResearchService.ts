@@ -88,50 +88,53 @@ Return ONLY the JSON array.`
   }
 }
 
-// ── Step 2: Scrape career page via Apify ──────────────────────────────────────
+// ── Step 2: Scrape career page via Firecrawl ─────────────────────────────────
 async function scrapeCareerPage(
   careersUrl: string,
   targetRoles: string
 ): Promise<Array<{ title: string; description: string; url: string; salary?: string; remote?: boolean }>> {
-  const apifyKey = process.env.APIFY_API_KEY;
-  if (!apifyKey) {
-    console.warn("[JobResearch] APIFY_API_KEY not set — skipping scrape");
+  const firecrawlKey = process.env.FIRECRAWL_API_KEY;
+  if (!firecrawlKey) {
+    console.warn("[JobResearch] FIRECRAWL_API_KEY not set — skipping scrape");
     return [];
   }
 
   try {
-    // Use Apify's Website Content Crawler actor
-    const runRes = await fetch(
-      "https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=" + apifyKey,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          startUrls: [{ url: careersUrl }],
-          maxCrawlPages: 5,
-          crawlerType: "cheerio",
-          maxCrawlDepth: 2,
-          timeoutSecs: 40,
-          maxSessionRotations: 0,
-        }),
-        signal: AbortSignal.timeout(45000),
-      }
-    );
+    console.log(`[JobResearch] Firecrawl scraping: ${careersUrl}`);
 
-    if (!runRes.ok) {
-      console.warn(`[JobResearch] Apify scrape failed for ${careersUrl}: ${runRes.status}`);
+    // Use Firecrawl to scrape the career page — handles JS-rendered pages
+    const scrapeRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${firecrawlKey}`,
+      },
+      body: JSON.stringify({
+        url: careersUrl,
+        formats: ["markdown"],
+        onlyMainContent: true,
+        timeout: 30000,
+      }),
+      signal: AbortSignal.timeout(35000),
+    });
+
+    if (!scrapeRes.ok) {
+      const errText = await scrapeRes.text();
+      console.warn(`[JobResearch] Firecrawl failed for ${careersUrl}: ${scrapeRes.status} — ${errText.slice(0,200)}`);
       return [];
     }
 
-    const pages = await runRes.json() as any[];
-    if (!pages || pages.length === 0) return [];
+    const scrapeData = await scrapeRes.json() as any;
+    const pageContent = scrapeData?.data?.markdown || scrapeData?.markdown || "";
 
-    // Combine all page text
-    const allText = pages.map((p: any) => p.text || p.markdown || "").join("\n\n").slice(0, 15000);
+    if (!pageContent.trim()) {
+      console.warn(`[JobResearch] Firecrawl returned empty content for ${careersUrl}`);
+      return [];
+    }
 
-    if (!allText.trim()) return [];
+    console.log(`[JobResearch] Firecrawl got ${pageContent.length} chars from ${careersUrl}`);
 
-    // Use GPT to extract matching job postings from the scraped text
+    // Use GPT to extract matching job postings from scraped content
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return [];
 
@@ -141,27 +144,27 @@ async function scrapeCareerPage(
       body: JSON.stringify({
         model: "gpt-4o",
         messages: [
-          { role: "system", content: "Extract job postings from career page content. Return only valid JSON." },
+          { role: "system", content: "Extract job postings from career page content. Return only valid JSON. No markdown." },
           {
             role: "user",
             content: `From this career page content, extract job postings that match these roles: ${targetRoles}
 
 Career page content:
-${allText}
+${pageContent.slice(0, 12000)}
 
 Return a JSON array of matching jobs. Each object must have:
 - title: exact job title as listed (string)
 - description: 2-3 sentence summary of the role (string)
-- url: direct link to the job posting if found, otherwise empty string (string)
+- url: direct application link if found, otherwise empty string (string)
 - salary: salary range if mentioned, otherwise empty string (string)
-- remote: true if remote/hybrid is mentioned, false otherwise (boolean)
+- remote: true if remote or hybrid is mentioned, false otherwise (boolean)
 
-Only include roles that genuinely match the target roles. If no matches found, return empty array [].
+Only include roles that genuinely match the target roles. If no matches, return [].
 Return ONLY the JSON array.`
           }
         ],
-        max_tokens: 1500,
-        temperature: 0.2,
+        max_tokens: 2000,
+        temperature: 0.1,
       }),
     });
 
@@ -170,10 +173,15 @@ Return ONLY the JSON array.`
     let extractText = (extractData.choices?.[0]?.message?.content || "").trim()
       .replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
 
-    const jobs = JSON.parse(extractText);
-    return Array.isArray(jobs) ? jobs : [];
+    try {
+      const jobs = JSON.parse(extractText);
+      return Array.isArray(jobs) ? jobs : [];
+    } catch {
+      console.warn(`[JobResearch] Failed to parse job extraction response`);
+      return [];
+    }
   } catch (err) {
-    console.warn(`[JobResearch] Scrape error for ${careersUrl}:`, err);
+    console.warn(`[JobResearch] Firecrawl scrape error for ${careersUrl}:`, err);
     return [];
   }
 }
