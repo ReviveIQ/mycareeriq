@@ -1,6 +1,6 @@
 import { getDb } from "./db";
-import { buildLinkedInUrl, findCompanyLinkedIn, buildContactLinkedIn } from "./linkedinService";
 import { getDomainInfo, extractDomain } from "./hunterService";
+import { buildLinkedInUrl, findCompanyLinkedIn, buildContactLinkedIn } from "./linkedinService";
 import { companies, researchConfig } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 
@@ -27,70 +27,17 @@ function slugify(str: string): string {
 
 function getPriority(title: string): "High" | "Medium" | "Low" {
   const t = title.toLowerCase();
-  if (t.includes("vp") || t.includes("director") || t.includes("senior")) return "High";
-  if (t.includes("manager") || t.includes("lead")) return "Medium";
+  if (t.includes("vp") || t.includes("vice president") || t.includes("director") || t.includes("senior")) return "High";
+  if (t.includes("manager") || t.includes("lead") || t.includes("head")) return "Medium";
   return "Low";
 }
 
-export async function researchNewJobs(count?: number, userId: number = 1): Promise<GeneratedJob[]> {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const configs = await db.select().from(researchConfig).where(eq(researchConfig.userId, userId));
-  const config = configs[0];
-
-  const targetRoles = config?.targetRoles?.toString() || "Account Executive, Sales Manager";
-  const targetCategories = config?.targetCategories?.toString() || "B2B SaaS";
-  const requestedCount = Math.min(count || config?.rolesPerDay || 10, 30);
-
-  console.log(`[JobResearchService] Researching ${requestedCount} jobs for: ${targetRoles}`);
-
-  const jobs = await aiResearchJobs(targetRoles, targetCategories, requestedCount);
-
-  // Enrich contacts via Hunter.io if available
-  if (process.env.HUNTER_API_KEY) {
-    for (const job of jobs) {
-      if (job.contactName) continue; // already has contact
-      try {
-        const domain = extractDomain(job.companyName);
-        const hunterData = await getDomainInfo(domain);
-        const contacts = hunterData?.emails || [];
-
-        const salesKeywords = ["sales", "revenue", "business development", "account", "growth", "commercial"];
-        const seniorTitles = ["vp", "vice president", "director", "head of", "chief", "svp"];
-
-        const best = contacts.find((c: any) => {
-          const pos = (c.position || "").toLowerCase();
-          return seniorTitles.some(t => pos.includes(t)) && salesKeywords.some(k => pos.includes(k));
-        }) || contacts.find((c: any) => {
-          const pos = (c.position || "").toLowerCase();
-          return salesKeywords.some(k => pos.includes(k));
-        });
-
-        if (best) {
-          job.contactName = `${best.first_name || ""} ${best.last_name || ""}`.trim();
-          job.contactEmail = best.email || "";
-          job.contactLinkedIn = best.linkedin_url || buildContactLinkedIn(best.first_name || "", best.last_name || "");
-          console.log(`[JobResearchService] Found contact at ${job.companyName}: ${job.contactName}`);
-        }
-      } catch { /* Hunter lookup non-critical */ }
-    }
-  }
-
-  // Enrich LinkedIn company URLs
-  for (const job of jobs) {
-    if (!job.linkedinUrl) {
-      try {
-        job.linkedinUrl = await findCompanyLinkedIn(job.companyName);
-      } catch { /* non-critical */ }
-    }
-  }
-
-  console.log(`[JobResearchService] Total jobs researched: ${jobs.length}`);
-  return jobs;
-}
-
-async function aiResearchJobs(targetRoles: string, targetCategories: string, count: number): Promise<GeneratedJob[]> {
+// ── Step 1: Discover target companies via GPT ─────────────────────────────────
+async function discoverTargetCompanies(
+  targetRoles: string,
+  targetCategories: string,
+  count: number = 20
+): Promise<Array<{ name: string; domain: string; careersUrl: string; category: string }>> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY not configured");
 
@@ -103,71 +50,294 @@ async function aiResearchJobs(targetRoles: string, targetCategories: string, cou
         { role: "system", content: "Return only valid JSON arrays. No markdown, no explanation." },
         {
           role: "user",
-          content: `Generate ${count} realistic job opportunities for the following search:
+          content: `Generate a list of ${count} real companies that are actively hiring for these roles: ${targetRoles}
 
-Target Roles: ${targetRoles}
-Target Categories: ${targetCategories}
-Location: United States only
-Preference: Remote-friendly roles
+Focus on companies in these categories: ${targetCategories}
 
-Use only real, well-known companies in these categories. Do not invent obscure companies.
+Requirements:
+- Must be real, well-known companies with active hiring
+- Mix of enterprise (Salesforce, HubSpot) and growth-stage (Gong, Outreach, Clari)
+- US-based or US hiring
+- Vary the companies each time — don't always return the same list
 
-Return a JSON array where each object has exactly these fields:
-- companyName: string (real company name)
-- jobTitle: string (realistic title matching the role)
-- category: string (industry category)
-- jobDescription: string (2-3 sentences describing the role)
-- jobLink: string (real careers page URL, e.g. https://company.com/careers)
-- salary: string (e.g. "$120k - $160k" or "Competitive")
-- remote: boolean
-- priority: "High" | "Medium" | "Low" (based on seniority of role)
+Return a JSON array where each object has:
+- name: company name (string)
+- domain: company website domain only, e.g. "salesforce.com" (string)  
+- careersUrl: direct URL to their careers/jobs page, e.g. "https://salesforce.com/careers" (string)
+- category: one of the target categories above (string)
 
-Return ONLY the JSON array. No other text.`
+Return ONLY the JSON array.`
         }
       ],
-      max_tokens: 4000,
+      max_tokens: 2000,
+      temperature: 0.8,
+    }),
+  });
+
+  if (!res.ok) throw new Error(`OpenAI company discovery failed: ${res.status}`);
+  const data = await res.json() as any;
+  let text = (data.choices?.[0]?.message?.content || "").trim()
+    .replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
+
+  try {
+    const parsed = JSON.parse(text);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    console.error("[JobResearch] Failed to parse company list");
+    return [];
+  }
+}
+
+// ── Step 2: Scrape career page via Apify ──────────────────────────────────────
+async function scrapeCareerPage(
+  careersUrl: string,
+  targetRoles: string
+): Promise<Array<{ title: string; description: string; url: string; salary?: string; remote?: boolean }>> {
+  const apifyKey = process.env.APIFY_API_KEY;
+  if (!apifyKey) {
+    console.warn("[JobResearch] APIFY_API_KEY not set — skipping scrape");
+    return [];
+  }
+
+  try {
+    // Use Apify's Website Content Crawler actor
+    const runRes = await fetch(
+      "https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=" + apifyKey,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          startUrls: [{ url: careersUrl }],
+          maxCrawlPages: 3,
+          crawlerType: "cheerio",
+          maxCrawlDepth: 1,
+          excludeUrlGlobs: [],
+          timeoutSecs: 30,
+        }),
+        signal: AbortSignal.timeout(45000),
+      }
+    );
+
+    if (!runRes.ok) {
+      console.warn(`[JobResearch] Apify scrape failed for ${careersUrl}: ${runRes.status}`);
+      return [];
+    }
+
+    const pages = await runRes.json() as any[];
+    if (!pages || pages.length === 0) return [];
+
+    // Combine all page text
+    const allText = pages.map((p: any) => p.text || p.markdown || "").join("\n\n").slice(0, 15000);
+
+    if (!allText.trim()) return [];
+
+    // Use GPT to extract matching job postings from the scraped text
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) return [];
+
+    const extractRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: "Extract job postings from career page content. Return only valid JSON." },
+          {
+            role: "user",
+            content: `From this career page content, extract job postings that match these roles: ${targetRoles}
+
+Career page content:
+${allText}
+
+Return a JSON array of matching jobs. Each object must have:
+- title: exact job title as listed (string)
+- description: 2-3 sentence summary of the role (string)
+- url: direct link to the job posting if found, otherwise empty string (string)
+- salary: salary range if mentioned, otherwise empty string (string)
+- remote: true if remote/hybrid is mentioned, false otherwise (boolean)
+
+Only include roles that genuinely match the target roles. If no matches found, return empty array [].
+Return ONLY the JSON array.`
+          }
+        ],
+        max_tokens: 1500,
+        temperature: 0.2,
+      }),
+    });
+
+    if (!extractRes.ok) return [];
+    const extractData = await extractRes.json() as any;
+    let extractText = (extractData.choices?.[0]?.message?.content || "").trim()
+      .replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
+
+    const jobs = JSON.parse(extractText);
+    return Array.isArray(jobs) ? jobs : [];
+  } catch (err) {
+    console.warn(`[JobResearch] Scrape error for ${careersUrl}:`, err);
+    return [];
+  }
+}
+
+// ── Step 3: Enrich with Hunter.io contact ────────────────────────────────────
+async function enrichContact(companyName: string, domain: string): Promise<{
+  contactName: string;
+  contactEmail: string;
+  contactLinkedIn: string;
+}> {
+  if (!process.env.HUNTER_API_KEY) return { contactName: "", contactEmail: "", contactLinkedIn: "" };
+
+  try {
+    const hunterData = await getDomainInfo(domain);
+    const contacts = hunterData?.emails || [];
+
+    const salesKeywords = ["sales", "revenue", "business development", "account", "growth", "commercial", "partnerships"];
+    const seniorTitles = ["vp", "vice president", "director", "head of", "chief", "svp", "evp"];
+
+    const best = contacts.find((c: any) => {
+      const pos = (c.position || "").toLowerCase();
+      return seniorTitles.some(t => pos.includes(t)) && salesKeywords.some(k => pos.includes(k));
+    }) || contacts.find((c: any) => {
+      const pos = (c.position || "").toLowerCase();
+      return salesKeywords.some(k => pos.includes(k));
+    });
+
+    if (best) {
+      return {
+        contactName: `${best.first_name || ""} ${best.last_name || ""}`.trim(),
+        contactEmail: best.email || "",
+        contactLinkedIn: best.linkedin_url || buildContactLinkedIn(best.first_name || "", best.last_name || ""),
+      };
+    }
+  } catch { /* non-critical */ }
+
+  return { contactName: "", contactEmail: "", contactLinkedIn: "" };
+}
+
+// ── Main export ───────────────────────────────────────────────────────────────
+export async function researchNewJobs(count?: number, userId: number = 1): Promise<GeneratedJob[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const configs = await db.select().from(researchConfig).where(eq(researchConfig.userId, userId));
+  const config = configs[0];
+
+  const targetRoles = config?.targetRoles?.toString() || "Account Executive, Business Development Manager";
+  const targetCategories = config?.targetCategories?.toString() || "B2B SaaS, Enterprise Software";
+  const requestedCount = Math.min(count || config?.rolesPerDay || 10, 30);
+
+  console.log(`[JobResearch] Starting research — ${requestedCount} jobs for: ${targetRoles}`);
+
+  // Step 1 — Discover companies
+  const companyCount = Math.min(Math.ceil(requestedCount / 2), 15);
+  const targetCompanies = await discoverTargetCompanies(targetRoles, targetCategories, companyCount);
+  console.log(`[JobResearch] Discovered ${targetCompanies.length} target companies`);
+
+  const jobs: GeneratedJob[] = [];
+
+  // Step 2 — Scrape each company's career page
+  for (const company of targetCompanies) {
+    if (jobs.length >= requestedCount) break;
+
+    console.log(`[JobResearch] Scraping ${company.name} — ${company.careersUrl}`);
+
+    const scrapedJobs = await scrapeCareerPage(company.careersUrl, targetRoles);
+    console.log(`[JobResearch] Found ${scrapedJobs.length} matching jobs at ${company.name}`);
+
+    // Step 3 — Enrich contact once per company
+    let contact = { contactName: "", contactEmail: "", contactLinkedIn: "" };
+    if (scrapedJobs.length > 0) {
+      contact = await enrichContact(company.name, company.domain);
+    }
+
+    // Step 4 — Build LinkedIn URL
+    let linkedinUrl = "";
+    try { linkedinUrl = await findCompanyLinkedIn(company.name); } catch { /* non-critical */ }
+
+    for (const job of scrapedJobs) {
+      if (jobs.length >= requestedCount) break;
+      jobs.push({
+        companyName: company.name,
+        companyId: `${slugify(company.name)}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+        jobTitle: job.title,
+        category: company.category,
+        contactName: contact.contactName,
+        contactEmail: contact.contactEmail,
+        linkedinUrl,
+        contactLinkedIn: contact.contactLinkedIn,
+        jobDescription: job.description,
+        jobLink: job.url || company.careersUrl,
+        salary: job.salary || "Competitive",
+        remote: job.remote || false,
+        priority: getPriority(job.title),
+        source: "Apify",
+      });
+    }
+  }
+
+  // Fallback — if scraping found nothing, use GPT to generate plausible listings
+  if (jobs.length === 0) {
+    console.warn("[JobResearch] No scraped jobs found — falling back to GPT research");
+    return fallbackGptResearch(targetRoles, targetCategories, requestedCount);
+  }
+
+  console.log(`[JobResearch] Total jobs found via Apify: ${jobs.length}`);
+  return jobs;
+}
+
+// ── Fallback: GPT-generated listings (used only when Apify finds nothing) ────
+async function fallbackGptResearch(targetRoles: string, targetCategories: string, count: number): Promise<GeneratedJob[]> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY not configured");
+
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: "Return only valid JSON arrays." },
+        {
+          role: "user",
+          content: `Generate ${count} realistic job opportunities for: ${targetRoles} in ${targetCategories}.
+Use only real companies. Return JSON array with: companyName, jobTitle, category, jobDescription (2 sentences), jobLink (real careers URL), salary, remote (bool), priority (High/Medium/Low). No markdown.`
+        }
+      ],
+      max_tokens: 3000,
       temperature: 0.4,
     }),
   });
 
-  if (!res.ok) throw new Error(`OpenAI error: ${await res.text()}`);
+  if (!res.ok) throw new Error(`OpenAI fallback failed: ${res.status}`);
   const data = await res.json() as any;
-  let text = (data.choices?.[0]?.message?.content || "").trim();
-  text = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
+  let text = (data.choices?.[0]?.message?.content || "").trim()
+    .replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
 
-  // Repair truncated JSON
   if (!text.endsWith("]")) {
     const last = text.lastIndexOf("}");
     if (last > 0) text = text.slice(0, last + 1) + "]";
   }
 
-  let parsed: any[];
   try {
-    parsed = JSON.parse(text);
-    if (!Array.isArray(parsed)) parsed = [];
+    const parsed = JSON.parse(text);
+    return (Array.isArray(parsed) ? parsed : []).map((j: any) => ({
+      companyName: j.companyName || "Unknown",
+      companyId: `${slugify(j.companyName || "co")}-${Date.now()}`,
+      jobTitle: j.jobTitle || targetRoles.split(",")[0].trim(),
+      category: j.category || targetCategories.split(",")[0].trim(),
+      contactName: "", contactEmail: "", linkedinUrl: "", contactLinkedIn: "",
+      jobDescription: j.jobDescription || "",
+      jobLink: j.jobLink || "",
+      salary: j.salary || "Competitive",
+      remote: j.remote === true,
+      priority: ["High","Medium","Low"].includes(j.priority) ? j.priority : getPriority(j.jobTitle || ""),
+      source: "GPT Research",
+    }));
   } catch {
-    console.error("[JobResearchService] Failed to parse AI jobs response");
-    parsed = [];
+    return [];
   }
-
-  return parsed.map((j: any) => ({
-    companyName: j.companyName || "Unknown",
-    companyId: `${slugify(j.companyName || "co")}-${Date.now()}-${Math.random().toString(36).slice(2,5)}`,
-    jobTitle: j.jobTitle || targetRoles.split(",")[0].trim(),
-    category: j.category || targetCategories.split(",")[0].trim(),
-    contactName: "",
-    contactEmail: "",
-    linkedinUrl: "",
-    contactLinkedIn: "",
-    jobDescription: j.jobDescription || "",
-    jobLink: j.jobLink || "",
-    salary: j.salary || "Competitive",
-    remote: j.remote === true,
-    priority: ["High","Medium","Low"].includes(j.priority) ? j.priority : getPriority(j.jobTitle || ""),
-    source: "AI Research",
-  }));
 }
 
+// ── Add jobs to pipeline DB ────────────────────────────────────────────────────
 export async function addJobsToPipeline(jobs: GeneratedJob[], userId: number = 1): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -196,10 +366,10 @@ export async function addJobsToPipeline(jobs: GeneratedJob[], userId: number = 1
       });
       addedCount++;
     } catch (err) {
-      console.warn(`[JobResearchService] Failed to add ${job.companyName}:`, err);
+      console.warn(`[JobResearch] Failed to add ${job.companyName}:`, err);
     }
   }
 
-  console.log(`[JobResearchService] Added ${addedCount} jobs to pipeline`);
+  console.log(`[JobResearch] Added ${addedCount} jobs to pipeline`);
   return addedCount;
 }
