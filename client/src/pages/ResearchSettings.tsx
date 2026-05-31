@@ -67,15 +67,15 @@ export default function ResearchSettings() {
   const handleRunNow = async () => {
     setIsRunning(true);
     try {
-      const result = await runResearch.mutateAsync();
-      if (result.success) {
-        toast.success(`✅ Research completed! Added ${result.jobsAdded} jobs to your pipeline`);
-      } else {
-        toast.error(`Failed: ${result.message}`);
-      }
+      await runResearch.mutateAsync();
+      toast.success("Job research started — check the Pipeline tab in 20-30 seconds");
+      // Navigate back to pipeline tab after kicking off research
+      setTimeout(() => {
+        window.location.href = "/?tab=pipeline";
+      }, 1500);
     } catch (error) {
       console.error("Failed to run research:", error);
-      toast.error("Failed to run job research");
+      toast.error("Failed to start job research");
     } finally {
       setIsRunning(false);
     }
