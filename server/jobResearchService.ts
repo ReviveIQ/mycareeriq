@@ -1,6 +1,6 @@
 import { getDb } from "./db";
-import { getDomainInfo, extractDomain } from "./hunterService";
-import { buildLinkedInUrl, findCompanyLinkedIn, buildContactLinkedIn } from "./linkedinService";
+import { findHiringManager } from "./apolloService";
+import { findCompanyLinkedIn } from "./linkedinService";
 import { companies, researchConfig } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 
@@ -178,39 +178,22 @@ Return ONLY the JSON array.`
   }
 }
 
-// ── Step 3: Enrich with Hunter.io contact ────────────────────────────────────
+// ── Step 3: Enrich with Apollo.io contact ────────────────────────────────────
 async function enrichContact(companyName: string, domain: string): Promise<{
   contactName: string;
   contactEmail: string;
   contactLinkedIn: string;
 }> {
-  if (!process.env.HUNTER_API_KEY) return { contactName: "", contactEmail: "", contactLinkedIn: "" };
+  if (!process.env.APOLLO_API_KEY) return { contactName: "", contactEmail: "", contactLinkedIn: "" };
 
-  try {
-    const hunterData = await getDomainInfo(domain);
-    const contacts = hunterData?.emails || [];
+  const contact = await findHiringManager(companyName, domain);
+  if (!contact) return { contactName: "", contactEmail: "", contactLinkedIn: "" };
 
-    const salesKeywords = ["sales", "revenue", "business development", "account", "growth", "commercial", "partnerships"];
-    const seniorTitles = ["vp", "vice president", "director", "head of", "chief", "svp", "evp"];
-
-    const best = contacts.find((c: any) => {
-      const pos = (c.position || "").toLowerCase();
-      return seniorTitles.some(t => pos.includes(t)) && salesKeywords.some(k => pos.includes(k));
-    }) || contacts.find((c: any) => {
-      const pos = (c.position || "").toLowerCase();
-      return salesKeywords.some(k => pos.includes(k));
-    });
-
-    if (best) {
-      return {
-        contactName: `${best.first_name || ""} ${best.last_name || ""}`.trim(),
-        contactEmail: best.email || "",
-        contactLinkedIn: best.linkedin_url || buildContactLinkedIn(best.first_name || "", best.last_name || ""),
-      };
-    }
-  } catch { /* non-critical */ }
-
-  return { contactName: "", contactEmail: "", contactLinkedIn: "" };
+  return {
+    contactName: contact.name,
+    contactEmail: contact.email,
+    contactLinkedIn: contact.linkedinUrl,
+  };
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
