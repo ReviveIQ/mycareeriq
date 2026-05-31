@@ -87,11 +87,33 @@ export default function Login({ onSuccess }: LoginProps) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">
-            {mode === "login" ? "Welcome back" : "Create your account"}
-          </h1>
-          <p className="text-gray-500 mt-1">
+        <div className="flex flex-col items-center gap-3 mb-8">
+          <div className="flex items-center gap-3">
+            <svg viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width:"36px",height:"36px"}}>
+              <defs>
+                <linearGradient id="l-lg1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#60a5fa"/><stop offset="100%" stopColor="#2563eb"/></linearGradient>
+                <linearGradient id="l-lg2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#93c5fd"/><stop offset="100%" stopColor="#3b82f6"/></linearGradient>
+                <linearGradient id="l-lg3" x1="100%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor="#1d4ed8"/><stop offset="100%" stopColor="#1e3a5f"/></linearGradient>
+                <filter id="l-glow"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              </defs>
+              <polygon points="36,4 68,36 36,68 4,36" fill="url(#l-lg3)" opacity="0.35"/>
+              <polygon points="36,4 20,20 36,36 52,20" fill="url(#l-lg2)" opacity="0.9"/>
+              <polygon points="36,4 52,20 68,36 36,36" fill="url(#l-lg1)" opacity="0.65"/>
+              <polygon points="4,36 20,20 36,36 20,52" fill="url(#l-lg1)" opacity="0.5"/>
+              <polygon points="68,36 52,20 36,36 52,52" fill="url(#l-lg2)" opacity="0.75"/>
+              <polygon points="36,68 20,52 36,36 52,52" fill="url(#l-lg3)" opacity="0.95"/>
+              <circle cx="36" cy="36" r="10" fill="none" stroke="rgba(147,197,253,0.3)" strokeWidth="1"/>
+              <circle cx="36" cy="36" r="6" fill="white" opacity="0.95" filter="url(#l-glow)"/>
+              <circle cx="36" cy="36" r="3" fill="#93c5fd"/>
+            </svg>
+            <div>
+              <h1 className="text-2xl leading-none" style={{fontFamily:"'Syne',sans-serif",fontWeight:800}}>
+                <span style={{color:"#0f172a"}}>MyCareer</span><span style={{color:"#2563eb"}}>IQ</span>
+              </h1>
+              <p className="text-xs" style={{color:"#64748b"}}>Job Search Pipeline · by ReviveIQI</p>
+            </div>
+          </div>
+          <p className="text-sm text-gray-500 text-center">
             {mode === "login" ? "Sign in to your pipeline" : "Start building your pipeline"}
           </p>
         </div>
