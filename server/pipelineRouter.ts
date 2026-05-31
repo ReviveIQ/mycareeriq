@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import { companies as companiesTable } from "../drizzle/schema";
@@ -104,4 +105,27 @@ export const pipelineRouter = router({
       throw error;
     }
   }),
+
+  // Update company stage
+  updateStage: protectedProcedure
+    .input(z.object({ id: z.number(), stage: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      await db.update(companiesTable)
+        .set({ stage: input.stage as any })
+        .where(eq(companiesTable.id, input.id));
+      return { success: true };
+    }),
+
+  // Delete (dismiss) a company from the pipeline
+  deleteCompany: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      await db.delete(companiesTable)
+        .where(eq(companiesTable.id, input.id));
+      return { success: true };
+    }),
 });
