@@ -241,7 +241,7 @@ export default function Home() {
               <circle cx="36" cy="36" r="3" fill="#93c5fd"/>
             </svg>
             <div>
-              <h1 className="text-[15px] leading-tight tracking-tight" style={{fontFamily:"'Syne',sans-serif",fontWeight:800}}>
+              <h1 className="text-[15px] leading-tight tracking-tight" style={{fontFamily:"'Montserrat',sans-serif",fontWeight:800}}>
                 <span style={{color:"#0f172a"}}>MyCareer</span><span style={{color:"#2563eb"}}>IQ</span>
                 <span style={{color:"#64748b",fontWeight:500,fontSize:"13px"}}> — Job Search Pipeline</span>
               </h1>
