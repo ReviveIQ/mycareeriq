@@ -116,10 +116,10 @@ export default function Home() {
       const q = search.toLowerCase();
       data = data.filter(
         (c) =>
-          c.name.toLowerCase().includes(q) ||
-          c.role.toLowerCase().includes(q) ||
-          c.contactName.toLowerCase().includes(q) ||
-          c.category.toLowerCase().includes(q)
+          (c.name || "").toLowerCase().includes(q) ||
+          (c.role || "").toLowerCase().includes(q) ||
+          (c.contactName || "").toLowerCase().includes(q) ||
+          (c.category || "").toLowerCase().includes(q)
       );
     }
     if (stageFilter !== "All") data = data.filter((c) => c.stage === stageFilter);
