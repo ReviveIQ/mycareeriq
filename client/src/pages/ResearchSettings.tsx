@@ -172,6 +172,54 @@ export default function ResearchSettings() {
           </div>
         </div>
 
+        {/* Remote Only Toggle */}
+        <div>
+          <label className="block text-sm font-semibold text-slate-900 mb-3">
+            Remote Roles
+          </label>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setRemoteOnly(!remoteOnly)}
+              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                remoteOnly ? "bg-indigo-600" : "bg-slate-300"
+              }`}
+            >
+              <span
+                className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                  remoteOnly ? "translate-x-7" : "translate-x-1"
+                }`}
+              />
+            </button>
+            <span className={`text-sm font-medium ${remoteOnly ? "text-emerald-600" : "text-slate-600"}`}>
+              {remoteOnly ? "Remote roles only" : "All roles (remote + in-office)"}
+            </span>
+          </div>
+        </div>
+
+        {/* US Only Toggle */}
+        <div>
+          <label className="block text-sm font-semibold text-slate-900 mb-3">
+            US Hiring Only
+          </label>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setUsHiringOnly(!usHiringOnly)}
+              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                usHiringOnly ? "bg-indigo-600" : "bg-slate-300"
+              }`}
+            >
+              <span
+                className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                  usHiringOnly ? "translate-x-7" : "translate-x-1"
+                }`}
+              />
+            </button>
+            <span className={`text-sm font-medium ${usHiringOnly ? "text-emerald-600" : "text-slate-600"}`}>
+              {usHiringOnly ? "US positions only" : "All locations"}
+            </span>
+          </div>
+        </div>
+
         {/* Enable/Disable Toggle */}
         <div>
           <label className="block text-sm font-semibold text-slate-900 mb-3">
