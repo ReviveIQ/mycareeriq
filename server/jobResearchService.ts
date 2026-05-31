@@ -108,11 +108,11 @@ async function scrapeCareerPage(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           startUrls: [{ url: careersUrl }],
-          maxCrawlPages: 3,
+          maxCrawlPages: 5,
           crawlerType: "cheerio",
-          maxCrawlDepth: 1,
-          excludeUrlGlobs: [],
-          timeoutSecs: 30,
+          maxCrawlDepth: 2,
+          timeoutSecs: 40,
+          maxSessionRotations: 0,
         }),
         signal: AbortSignal.timeout(45000),
       }
@@ -224,7 +224,7 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
     console.log(`[JobResearch] Scraping ${company.name} — ${company.careersUrl}`);
 
     const scrapedJobs = await scrapeCareerPage(company.careersUrl, targetRoles);
-    console.log(`[JobResearch] Found ${scrapedJobs.length} matching jobs at ${company.name}`);
+    console.log(`[JobResearch] Scrape result: ${scrapedJobs.length} matching jobs at ${company.name} (${company.careersUrl})`);
 
     // Step 3 — Enrich contact once per company
     let contact = { contactName: "", contactEmail: "", contactLinkedIn: "" };
@@ -257,10 +257,15 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
     }
   }
 
-  // Fallback — if scraping found nothing, use GPT to generate plausible listings
+  // If Apify found fewer than expected, supplement with GPT research
   if (jobs.length === 0) {
-    console.warn("[JobResearch] No scraped jobs found — falling back to GPT research");
+    console.warn("[JobResearch] Apify found 0 jobs — falling back to GPT research for all roles");
     return fallbackGptResearch(targetRoles, targetCategories, requestedCount);
+  } else if (jobs.length < requestedCount) {
+    console.log(`[JobResearch] Apify found ${jobs.length}/${requestedCount} — supplementing with GPT`);
+    const remaining = requestedCount - jobs.length;
+    const supplement = await fallbackGptResearch(targetRoles, targetCategories, remaining);
+    jobs.push(...supplement);
   }
 
   console.log(`[JobResearch] Total jobs found via Apify: ${jobs.length}`);
