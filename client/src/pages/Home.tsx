@@ -278,24 +278,38 @@ export default function Home() {
               <Settings className="w-3.5 h-3.5" />
               Team
             </Button>
-            <Button
-              onClick={handleRunNow}
-              disabled={isRunning}
-              size="sm"
-              className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
-            >
-              {isRunning ? (
-                <>
-                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Running...
-                </>
-              ) : (
-                <>
-                  <Play className="w-3.5 h-3.5" />
-                  Run Now
-                </>
+            <div className="flex flex-col items-center gap-0.5">
+              <Button
+                onClick={handleRunNow}
+                disabled={isRunning || rateLimitStatus?.canRunNow === false}
+                size="sm"
+                className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                title={!rateLimitStatus?.canRunNow
+                  ? (rateLimitStatus?.hoursUntilNextRun ? `Next run in ${rateLimitStatus.hoursUntilNextRun}h` : "Monthly limit reached")
+                  : undefined}
+              >
+                {isRunning ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Running...
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-3.5 h-3.5" />
+                    Run Now
+                  </>
+                )}
+              </Button>
+              {rateLimitStatus && (
+                <span className="text-[10px] text-slate-500 leading-none">
+                  {rateLimitStatus.canRunNow
+                    ? `${rateLimitStatus.runsThisMonth}/${rateLimitStatus.monthlyLimit} used`
+                    : rateLimitStatus.hoursUntilNextRun > 0
+                      ? `${rateLimitStatus.hoursUntilNextRun}h cooldown`
+                      : `Limit reached`}
+                </span>
               )}
-            </Button>
+            </div>
 
             {/* User menu with logout */}
             <div className="relative">
