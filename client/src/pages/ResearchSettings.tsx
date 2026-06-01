@@ -8,7 +8,11 @@ import { toast } from "sonner";
 import { DocumentIntake } from "@/components/DocumentIntake";
 import { RoleSelector } from "@/components/RoleSelector";
 
-export default function ResearchSettings() {
+interface ResearchSettingsProps {
+  onRunNow?: () => void;
+}
+
+export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {}) {
   const [targetRoles, setTargetRoles] = useState("");
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [usHiringOnly, setUsHiringOnly] = useState(true);
@@ -67,12 +71,18 @@ export default function ResearchSettings() {
   const handleRunNow = async () => {
     setIsRunning(true);
     try {
-      await runResearch.mutateAsync();
-      toast.success("Job research started — check the Pipeline tab in 20-30 seconds");
-      // Navigate back to pipeline tab after kicking off research
-      setTimeout(() => {
-        window.location.href = "/?tab=pipeline";
-      }, 1500);
+      const result = await runResearch.mutateAsync();
+      if (result.rateLimited) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success("Job research started — your pipeline will update in 20-30 seconds");
+      // Switch to pipeline tab without full reload
+      if (onRunNow) {
+        onRunNow();
+      } else {
+        setTimeout(() => { window.location.href = "/"; }, 1500);
+      }
     } catch (error) {
       console.error("Failed to run research:", error);
       toast.error("Failed to start job research");
