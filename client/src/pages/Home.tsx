@@ -4,7 +4,7 @@
 
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-import { stageColors, priorityColors, categoryColors, stageOrder, exportToCSV, type PipelineStage, type Company, type CompanyCategory } from "@/lib/pipelineData";
+import { stageColors, priorityColors, categoryColors, getCategoryColor, stageOrder, exportToCSV, type PipelineStage, type Company, type CompanyCategory } from "@/lib/pipelineData";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -894,7 +894,7 @@ export default function Home() {
                     {selectedCompany.priority} Priority
                   </Badge>
                   <Badge
-                    className={`${categoryColors[selectedCompany.category]} text-xs`}
+                    className={`${getCategoryColor(selectedCompany.category)} text-xs`}
                     variant="outline"
                   >
                     {selectedCompany.category}
