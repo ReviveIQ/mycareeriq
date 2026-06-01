@@ -134,11 +134,11 @@ export const researchConfig = mysqlTable("researchConfig", {
   // Comma-separated list of categories to research
   targetCategories: text("targetCategories").notNull(),
 
-  // Rate limiting & usage caps
-  lastRunAt: timestamp("lastRunAt"),
-  runsThisMonth: int("runsThisMonth").default(0).notNull(),
-  monthlyRunsResetAt: timestamp("monthlyRunsResetAt"),
-  monthlyRunLimit: int("monthlyRunLimit").default(10).notNull(),
+  // Rate limiting & usage caps — use lowercase column names to match TiDB storage
+  lastRunAt: timestamp("lastrunat"),
+  runsThisMonth: int("runsthismonth").default(0).notNull(),
+  monthlyRunsResetAt: timestamp("monthlyrunsresetat"),
+  monthlyRunLimit: int("monthlyrunlimit").default(10).notNull(),
 
   // Comma-separated list of target companies to scrape
   targetCompanies: text("targetCompanies").notNull(),
