@@ -50,29 +50,50 @@ async function discoverTargetCompanies(
         { role: "system", content: "Return only valid JSON arrays. No markdown, no explanation." },
         {
           role: "user",
-          content: `Generate a list of ${count} real companies actively hiring for: ${targetRoles}
+          content: `Generate a list of ${count} real B2B SaaS companies that are actively hiring for these roles right now: ${targetRoles}
 
-Focus on: ${targetCategories}
+Focus on categories: ${targetCategories}
 
-Requirements:
-- Real companies with ACTIVE job listings right now
-- Mix of enterprise and growth-stage B2B SaaS companies
-- US-based or US remote hiring
-- Vary companies each run — avoid repeating the same list
+For each company you MUST provide a filtered ATS URL that goes directly to matching job listings — not a generic /careers page.
 
-CRITICAL — careersUrl must be the DIRECT job listings page, not the homepage:
-- Use job board URLs like: https://jobs.lever.co/company, https://boards.greenhouse.io/company, https://company.jobs.workday.com/...
-- Or direct search URLs like: https://salesforce.com/company/careers/search/?keyword=account+executive
-- Or ATS listing pages that show MULTIPLE open roles
-- NOT generic pages like /careers or /about/careers that just describe the company
+Use these ATS URL patterns based on what each company uses:
+- Greenhouse: https://boards.greenhouse.io/{company-slug}/jobs?q={role-keyword}
+- Lever: https://jobs.lever.co/{company-slug}?department=Sales
+- Workday: https://{company}.wd1.myworkdayjobs.com/External_Career_Site/jobs?q={role-keyword}
+- Ashby: https://jobs.ashbyhq.com/{company-slug}
+- Rippling/custom: https://{company}.com/careers?department=sales&q={role-keyword}
 
-Return a JSON array where each object has:
-- name: company name (string)
-- domain: domain only e.g. "salesforce.com" (string)
-- careersUrl: DIRECT link to job listings page (string)
-- category: industry category (string)
+Role keywords to use in URLs: account-executive, account+executive, "account executive", sales, business-development
 
-Return ONLY the JSON array. No markdown.`
+Real examples of CORRECT filtered URLs:
+- HubSpot AE: https://www.hubspot.com/careers/jobs?q=account+executive&page=1
+- Salesforce AE: https://salesforce.wd1.myworkdayjobs.com/External_Career_Site/jobs?q=Account+Executive
+- Gong: https://jobs.lever.co/gong?department=Sales
+- Outreach: https://jobs.lever.co/outreach?department=Sales
+- Zendesk: https://jobs.lever.co/zendesk?department=Sales&commitment=Full-time
+- Clari: https://jobs.lever.co/clari?department=Sales
+- Seismic: https://boards.greenhouse.io/seismic/jobs?q=account+executive
+- Salesloft: https://boards.greenhouse.io/salesloft?q=account
+- Apollo.io: https://boards.greenhouse.io/apolloio?q=account
+- Drift: https://boards.greenhouse.io/drift?q=sales
+
+Rules:
+- ONLY real companies you are confident use these specific ATS systems
+- Vary the companies each run — do not repeat the same list every time
+- US-based or US remote positions
+- Mix enterprise (Salesforce, HubSpot) with growth-stage (Gong, Outreach, Clari, Seismic)
+- If unsure of the exact ATS URL, use the Greenhouse or Lever pattern as a safe default
+
+Return a JSON array only — no markdown, no explanation:
+[
+  {
+    "name": "HubSpot",
+    "domain": "hubspot.com",
+    "careersUrl": "https://www.hubspot.com/careers/jobs?q=account+executive&page=1",
+    "category": "Sales Enablement",
+    "ats": "hubspot-custom"
+  }
+]`
         }
       ],
       max_tokens: 2000,
@@ -120,6 +141,10 @@ async function scrapeCareerPage(
         formats: ["markdown"],
         onlyMainContent: true,
         timeout: 30000,
+        waitFor: 2000,
+        actions: [
+          { type: "wait", milliseconds: 2000 }
+        ],
       }),
       signal: AbortSignal.timeout(35000),
     });
@@ -150,7 +175,7 @@ async function scrapeCareerPage(
       body: JSON.stringify({
         model: "gpt-4o",
         messages: [
-          { role: "system", content: "Extract job postings from career page content. Return only valid JSON. No markdown." },
+          { role: "system", content: "You are extracting job listings from a career page. Be inclusive — if there is any doubt whether a role matches, include it. Return only valid JSON arrays." },
           {
             role: "user",
             content: `Extract job postings from this career page that match: ${targetRoles}
