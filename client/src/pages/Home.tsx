@@ -91,6 +91,7 @@ export default function Home() {
   const { data: highPriorityCount = 0 } = trpc.pipeline.getHighPriority.useQuery();
   const { data: remoteCount = 0 } = trpc.pipeline.getRemoteCount.useQuery();
   const runResearch = trpc.monitoring.runNow.useMutation();
+  const { data: rateLimitStatus, refetch: refetchRateLimit } = trpc.monitoring.getRateLimitStatus.useQuery();
   const updateStage = trpc.pipeline.updateStage.useMutation();
   const deleteCompany = trpc.pipeline.deleteCompany.useMutation();
 
@@ -201,10 +202,19 @@ export default function Home() {
     setIsRunning(true);
     setActiveTab("pipeline");
     try {
-      await runResearch.mutateAsync();
-      toast.success("Job research started — your pipeline will update in 20-30 seconds");
+      const result = await runResearch.mutateAsync();
 
-      // Poll every 5 seconds for 60 seconds to catch when results arrive
+      if (result.rateLimited) {
+        toast.error(result.message);
+        setIsRunning(false);
+        return;
+      }
+
+      const runsLeft = (result.monthlyLimit || 10) - (result.runsThisMonth || 0);
+      toast.success(`Job research started — ${runsLeft} run${runsLeft === 1 ? "" : "s"} remaining this month`);
+      refetchRateLimit();
+
+      // Poll every 5 seconds for 60 seconds
       let polls = 0;
       const poll = setInterval(async () => {
         polls++;
