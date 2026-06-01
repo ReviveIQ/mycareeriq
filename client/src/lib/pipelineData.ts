@@ -42,20 +42,47 @@ export const priorityColors: Record<"High" | "Medium" | "Low", string> = {
 };
 
 const _categoryColorMap: Record<string, string> = {
-  "Sales Enablement": "bg-indigo-50 text-indigo-700",
-  "Revenue Intelligence": "bg-violet-50 text-violet-700",
-  "Customer Success": "bg-teal-50 text-teal-700",
-  "Marketing Automation": "bg-pink-50 text-pink-700",
-  "HR / Workforce Tech": "bg-orange-50 text-orange-700",
-  "Subscription / Billing": "bg-cyan-50 text-cyan-700",
-  "Social Media SaaS": "bg-sky-50 text-sky-700",
-  "Partnership Platform": "bg-lime-50 text-lime-700",
-  "EdTech SaaS": "bg-emerald-50 text-emerald-700",
-  "Compliance SaaS": "bg-rose-50 text-rose-700",
-  "B2B SaaS": "bg-blue-50 text-blue-700",
+  // Sales
   "CRM": "bg-indigo-50 text-indigo-700",
-  "Enterprise Software": "bg-violet-50 text-violet-700",
+  "Sales Engagement": "bg-indigo-50 text-indigo-700",
+  "Sales Enablement": "bg-indigo-50 text-indigo-700",
+  "Sales Intelligence": "bg-indigo-100 text-indigo-800",
   "Sales Technology": "bg-indigo-50 text-indigo-700",
+  "Revenue Intelligence": "bg-violet-50 text-violet-700",
+  "Revenue Operations": "bg-violet-100 text-violet-800",
+  // Marketing
+  "Marketing Automation": "bg-pink-50 text-pink-700",
+  "Marketing Technology": "bg-pink-50 text-pink-700",
+  "Account-Based Marketing": "bg-pink-100 text-pink-800",
+  // Customer
+  "Customer Success": "bg-teal-50 text-teal-700",
+  "Customer Experience": "bg-teal-50 text-teal-700",
+  "Customer Support": "bg-teal-100 text-teal-800",
+  // HR
+  "HR Technology": "bg-orange-50 text-orange-700",
+  // Data
+  "Data & Analytics": "bg-cyan-50 text-cyan-700",
+  "Business Intelligence": "bg-cyan-50 text-cyan-700",
+  // Finance
+  "FinTech": "bg-emerald-50 text-emerald-700",
+  "Billing & Payments": "bg-emerald-50 text-emerald-700",
+  // EdTech
+  "EdTech": "bg-lime-50 text-lime-700",
+  // Security
+  "Cybersecurity": "bg-red-50 text-red-700",
+  "Identity & Access": "bg-red-50 text-red-700",
+  // Collab
+  "Collaboration": "bg-sky-50 text-sky-700",
+  "Productivity": "bg-sky-50 text-sky-700",
+  "Project Management": "bg-sky-100 text-sky-800",
+  // Dev
+  "DevOps": "bg-slate-100 text-slate-700",
+  "Developer Tools": "bg-slate-100 text-slate-700",
+  "Cloud Infrastructure": "bg-slate-100 text-slate-700",
+  // General
+  "B2B SaaS": "bg-blue-50 text-blue-700",
+  "Enterprise Software": "bg-blue-50 text-blue-700",
+  "Platform": "bg-blue-50 text-blue-700",
 };
 
 export function getCategoryColor(category: string): string {
