@@ -72,8 +72,8 @@ export const monitoringRouter = router({
     if (config?.lastRunAt) {
       const lastRun = new Date(config.lastRunAt);
       const hoursSinceLastRun = (now.getTime() - lastRun.getTime()) / (1000 * 60 * 60);
-      if (hoursSinceLastRun < 24) {
-        const hoursLeft = Math.ceil(24 - hoursSinceLastRun);
+      if (hoursSinceLastRun < 12) {
+        const hoursLeft = Math.ceil(12 - hoursSinceLastRun);
         return {
           success: false,
           jobsResearched: 0,
@@ -170,8 +170,8 @@ export const monitoringRouter = router({
 
     if (config?.lastRunAt) {
       const hoursSince = (now.getTime() - new Date(config.lastRunAt).getTime()) / (1000 * 60 * 60);
-      if (hoursSince < 24) {
-        hoursUntilNextRun = Math.ceil(24 - hoursSince);
+      if (hoursSince < 12) {
+        hoursUntilNextRun = Math.ceil(12 - hoursSince);
         canRunNow = false;
       }
     }
