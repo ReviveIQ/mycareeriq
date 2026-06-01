@@ -55,23 +55,23 @@ export const monitoringRouter = router({
   runNow: protectedProcedure.mutation(async ({ ctx }) => {
     const userId = ctx.user.id;
 
-    // ── Rate limiting via raw SQL (avoids Drizzle schema column name issues) ────
+    // ── Rate limiting via Drizzle sql template ───────────────────────────────
     const { getDb } = await import("./db");
-    const conn = await getDb();
-    if (!conn) throw new Error("Database not available");
+    const { sql } = await import("drizzle-orm");
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
 
     const now = new Date();
 
-    // Get rate limit state via raw SQL
-    const [rows] = await (conn as any).execute(
-      "SELECT lastRunAt, runsThisMonth, monthlyRunsResetAt, monthlyRunLimit FROM researchConfig WHERE userId = ? LIMIT 1",
-      [userId]
-    ) as any[];
+    // Get rate limit state
+    const rows = await db.execute(
+      sql`SELECT lastRunAt, runsThisMonth, monthlyRunsResetAt, monthlyRunLimit FROM researchConfig WHERE userId = ${userId} LIMIT 1`
+    ) as any;
+    const row = Array.isArray(rows) ? rows[0] : (rows?.rows?.[0] ?? null);
 
-    const row = rows?.[0];
     const lastRunAt = row?.lastRunAt ? new Date(row.lastRunAt) : null;
-    const runsThisMonth = row?.runsThisMonth || 0;
-    const monthlyLimit = row?.monthlyRunLimit || 60;
+    const runsThisMonth = Number(row?.runsThisMonth ?? 0);
+    const monthlyLimit = Number(row?.monthlyRunLimit ?? 60);
     const resetAt = row?.monthlyRunsResetAt ? new Date(row.monthlyRunsResetAt) : null;
 
     // Check 20-minute cooldown
@@ -94,16 +94,13 @@ export const monitoringRouter = router({
       }
     }
 
-    // Check monthly cap
+    // Check monthly cap — reset if new period
     let currentRuns = runsThisMonth;
     if (!resetAt || now > resetAt) {
       currentRuns = 0;
       const nextReset = new Date(now);
       nextReset.setMonth(nextReset.getMonth() + 1);
-      await (conn as any).execute(
-        "UPDATE researchConfig SET runsThisMonth = 0, monthlyRunsResetAt = ? WHERE userId = ?",
-        [nextReset, userId]
-      );
+      await db.execute(sql`UPDATE researchConfig SET runsThisMonth = 0, monthlyRunsResetAt = ${nextReset} WHERE userId = ${userId}`);
     }
 
     if (currentRuns >= monthlyLimit) {
@@ -122,11 +119,8 @@ export const monitoringRouter = router({
     }
 
     // Update counters before firing
-    const nextReset = resetAt || (() => { const d = new Date(now); d.setMonth(d.getMonth() + 1); return d; })();
-    await (conn as any).execute(
-      "UPDATE researchConfig SET lastRunAt = ?, runsThisMonth = ?, monthlyRunsResetAt = ? WHERE userId = ?",
-      [now, currentRuns + 1, nextReset, userId]
-    );
+    const nextReset2 = resetAt || (() => { const d = new Date(now); d.setMonth(d.getMonth() + 1); return d; })();
+    await db.execute(sql`UPDATE researchConfig SET lastRunAt = ${now}, runsThisMonth = ${currentRuns + 1}, monthlyRunsResetAt = ${nextReset2} WHERE userId = ${userId}`);
 
     console.log(`[MonitoringRouter] Run approved for user ${userId} — run ${currentRuns + 1}/${monthlyLimit} this month`);
 
@@ -157,19 +151,19 @@ export const monitoringRouter = router({
   // Get current rate limit status
   getRateLimitStatus: protectedProcedure.query(async ({ ctx }) => {
     const { getDb } = await import("./db");
-    const conn = await getDb();
-    if (!conn) return { runsThisMonth: 0, monthlyLimit: 60, minutesUntilNextRun: 0, canRunNow: true };
+    const { sql } = await import("drizzle-orm");
+    const db = await getDb();
+    if (!db) return { runsThisMonth: 0, monthlyLimit: 60, minutesUntilNextRun: 0, canRunNow: true };
 
-    const [rows] = await (conn as any).execute(
-      "SELECT lastRunAt, runsThisMonth, monthlyRunsResetAt, monthlyRunLimit FROM researchConfig WHERE userId = ? LIMIT 1",
-      [ctx.user.id]
-    ) as any[];
+    const rows = await db.execute(
+      sql`SELECT lastRunAt, runsThisMonth, monthlyRunsResetAt, monthlyRunLimit FROM researchConfig WHERE userId = ${ctx.user.id} LIMIT 1`
+    ) as any;
+    const row = Array.isArray(rows) ? rows[0] : (rows?.rows?.[0] ?? null);
 
-    const row = rows?.[0];
     const now = new Date();
     const lastRunAt = row?.lastRunAt ? new Date(row.lastRunAt) : null;
-    const runsThisMonth = row?.runsThisMonth || 0;
-    const monthlyLimit = row?.monthlyRunLimit || 60;
+    const runsThisMonth = Number(row?.runsThisMonth ?? 0);
+    const monthlyLimit = Number(row?.monthlyRunLimit ?? 60);
 
     let minutesUntilNextRun = 0;
     let canRunNow = true;
