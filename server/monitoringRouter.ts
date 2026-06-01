@@ -55,29 +55,30 @@ export const monitoringRouter = router({
   runNow: protectedProcedure.mutation(async ({ ctx }) => {
     const userId = ctx.user.id;
 
-    // ── Rate limiting check ────────────────────────────────────────────────
+    // ── Rate limiting via raw SQL (avoids Drizzle schema column name issues) ────
     const { getDb } = await import("./db");
-    const { researchConfig } = await import("../drizzle/schema");
-    const { eq } = await import("drizzle-orm");
-
-    const db = await getDb();
-    if (!db) throw new Error("Database not available");
-
-    const configs = await db.select().from(researchConfig).where(eq(researchConfig.userId, userId));
-    const config = configs[0];
+    const conn = await getDb();
+    if (!conn) throw new Error("Database not available");
 
     const now = new Date();
 
-    // Check per-hour rate limit — max 3 runs per hour
-    const MAX_RUNS_PER_HOUR = 3;
-    if (config?.lastRunAt) {
-      const lastRun = new Date(config.lastRunAt);
-      const minutesSinceLastRun = (now.getTime() - lastRun.getTime()) / (1000 * 60);
+    // Get rate limit state via raw SQL
+    const [rows] = await (conn as any).execute(
+      "SELECT lastRunAt, runsThisMonth, monthlyRunsResetAt, monthlyRunLimit FROM researchConfig WHERE userId = ? LIMIT 1",
+      [userId]
+    ) as any[];
 
-      // Count runs in last 60 minutes — use runsThisHour tracking via lastRunAt window
-      // Simple approach: enforce minimum 20 minutes between runs (3 per hour max)
-      if (minutesSinceLastRun < 20) {
-        const minutesLeft = Math.ceil(20 - minutesSinceLastRun);
+    const row = rows?.[0];
+    const lastRunAt = row?.lastRunAt ? new Date(row.lastRunAt) : null;
+    const runsThisMonth = row?.runsThisMonth || 0;
+    const monthlyLimit = row?.monthlyRunLimit || 60;
+    const resetAt = row?.monthlyRunsResetAt ? new Date(row.monthlyRunsResetAt) : null;
+
+    // Check 20-minute cooldown
+    if (lastRunAt) {
+      const minutesSince = (now.getTime() - lastRunAt.getTime()) / (1000 * 60);
+      if (minutesSince < 20) {
+        const minutesLeft = Math.ceil(20 - minutesSince);
         return {
           success: false,
           jobsResearched: 0,
@@ -87,51 +88,47 @@ export const monitoringRouter = router({
           rateLimited: true,
           minutesUntilNextRun: minutesLeft,
           hoursUntilNextRun: 0,
+          runsThisMonth,
+          monthlyLimit,
         };
       }
     }
 
-    // Check monthly run limit — reset counter if new month
-    let runsThisMonth = config?.runsThisMonth || 0;
-    const monthlyLimit = config?.monthlyRunLimit || 10;
-    const resetAt = config?.monthlyRunsResetAt ? new Date(config.monthlyRunsResetAt) : null;
-
+    // Check monthly cap
+    let currentRuns = runsThisMonth;
     if (!resetAt || now > resetAt) {
-      // Reset monthly counter
-      runsThisMonth = 0;
+      currentRuns = 0;
       const nextReset = new Date(now);
       nextReset.setMonth(nextReset.getMonth() + 1);
-      await db.update(researchConfig)
-        .set({ runsThisMonth: 0, monthlyRunsResetAt: nextReset })
-        .where(eq(researchConfig.userId, userId));
+      await (conn as any).execute(
+        "UPDATE researchConfig SET runsThisMonth = 0, monthlyRunsResetAt = ? WHERE userId = ?",
+        [nextReset, userId]
+      );
     }
 
-    if (runsThisMonth >= monthlyLimit) {
-      const daysUntilReset = resetAt ? Math.ceil((resetAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 30;
+    if (currentRuns >= monthlyLimit) {
+      const daysLeft = resetAt ? Math.ceil((resetAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 30;
       return {
         success: false,
         jobsResearched: 0,
         jobsAdded: 0,
         executionTimeMs: 0,
-        message: `Monthly limit reached (${monthlyLimit} runs). Resets in ${daysUntilReset} day${daysUntilReset === 1 ? "" : "s"}.`,
+        message: `Monthly limit reached (${monthlyLimit} runs). Resets in ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`,
         rateLimited: true,
         monthlyLimitReached: true,
-        runsThisMonth,
+        runsThisMonth: currentRuns,
         monthlyLimit,
       };
     }
 
-    // ── Update timestamps before firing ────────────────────────────────────
+    // Update counters before firing
     const nextReset = resetAt || (() => { const d = new Date(now); d.setMonth(d.getMonth() + 1); return d; })();
-    await db.update(researchConfig)
-      .set({
-        lastRunAt: now,
-        runsThisMonth: runsThisMonth + 1,
-        monthlyRunsResetAt: nextReset,
-      })
-      .where(eq(researchConfig.userId, userId));
+    await (conn as any).execute(
+      "UPDATE researchConfig SET lastRunAt = ?, runsThisMonth = ?, monthlyRunsResetAt = ? WHERE userId = ?",
+      [now, currentRuns + 1, nextReset, userId]
+    );
 
-    console.log(`[MonitoringRouter] Run approved for user ${userId} — run ${runsThisMonth + 1}/${monthlyLimit} this month`);
+    console.log(`[MonitoringRouter] Run approved for user ${userId} — run ${currentRuns + 1}/${monthlyLimit} this month`);
 
     // ── Fire research in background ────────────────────────────────────────
     (async () => {
@@ -160,47 +157,39 @@ export const monitoringRouter = router({
   // Get current rate limit status
   getRateLimitStatus: protectedProcedure.query(async ({ ctx }) => {
     const { getDb } = await import("./db");
-    const { researchConfig } = await import("../drizzle/schema");
-    const { eq } = await import("drizzle-orm");
+    const conn = await getDb();
+    if (!conn) return { runsThisMonth: 0, monthlyLimit: 60, minutesUntilNextRun: 0, canRunNow: true };
 
-    const db = await getDb();
-    if (!db) return { runsThisMonth: 0, monthlyLimit: 10, hoursUntilNextRun: 0, canRunNow: true };
+    const [rows] = await (conn as any).execute(
+      "SELECT lastRunAt, runsThisMonth, monthlyRunsResetAt, monthlyRunLimit FROM researchConfig WHERE userId = ? LIMIT 1",
+      [ctx.user.id]
+    ) as any[];
 
-    const configs = await db.select().from(researchConfig).where(eq(researchConfig.userId, ctx.user.id));
-    const config = configs[0];
+    const row = rows?.[0];
     const now = new Date();
+    const lastRunAt = row?.lastRunAt ? new Date(row.lastRunAt) : null;
+    const runsThisMonth = row?.runsThisMonth || 0;
+    const monthlyLimit = row?.monthlyRunLimit || 60;
 
-    let hoursUntilNextRun = 0;
+    let minutesUntilNextRun = 0;
     let canRunNow = true;
 
-    if (config?.lastRunAt) {
-      const minutesSince = (now.getTime() - new Date(config.lastRunAt).getTime()) / (1000 * 60);
-      if (minutesSince < 20) {
-        hoursUntilNextRun = 0;
-        minutesUntilNextRun = Math.ceil(20 - minutesSince);
+    if (lastRunAt) {
+      const minsSince = (now.getTime() - lastRunAt.getTime()) / (1000 * 60);
+      if (minsSince < 20) {
+        minutesUntilNextRun = Math.ceil(20 - minsSince);
         canRunNow = false;
       }
     }
 
-    const runsThisMonth = config?.runsThisMonth || 0;
-    const monthlyLimit = config?.monthlyRunLimit || 10;
-
     if (runsThisMonth >= monthlyLimit) canRunNow = false;
-
-    const minutesUntilNextRun = (() => {
-      if (!config?.lastRunAt) return 0;
-      const mins = (now.getTime() - new Date(config.lastRunAt).getTime()) / (1000 * 60);
-      return mins < 20 ? Math.ceil(20 - mins) : 0;
-    })();
 
     return {
       runsThisMonth,
       monthlyLimit,
-      hoursUntilNextRun,
       minutesUntilNextRun,
-      canRunNow: canRunNow && minutesUntilNextRun === 0,
-      lastRunAt: config?.lastRunAt || null,
-      monthlyRunsResetAt: config?.monthlyRunsResetAt || null,
+      hoursUntilNextRun: 0,
+      canRunNow,
     };
   }),
 
