@@ -21,6 +21,104 @@ export interface GeneratedJob {
   contactLinkedIn: string;
 }
 
+// Standard B2B SaaS category taxonomy — maps to industry-standard classifications
+const STANDARD_CATEGORIES: Record<string, string> = {
+  // CRM & Sales
+  "crm": "CRM",
+  "customer relationship management": "CRM",
+  "sales crm": "CRM",
+
+  // Sales Engagement & Enablement
+  "sales engagement": "Sales Engagement",
+  "sales enablement": "Sales Enablement",
+  "sales intelligence": "Sales Intelligence",
+  "sales technology": "Sales Technology",
+  "sales automation": "Sales Engagement",
+  "revenue intelligence": "Revenue Intelligence",
+  "conversation intelligence": "Revenue Intelligence",
+  "revenue operations": "Revenue Operations",
+  "revops": "Revenue Operations",
+
+  // Marketing
+  "marketing automation": "Marketing Automation",
+  "marketing technology": "Marketing Technology",
+  "martech": "Marketing Technology",
+  "demand generation": "Marketing Automation",
+  "account-based marketing": "Account-Based Marketing",
+  "abm": "Account-Based Marketing",
+
+  // Customer Success
+  "customer success": "Customer Success",
+  "customer experience": "Customer Experience",
+  "customer support": "Customer Support",
+  "help desk": "Customer Support",
+
+  // HR & Workforce
+  "hr tech": "HR Technology",
+  "hr technology": "HR Technology",
+  "human resources": "HR Technology",
+  "workforce management": "HR Technology",
+  "talent management": "HR Technology",
+  "recruiting": "HR Technology",
+
+  // Data & Analytics
+  "data analytics": "Data & Analytics",
+  "business intelligence": "Business Intelligence",
+  "bi": "Business Intelligence",
+
+  // Security
+  "cybersecurity": "Cybersecurity",
+  "security": "Cybersecurity",
+  "identity": "Identity & Access",
+
+  // Finance & Billing
+  "fintech": "FinTech",
+  "billing": "Billing & Payments",
+  "payments": "Billing & Payments",
+  "subscription management": "Billing & Payments",
+  "financial technology": "FinTech",
+
+  // EdTech
+  "edtech": "EdTech",
+  "education technology": "EdTech",
+  "learning management": "EdTech",
+  "lms": "EdTech",
+
+  // Collaboration & Productivity
+  "collaboration": "Collaboration",
+  "productivity": "Productivity",
+  "project management": "Project Management",
+
+  // DevOps & Engineering
+  "devops": "DevOps",
+  "developer tools": "Developer Tools",
+
+  // Vertical SaaS
+  "healthcare": "Healthcare Tech",
+  "legal tech": "Legal Tech",
+  "real estate tech": "Real Estate Tech",
+  "proptech": "Real Estate Tech",
+
+  // General
+  "b2b saas": "B2B SaaS",
+  "enterprise software": "Enterprise Software",
+  "cloud": "Cloud Infrastructure",
+  "infrastructure": "Cloud Infrastructure",
+  "platform": "Platform",
+};
+
+function standardizeCategory(raw: string): string {
+  const lower = (raw || "").toLowerCase().trim();
+  // Direct match
+  if (STANDARD_CATEGORIES[lower]) return STANDARD_CATEGORIES[lower];
+  // Partial match
+  for (const [key, value] of Object.entries(STANDARD_CATEGORIES)) {
+    if (lower.includes(key) || key.includes(lower)) return value;
+  }
+  // Title case the raw value as fallback
+  return raw.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+}
+
 function slugify(str: string): string {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
@@ -257,6 +355,21 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
 
   console.log(`[JobResearch] Starting research — ${requestedCount} jobs for: ${targetRoles}`);
 
+  // Get existing companies in pipeline to avoid duplicates
+  const existingRows = await db.select({ companyName: companies.companyName })
+    .from(companies)
+    .where(eq(companies.userId, userId));
+
+  // Count how many roles each company already has in pipeline
+  const companyRoleCounts: Record<string, number> = {};
+  for (const row of existingRows) {
+    const name = (row.companyName || "").toLowerCase();
+    companyRoleCounts[name] = (companyRoleCounts[name] || 0) + 1;
+  }
+  const MAX_ROLES_PER_COMPANY = 2;
+
+  console.log(`[JobResearch] ${Object.keys(companyRoleCounts).length} companies already in pipeline`);
+
   // Step 1 — Discover companies
   const companyCount = Math.min(Math.ceil(requestedCount / 2), 15);
   const targetCompanies = await discoverTargetCompanies(targetRoles, targetCategories, companyCount);
@@ -285,11 +398,20 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
 
     for (const job of scrapedJobs) {
       if (jobs.length >= requestedCount) break;
+
+      // Skip if this company already has max roles in pipeline
+      const existingCount = companyRoleCounts[(company.name || "").toLowerCase()] || 0;
+      const addedThisRun = jobs.filter(j => j.companyName.toLowerCase() === company.name.toLowerCase()).length;
+      if (existingCount + addedThisRun >= MAX_ROLES_PER_COMPANY) {
+        console.log(`[JobResearch] Skipping ${company.name} — already has ${existingCount + addedThisRun} roles`);
+        break;
+      }
+
       jobs.push({
         companyName: company.name,
         companyId: `${slugify(company.name)}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
         jobTitle: job.title,
-        category: company.category,
+        category: standardizeCategory(company.category),
         contactName: contact.contactName,
         contactEmail: contact.contactEmail,
         linkedinUrl,
@@ -358,7 +480,7 @@ Use only real companies. Return JSON array with: companyName, jobTitle, category
       companyName: j.companyName || "Unknown",
       companyId: `${slugify(j.companyName || "co")}-${Date.now()}`,
       jobTitle: j.jobTitle || targetRoles.split(",")[0].trim(),
-      category: j.category || targetCategories.split(",")[0].trim(),
+      category: standardizeCategory(j.category || targetCategories.split(",")[0].trim()),
       contactName: "", contactEmail: "", linkedinUrl: "", contactLinkedIn: "",
       jobDescription: j.jobDescription || "",
       jobLink: j.jobLink || "",
