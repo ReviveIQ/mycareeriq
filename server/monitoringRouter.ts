@@ -68,20 +68,25 @@ export const monitoringRouter = router({
 
     const now = new Date();
 
-    // Check 24-hour cooldown
+    // Check per-hour rate limit — max 3 runs per hour
+    const MAX_RUNS_PER_HOUR = 3;
     if (config?.lastRunAt) {
       const lastRun = new Date(config.lastRunAt);
-      const hoursSinceLastRun = (now.getTime() - lastRun.getTime()) / (1000 * 60 * 60);
-      if (hoursSinceLastRun < 12) {
-        const hoursLeft = Math.ceil(12 - hoursSinceLastRun);
+      const minutesSinceLastRun = (now.getTime() - lastRun.getTime()) / (1000 * 60);
+
+      // Count runs in last 60 minutes — use runsThisHour tracking via lastRunAt window
+      // Simple approach: enforce minimum 20 minutes between runs (3 per hour max)
+      if (minutesSinceLastRun < 20) {
+        const minutesLeft = Math.ceil(20 - minutesSinceLastRun);
         return {
           success: false,
           jobsResearched: 0,
           jobsAdded: 0,
           executionTimeMs: 0,
-          message: `Rate limited — next run available in ${hoursLeft} hour${hoursLeft === 1 ? "" : "s"}`,
+          message: `Please wait ${minutesLeft} more minute${minutesLeft === 1 ? "" : "s"} before running again`,
           rateLimited: true,
-          hoursUntilNextRun: hoursLeft,
+          minutesUntilNextRun: minutesLeft,
+          hoursUntilNextRun: 0,
         };
       }
     }
@@ -169,9 +174,10 @@ export const monitoringRouter = router({
     let canRunNow = true;
 
     if (config?.lastRunAt) {
-      const hoursSince = (now.getTime() - new Date(config.lastRunAt).getTime()) / (1000 * 60 * 60);
-      if (hoursSince < 12) {
-        hoursUntilNextRun = Math.ceil(12 - hoursSince);
+      const minutesSince = (now.getTime() - new Date(config.lastRunAt).getTime()) / (1000 * 60);
+      if (minutesSince < 20) {
+        hoursUntilNextRun = 0;
+        minutesUntilNextRun = Math.ceil(20 - minutesSince);
         canRunNow = false;
       }
     }
@@ -181,11 +187,18 @@ export const monitoringRouter = router({
 
     if (runsThisMonth >= monthlyLimit) canRunNow = false;
 
+    const minutesUntilNextRun = (() => {
+      if (!config?.lastRunAt) return 0;
+      const mins = (now.getTime() - new Date(config.lastRunAt).getTime()) / (1000 * 60);
+      return mins < 20 ? Math.ceil(20 - mins) : 0;
+    })();
+
     return {
       runsThisMonth,
       monthlyLimit,
       hoursUntilNextRun,
-      canRunNow,
+      minutesUntilNextRun,
+      canRunNow: canRunNow && minutesUntilNextRun === 0,
       lastRunAt: config?.lastRunAt || null,
       monthlyRunsResetAt: config?.monthlyRunsResetAt || null,
     };
