@@ -858,7 +858,14 @@ export default function Home() {
           <ApplicationHistory />
         )}
 
-        {activeTab === "settings" && <ResearchSettings />}
+        {activeTab === "settings" && (
+          <ResearchSettings
+            onRunNow={() => {
+              setActiveTab("pipeline");
+              handleRunNow();
+            }}
+          />
+        )}
       </main>
 
       {/* Company Detail Modal */}
