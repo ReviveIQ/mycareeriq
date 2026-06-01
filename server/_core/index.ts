@@ -77,10 +77,9 @@ async function runMigrations() {
         CONSTRAINT companies_id PRIMARY KEY(id)
       )`,
 
-      // passwordHash column (for existing databases)
+      // passwordHash column (for existing databases) - ignore if already exists
       `ALTER TABLE users ADD COLUMN passwordHash varchar(255)`,
-      // Add contactLinkedIn column
-      `ALTER TABLE companies ADD COLUMN contactLinkedIn varchar(500) DEFAULT ''`,
+      // contactLinkedIn is deprecated - linkedinUrl is used instead - skip this migration
       // Expand jobLink column size for long Adzuna URLs
       `ALTER TABLE companies MODIFY COLUMN jobLink varchar(2000) DEFAULT ''`,
 
