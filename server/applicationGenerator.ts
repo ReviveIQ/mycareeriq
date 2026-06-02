@@ -280,7 +280,24 @@ export async function generateCoverLetter(
           const parsed = typeof config.lastDocumentParsed === "string"
             ? JSON.parse(config.lastDocumentParsed)
             : config.lastDocumentParsed;
-          resumeText = parsed?.rawText || parsed?.text || JSON.stringify(parsed);
+
+          // Use raw resume text if available (best for cover letter generation)
+          if (parsed?.rawText) {
+            resumeText = parsed.rawText;
+          } else if (parsed?.extracted) {
+            // Fall back to structured extracted data
+            const e = parsed.extracted;
+            resumeText = [
+              e.candidateName ? `Name: ${e.candidateName}` : "",
+              e.currentTitle ? `Current Title: ${e.currentTitle}` : "",
+              e.summary ? `Summary: ${e.summary}` : "",
+              e.experience ? `Experience: ${JSON.stringify(e.experience)}` : "",
+              e.skills ? `Skills: ${JSON.stringify(e.skills)}` : "",
+              e.education ? `Education: ${JSON.stringify(e.education)}` : "",
+            ].filter(Boolean).join("
+
+");
+          }
         }
       }
     } catch (e) {
@@ -288,9 +305,10 @@ export async function generateCoverLetter(
     }
   }
 
-  // Fallback resume text if none uploaded
+  // Fallback if no resume uploaded
   if (!resumeText) {
-    resumeText = `Professional with experience in ${jobTitle} roles. Strong track record of delivering results.`;
+    console.warn("[CoverLetter] No resume found for userId", userId, "— using generic fallback");
+    resumeText = `Experienced professional applying for ${jobTitle} role. Please upload a resume in Settings for a personalized cover letter.`;
   }
 
   // Stage 1 — Extract narrative
@@ -333,7 +351,19 @@ export async function generateTailoredResume(
           const parsed = typeof config.lastDocumentParsed === "string"
             ? JSON.parse(config.lastDocumentParsed)
             : config.lastDocumentParsed;
-          resumeText = parsed?.rawText || parsed?.text || JSON.stringify(parsed);
+          if (parsed?.rawText) {
+            resumeText = parsed.rawText;
+          } else if (parsed?.extracted) {
+            const e = parsed.extracted;
+            resumeText = [
+              e.candidateName ? `Name: ${e.candidateName}` : "",
+              e.summary ? `Summary: ${e.summary}` : "",
+              e.experience ? `Experience: ${JSON.stringify(e.experience)}` : "",
+              e.skills ? `Skills: ${JSON.stringify(e.skills)}` : "",
+            ].filter(Boolean).join("
+
+");
+          }
         }
       }
     } catch (e) {
