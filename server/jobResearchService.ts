@@ -176,11 +176,34 @@ Real examples of CORRECT filtered URLs:
 - Drift: https://boards.greenhouse.io/drift?q=sales
 
 Rules:
-- ONLY real companies you are confident use these specific ATS systems
+- STRONGLY PREFER companies that use Lever or Greenhouse ATS — these have clean direct job URLs
+- AVOID Workday (JavaScript-rendered, can't be scraped reliably)
+- AVOID generic /careers pages — only use filtered ATS URLs
 - Vary the companies each run — do not repeat the same list every time
 - US-based or US remote positions
-- Mix enterprise (Salesforce, HubSpot) with growth-stage (Gong, Outreach, Clari, Seismic)
-- If unsure of the exact ATS URL, use the Greenhouse or Lever pattern as a safe default
+- Mix enterprise and growth-stage B2B SaaS
+- If unsure of ATS, use Greenhouse pattern as safe default: https://boards.greenhouse.io/{slug}
+
+Additional Lever companies known to work well:
+- Salesloft: https://jobs.lever.co/salesloft?department=Sales
+- Drift: https://jobs.lever.co/drift?department=Sales
+- Chorus.ai: https://jobs.lever.co/chorus?department=Sales
+- Highspot: https://jobs.lever.co/highspot?department=Sales
+- Mindtickle: https://jobs.lever.co/mindtickle?department=Sales
+- Paychex: https://jobs.lever.co/paychex?department=Sales
+- Intercom: https://jobs.lever.co/intercom?department=Sales
+- Loom: https://jobs.lever.co/loom?department=Sales
+- Lattice: https://jobs.lever.co/lattice?department=Sales
+- Rippling: https://jobs.lever.co/rippling?department=Sales
+
+Additional Greenhouse companies:
+- HubSpot: https://boards.greenhouse.io/hubspot?q=account+executive
+- Apollo.io: https://boards.greenhouse.io/apolloio?q=account
+- Seismic: https://boards.greenhouse.io/seismic?q=account+executive
+- Salesloft: https://boards.greenhouse.io/salesloft?q=account
+- Klaviyo: https://boards.greenhouse.io/klaviyo?q=account+executive
+- Gainsight: https://boards.greenhouse.io/gainsight?q=account
+- Mixpanel: https://boards.greenhouse.io/mixpanel?q=account
 
 Return a JSON array only — no markdown, no explanation:
 [
@@ -283,21 +306,27 @@ ${pageContent.slice(0, 12000)}
 
 Instructions:
 - Be INCLUSIVE — if a job title is related to the target roles, include it
-- Account Executive, AE, Enterprise AE, Commercial AE, Strategic AE → all match "Account Executive"
-- Business Development, BD Manager, BDR, SDR in BD roles → match "Business Development"
-- VP Sales, Director of Sales, Sales Manager → match senior sales roles
+- Account Executive, AE, Enterprise AE, Commercial AE, Strategic AE → all match
+- Business Development, BD Manager, BDR → match
+- VP Sales, Director of Sales, Sales Manager → match senior roles
 - When in doubt, include the role
+
+IMPORTANT — Extract the direct job application URL:
+- For Lever pages: URLs look like https://jobs.lever.co/company/uuid-string — extract the FULL URL including UUID
+- For Greenhouse pages: URLs look like https://boards.greenhouse.io/company/jobs/12345 — extract the FULL URL
+- Look for "Apply", "View Job", or the job title as a hyperlink — the href is the direct URL
+- If you see partial URLs like /jobs/12345, prepend the base domain to make it absolute
+- If no direct URL found, use the careers page URL as fallback
 
 Return a JSON array. Each object must have:
 - title: exact job title from the page (string)
 - description: 2-3 sentences about the role (string)
-- url: application link if visible, otherwise "" (string)
-- salary: salary if mentioned, otherwise "" (string)
+- url: DIRECT application URL (full URL with https://, not a relative path) (string)
+- salary: salary range if mentioned, otherwise "" (string)
 - remote: true if remote/hybrid mentioned, false otherwise (boolean)
 
-If the page shows NO job listings (just a careers marketing page), return [].
-If it shows job titles, extract ALL that are related to the target roles.
-Return ONLY the JSON array.`
+If the page shows NO job listings, return [].
+Return ONLY the JSON array. No markdown.`
           }
         ],
         max_tokens: 2000,
