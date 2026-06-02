@@ -160,6 +160,7 @@ export const documentIntakeRouter = router({
           const parsedDoc = { 
             documentType: input.documentType, 
             parsedAt: new Date().toISOString(), 
+            rawText: textContent,
             extracted 
           };
 
