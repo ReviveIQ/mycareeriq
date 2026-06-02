@@ -114,8 +114,8 @@ export default function Home() {
   const utils = trpc.useUtils();
 
   const categories = useMemo(() => {
-    const cats = Array.from(new Set(pipelineData.map((c) => c.category)));
-    return cats.sort();
+    const cats = Array.from(new Set(pipelineData.map((c) => c.category).filter(Boolean)));
+    return cats.filter((c): c is string => typeof c === "string" && c.trim().length > 0).sort();
   }, [pipelineData]);
 
   const filtered = useMemo(() => {
