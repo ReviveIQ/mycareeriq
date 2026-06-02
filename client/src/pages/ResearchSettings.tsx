@@ -124,7 +124,15 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
         <p className="text-slate-600">Customize the roles and categories researched daily</p>
       </div>
 
-      {/* Document Intake — auto-configure pipeline from a resume or other document */}
+      {/* Document Intake — upload resume to configure pipeline */}
+      {!targetRoles && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg mb-2">
+          <span className="text-amber-500 text-lg">📄</span>
+          <p className="text-sm text-amber-800 font-medium">
+            Upload your resume below to auto-fill your target roles and categories.
+          </p>
+        </div>
+      )}
       <DocumentIntake
         documentType="resume"
         title="Auto-configure from Resume"
