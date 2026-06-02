@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Loader2, Send, Clock, FileText, CheckCircle, Linkedin, AlertCircle, Mail, Zap } from "lucide-react";
-import { pipelineData } from "@/lib/pipelineData";
+import { trpc as trpcClient } from "@/lib/trpc";
 import { toast } from "sonner";
 
 export default function GenerateApplication() {
@@ -37,10 +37,13 @@ export default function GenerateApplication() {
   const [manualEmail, setManualEmail] = useState("");
 
   const generateMutation = trpc.application.generate.useMutation();
+  const { data: pipelineCompanies = [] } = trpc.pipeline.getCompanies.useQuery();
   const sendMutation = trpc.application.send.useMutation();
   const emailLookupMutation = trpc.emailLookup.getSuggestedEmails.useMutation();
 
-  const company = selectedCompany ? pipelineData.find((c) => c.name === selectedCompany) : null;
+  const company = selectedCompany
+    ? pipelineCompanies.find((c: any) => c.name === selectedCompany || c.companyName === selectedCompany)
+    : null;
 
   const handleGenerate = async () => {
     if (!company) {
@@ -193,7 +196,7 @@ export default function GenerateApplication() {
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="">Choose a company from your pipeline...</option>
-              {pipelineData.map((c) => (
+              {pipelineCompanies.map((c: any) => (
                 <option key={c.id} value={c.name}>
                   {c.name} — {c.role}
                 </option>
@@ -204,9 +207,9 @@ export default function GenerateApplication() {
           {company && (
             <Card className="p-4 bg-indigo-50 border-indigo-200">
               <div className="text-sm">
-                <p className="font-semibold text-indigo-900">{company.name}</p>
+                <p className="font-semibold text-indigo-900">{company?.companyName || company?.name}</p>
                 <p className="text-indigo-700">{company.role}</p>
-                <p className="text-indigo-600 text-xs mt-1">Contact: {company.contactName}</p>
+                <p className="text-indigo-600 text-xs mt-1">Contact: {company?.contactName || "Hiring Manager"}</p>
               </div>
             </Card>
           )}
