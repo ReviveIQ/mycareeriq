@@ -24,6 +24,10 @@ export const pipelineRouter = router({
       ) as any;
       const jobs = Array.isArray(rawResult) ? rawResult : (rawResult?.rows ?? []);
       console.log("[PipelineRouter] getCompanies found:", jobs.length, "companies (raw SQL)");
+      if (jobs.length > 0) {
+        console.log("[PipelineRouter] First row keys:", Object.keys(jobs[0]));
+        console.log("[PipelineRouter] First row sample:", JSON.stringify(jobs[0]).slice(0, 200));
+      }
 
       // Transform to pipeline format
       // TiDB raw SQL returns lowercase field names — handle both cases
