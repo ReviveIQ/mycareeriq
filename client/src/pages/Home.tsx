@@ -214,17 +214,36 @@ export default function Home() {
       toast.success(`Job research started — ${runsLeft} run${runsLeft === 1 ? "" : "s"} remaining this month`);
       refetchRateLimit();
 
-      // Poll every 5 seconds for 60 seconds
+      // Poll every 5 seconds for 60 seconds — track previous count to detect when jobs land
       let polls = 0;
+      let prevCount = 0;
       const poll = setInterval(async () => {
         polls++;
         await utils.pipeline.getCompanies.invalidate();
         await utils.pipeline.getCompanyCount.invalidate();
         await utils.pipeline.getHighPriority.invalidate();
         await utils.pipeline.getRemoteCount.invalidate();
+        await refetchRateLimit();
+
+        // Check if new companies arrived
+        const currentCount = pipelineData.length;
+        if (currentCount > prevCount && prevCount > 0) {
+          // New jobs landed — do one final refresh and stop polling
+          clearInterval(poll);
+          setIsRunning(false);
+          await utils.pipeline.getCompanies.invalidate();
+          toast.success(`Pipeline updated — ${currentCount - prevCount} new companies added`);
+          return;
+        }
+        prevCount = currentCount;
+
         if (polls >= 12) {
           clearInterval(poll);
           setIsRunning(false);
+          // Final refresh when polling ends
+          await utils.pipeline.getCompanies.invalidate();
+          await utils.pipeline.getCompanyCount.invalidate();
+          toast.success("Research complete — pipeline refreshed");
         }
       }, 5000);
     } catch (error) {
