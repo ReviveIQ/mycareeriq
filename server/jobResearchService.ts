@@ -490,8 +490,14 @@ async function fallbackGptResearch(targetRoles: string, targetCategories: string
         { role: "system", content: "Return only valid JSON arrays." },
         {
           role: "user",
-          content: `Generate ${count} realistic job opportunities for: ${targetRoles} in ${targetCategories}.
-Use only real companies. Return JSON array with: companyName, jobTitle, category, jobDescription (2 sentences), jobLink (real careers URL), salary, remote (bool), priority (High/Medium/Low). No markdown.`
+          content: `Generate ${count} realistic job postings for: ${targetRoles} in ${targetCategories}.
+
+Use only real B2B SaaS companies. For jobLink use a FILTERED ATS URL that goes directly to job listings — NOT a generic /careers page:
+- Lever: https://jobs.lever.co/{company-slug}?department=Sales
+- Greenhouse: https://boards.greenhouse.io/{company-slug}/jobs?q=account+executive
+Prefer Lever and Greenhouse companies. Avoid Workday.
+
+Return JSON array with: companyName, jobTitle, category, jobDescription (2 sentences), jobLink (filtered ATS URL), salary, remote (bool), priority (High/Medium/Low). No markdown.`
         }
       ],
       max_tokens: 3000,
