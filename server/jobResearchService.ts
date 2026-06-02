@@ -527,8 +527,8 @@ export async function addJobsToPipeline(jobs: GeneratedJob[], userId: number = 1
         notes: `Source: ${job.source}`,
       });
       addedCount++;
-    } catch (err) {
-      console.warn(`[JobResearch] Failed to add ${job.companyName}:`, err);
+    } catch (err: any) {
+      console.error(`[JobResearch] INSERT FAILED for ${job.companyName}:`, err?.message || String(err));
     }
   }
 
