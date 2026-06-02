@@ -21,6 +21,7 @@ export const users = mysqlTable("users", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
   passwordHash: varchar("passwordHash", { length: 255 }),
+  linkedinAccessToken: varchar("linkedinAccessToken", { length: 1000 }),
 });
 
 export type User = typeof users.$inferSelect;
