@@ -91,6 +91,38 @@ export default function Home() {
   const { data: highPriorityCount = 0 } = trpc.pipeline.getHighPriority.useQuery();
   const { data: remoteCount = 0 } = trpc.pipeline.getRemoteCount.useQuery();
   const runResearch = trpc.monitoring.runNow.useMutation();
+  const markOutreachSent = trpc.pipeline.markOutreachSent.useMutation();
+  const markApplied = trpc.pipeline.markApplied.useMutation();
+  const { data: linkedInStatus } = trpc.pipeline.getLinkedInProfile.useQuery();
+
+  const handleSendOutreach = async (company: Company) => {
+    if (!company.contactLinkedIn) {
+      toast.error("No LinkedIn profile found for this contact");
+      return;
+    }
+    // Open LinkedIn profile in new tab
+    window.open(company.contactLinkedIn, "_blank");
+    // Auto-advance stage to Outreach
+    try {
+      await markOutreachSent.mutateAsync({ companyId: company.id });
+      await utils.pipeline.getCompanies.invalidate();
+      toast.success(`Stage updated to Outreach — message sent to ${company.contactName || "contact"} on LinkedIn`);
+      setSelectedCompany(null);
+    } catch (err) {
+      console.error("Failed to update stage:", err);
+    }
+  };
+
+  const handleMarkApplied = async (company: Company) => {
+    try {
+      await markApplied.mutateAsync({ companyId: company.id });
+      await utils.pipeline.getCompanies.invalidate();
+      toast.success("Stage updated to Applied");
+      setSelectedCompany(null);
+    } catch (err) {
+      console.error("Failed to mark applied:", err);
+    }
+  };
   const { data: rateLimitStatus, refetch: refetchRateLimit } = trpc.monitoring.getRateLimitStatus.useQuery();
   const updateStage = trpc.pipeline.updateStage.useMutation();
   const deleteCompany = trpc.pipeline.deleteCompany.useMutation();
