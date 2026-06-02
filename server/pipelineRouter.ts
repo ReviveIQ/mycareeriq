@@ -14,30 +14,33 @@ export const pipelineRouter = router({
       }
 
       // Fetch all researched companies for the user
-      console.log("[PipelineRouter] getCompanies for userId:", ctx.user.id);
-      const jobs = await db
-        .select()
-        .from(companiesTable)
-        .where(eq(companiesTable.userId, ctx.user.id))
-        .orderBy(desc(companiesTable.createdAt));
-      console.log("[PipelineRouter] getCompanies found:", jobs.length, "companies");
+      const userId = Number(ctx.user.id);
+      console.log("[PipelineRouter] getCompanies for userId:", userId, "type:", typeof userId);
 
-      // Transform to pipeline format
-      const companies = jobs.map((job) => ({
+      // Use raw SQL to bypass any Drizzle type coercion issues
+      const { sql } = await import("drizzle-orm");
+      const rawResult = await db.execute(
+        sql`SELECT * FROM companies WHERE userId = ${userId} ORDER BY createdAt DESC`
+      ) as any;
+      const jobs = Array.isArray(rawResult) ? rawResult : (rawResult?.rows ?? []);
+      console.log("[PipelineRouter] getCompanies found:", jobs.length, "companies (raw SQL)");
+
+      // Transform to pipeline format — handle both Drizzle and raw SQL field names
+      const companies = jobs.map((job: any) => ({
         id: job.id,
-        name: job.companyName,
-        category: job.category as any,
-        stage: job.stage as "Research" | "Outreach" | "Applied" | "Interviewing" | "Offer" | "Rejected",
-        role: job.jobTitle || "",
-        jobLink: job.jobLink || "",
-        contactName: job.contactName || "",
+        name: job.companyName || job.company_name || "",
+        category: job.category || "",
+        stage: (job.stage || "Research") as "Research" | "Outreach" | "Applied" | "Interviewing" | "Offer" | "Rejected",
+        role: job.jobTitle || job.job_title || "",
+        jobLink: job.jobLink || job.job_link || "",
+        contactName: job.contactName || job.contact_name || "",
         contactTitle: "",
-        contactLinkedIn: job.linkedinUrl || "",
-        priority: job.priority as "High" | "Medium" | "Low",
-        notes: job.notes || job.jobDescription || "",
-        remoteOk: job.remote || false,
+        contactLinkedIn: job.linkedinUrl || job.linkedin_url || job.contactLinkedIn || "",
+        priority: (job.priority || "Medium") as "High" | "Medium" | "Low",
+        notes: job.notes || job.jobDescription || job.job_description || "",
+        remoteOk: Boolean(job.remote),
         estSalary: job.salary || "",
-        companySize: job.companySize || "",
+        companySize: job.companySize || job.company_size || "",
       }));
 
       return companies;
