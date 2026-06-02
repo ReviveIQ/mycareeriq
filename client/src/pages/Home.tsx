@@ -995,21 +995,13 @@ export default function Home() {
                       View Job Posting
                     </Button>
                   </a>
-                  <a
-                    href={selectedCompany.contactLinkedIn}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    
-                    className="flex-1"
+                  <button
+                    onClick={() => handleSendOutreach(selectedCompany)}
+                    className="flex-1 flex items-center justify-center gap-2 border border-blue-200 text-blue-700 hover:bg-blue-50 text-sm font-medium h-9 px-3 rounded-md transition-colors"
                   >
-                    <Button
-                      variant="outline"
-                      className="w-full border-blue-200 text-blue-700 hover:bg-blue-50 text-sm h-9 gap-2"
-                    >
-                      <Linkedin className="w-4 h-4" />
-                      Contact on LinkedIn
-                    </Button>
-                  </a>
+                    <Linkedin className="w-4 h-4" />
+                    Contact on LinkedIn
+                  </button>
                 </div>
               </div>
             </>
@@ -1017,7 +1009,22 @@ export default function Home() {
             {/* Action buttons — only show for Research stage */}
             {selectedCompany && (
               <div className="flex gap-3 pt-4 border-t border-slate-200 mt-4">
-                {selectedCompany.stage === "Research" ? (
+                {selectedCompany.stage === "Outreach" ? (
+                  <>
+                    <button
+                      onClick={() => handleMarkApplied(selectedCompany)}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-2.5 px-4 rounded-lg transition-colors"
+                    >
+                      ✓ Mark as Applied
+                    </button>
+                    <button
+                      onClick={() => setSelectedCompany(null)}
+                      className="px-4 py-2.5 text-sm text-slate-500 hover:text-slate-700 border border-slate-200 rounded-lg transition-colors"
+                    >
+                      Close
+                    </button>
+                  </>
+                ) : selectedCompany.stage === "Research" ? (
                   <>
                     <button
                       onClick={() => handleAddToPipeline(selectedCompany)}
