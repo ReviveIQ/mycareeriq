@@ -3,6 +3,8 @@ import { findHiringManager } from "./apolloService";
 import { findCompanyLinkedIn } from "./linkedinService";
 import { companies, researchConfig } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
+import { isGreenhouseUrl, scrapeGreenhouseUrl } from "./greenhouseService";
+import { isLeverUrl, scrapeLeverUrl } from "./leverService";
 
 export interface GeneratedJob {
   companyName: string;
@@ -152,69 +154,46 @@ async function discoverTargetCompanies(
 
 Focus on categories: ${targetCategories}
 
-For each company you MUST provide a filtered ATS URL that goes directly to matching job listings — not a generic /careers page.
+CRITICAL — Only use companies that run Greenhouse or Lever ATS. These have public APIs that return clean structured job data.
 
-Use these ATS URL patterns based on what each company uses:
-- Greenhouse: https://boards.greenhouse.io/{company-slug}/jobs?q={role-keyword}
-- Lever: https://jobs.lever.co/{company-slug}?department=Sales
-- Workday: https://{company}.wd1.myworkdayjobs.com/External_Career_Site/jobs?q={role-keyword}
-- Ashby: https://jobs.ashbyhq.com/{company-slug}
-- Rippling/custom: https://{company}.com/careers?department=sales&q={role-keyword}
+Greenhouse board URL format: https://boards.greenhouse.io/{slug}/jobs?q=account+executive
+Lever board URL format: https://jobs.lever.co/{slug}?department=Sales
 
-Role keywords to use in URLs: account-executive, account+executive, "account executive", sales, business-development
-
-Real examples of CORRECT filtered URLs:
-- HubSpot AE: https://www.hubspot.com/careers/jobs?q=account+executive&page=1
-- Salesforce AE: https://salesforce.wd1.myworkdayjobs.com/External_Career_Site/jobs?q=Account+Executive
-- Gong: https://jobs.lever.co/gong?department=Sales
-- Outreach: https://jobs.lever.co/outreach?department=Sales
-- Zendesk: https://jobs.lever.co/zendesk?department=Sales&commitment=Full-time
-- Clari: https://jobs.lever.co/clari?department=Sales
-- Seismic: https://boards.greenhouse.io/seismic/jobs?q=account+executive
-- Salesloft: https://boards.greenhouse.io/salesloft?q=account
-- Apollo.io: https://boards.greenhouse.io/apolloio?q=account
-- Drift: https://boards.greenhouse.io/drift?q=sales
-
-Rules:
-- STRONGLY PREFER companies that use Lever or Greenhouse ATS — these have clean direct job URLs
-- AVOID Workday (JavaScript-rendered, can't be scraped reliably)
-- AVOID generic /careers pages — only use filtered ATS URLs
-- Vary the companies each run — do not repeat the same list every time
+RULES:
+- Use ONLY companies on Greenhouse or Lever — no Workday, no custom career pages
+- Vary companies each run — do not repeat the same list
 - US-based or US remote positions
 - Mix enterprise and growth-stage B2B SaaS
-- If unsure of ATS, use Greenhouse pattern as safe default: https://boards.greenhouse.io/{slug}
 
-Additional Lever companies known to work well:
-- Salesloft: https://jobs.lever.co/salesloft?department=Sales
-- Drift: https://jobs.lever.co/drift?department=Sales
-- Chorus.ai: https://jobs.lever.co/chorus?department=Sales
-- Highspot: https://jobs.lever.co/highspot?department=Sales
-- Mindtickle: https://jobs.lever.co/mindtickle?department=Sales
-- Paychex: https://jobs.lever.co/paychex?department=Sales
-- Intercom: https://jobs.lever.co/intercom?department=Sales
-- Loom: https://jobs.lever.co/loom?department=Sales
-- Lattice: https://jobs.lever.co/lattice?department=Sales
-- Rippling: https://jobs.lever.co/rippling?department=Sales
+Known Greenhouse board slugs (use these exact slugs):
+hubspot, apolloio, seismic, salesloft, klaviyo, gainsight, mixpanel, braze,
+chili-piper, zoominfo, g2, demandbase, leandata, drata, vendr, zip, ironclad,
+docusign, workramp, showpad, bigtincan, mindtickle, spekit, allego, kustomer,
+medallia, qualtrics, outreach, highspot
 
-Additional Greenhouse companies:
-- HubSpot: https://boards.greenhouse.io/hubspot?q=account+executive
-- Apollo.io: https://boards.greenhouse.io/apolloio?q=account
-- Seismic: https://boards.greenhouse.io/seismic?q=account+executive
-- Salesloft: https://boards.greenhouse.io/salesloft?q=account
-- Klaviyo: https://boards.greenhouse.io/klaviyo?q=account+executive
-- Gainsight: https://boards.greenhouse.io/gainsight?q=account
-- Mixpanel: https://boards.greenhouse.io/mixpanel?q=account
+Known Lever slugs (use these exact slugs):
+gong, clari, zendesk, intercom, rippling, lattice, loom, highspot, mindtickle,
+paychex, chorus, drift, figma, notion, deel, remote, vanta, secureframe, merge, finch
 
-Return a JSON array only — no markdown, no explanation:
+Return a JSON array only:
 [
   {
     "name": "HubSpot",
     "domain": "hubspot.com",
-    "careersUrl": "https://www.hubspot.com/careers/jobs?q=account+executive&page=1",
-    "category": "Sales Enablement",
-    "ats": "hubspot-custom"
+    "careersUrl": "https://boards.greenhouse.io/hubspot/jobs?q=account+executive",
+    "category": "CRM",
+    "ats": "greenhouse"
+  },
+  {
+    "name": "Gong",
+    "domain": "gong.io",
+    "careersUrl": "https://jobs.lever.co/gong?department=Sales",
+    "category": "Revenue Intelligence",
+    "ats": "lever"
   }
-]`
+]
+
+The "ats" field MUST be "greenhouse" or "lever". Return ONLY the JSON array.`
         }
       ],
       max_tokens: 2000,
@@ -236,21 +215,47 @@ Return a JSON array only — no markdown, no explanation:
   }
 }
 
-// ── Step 2: Scrape career page via Firecrawl ─────────────────────────────────
+// ── Step 2: Route to correct scraper based on ATS type ───────────────────────
 async function scrapeCareerPage(
+  careersUrl: string,
+  targetRoles: string
+): Promise<Array<{ title: string; description: string; url: string; salary?: string; remote?: boolean }>> {
+
+  // ── Greenhouse API (no scraping, structured JSON) ─────────────────────────
+  if (isGreenhouseUrl(careersUrl)) {
+    console.log(`[JobResearch] Routing to Greenhouse API: ${careersUrl}`);
+    const jobs = await scrapeGreenhouseUrl(careersUrl, targetRoles);
+    console.log(`[JobResearch] Greenhouse API returned ${jobs.length} jobs`);
+    return jobs;
+  }
+
+  // ── Lever API (no scraping, structured JSON) ──────────────────────────────
+  if (isLeverUrl(careersUrl)) {
+    console.log(`[JobResearch] Routing to Lever API: ${careersUrl}`);
+    const jobs = await scrapeLeverUrl(careersUrl, targetRoles);
+    console.log(`[JobResearch] Lever API returned ${jobs.length} jobs`);
+    return jobs;
+  }
+
+  // ── Firecrawl (fallback for custom/unknown career pages) ─────────────────
+  console.log(`[JobResearch] No ATS detected — using Firecrawl: ${careersUrl}`);
+  return scrapeWithFirecrawl(careersUrl, targetRoles);
+}
+
+// ── Firecrawl scraper (used only for non-Greenhouse, non-Lever pages) ────────
+async function scrapeWithFirecrawl(
   careersUrl: string,
   targetRoles: string
 ): Promise<Array<{ title: string; description: string; url: string; salary?: string; remote?: boolean }>> {
   const firecrawlKey = process.env.FIRECRAWL_API_KEY;
   if (!firecrawlKey) {
-    console.warn("[JobResearch] FIRECRAWL_API_KEY not set — skipping scrape");
+    console.warn("[JobResearch] FIRECRAWL_API_KEY not set — skipping Firecrawl scrape");
     return [];
   }
 
   try {
     console.log(`[JobResearch] Firecrawl scraping: ${careersUrl}`);
 
-    // Use Firecrawl to scrape the career page — handles JS-rendered pages
     const scrapeRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
       method: "POST",
       headers: {
@@ -262,32 +267,61 @@ async function scrapeCareerPage(
         formats: ["markdown"],
         onlyMainContent: true,
         timeout: 30000,
-        waitFor: 2000,
+        waitFor: 3000,
         actions: [
-          { type: "wait", milliseconds: 2000 }
+          { type: "wait", milliseconds: 3000 }
         ],
       }),
-      signal: AbortSignal.timeout(35000),
+      signal: AbortSignal.timeout(40000),
     });
 
     if (!scrapeRes.ok) {
       const errText = await scrapeRes.text();
-      console.warn(`[JobResearch] Firecrawl failed for ${careersUrl}: ${scrapeRes.status} — ${errText.slice(0,200)}`);
+      console.warn(`[JobResearch] Firecrawl HTTP ${scrapeRes.status} for ${careersUrl} — ${errText.slice(0, 300)}`);
       return [];
     }
 
     const scrapeData = await scrapeRes.json() as any;
-    const pageContent = scrapeData?.data?.markdown || scrapeData?.markdown || "";
+
+    // ── FIX: Firecrawl v1 wraps content in scrapeData.data, not scrapeData directly
+    const pageContent: string =
+      scrapeData?.data?.markdown ||   // v1 response shape
+      scrapeData?.markdown ||          // legacy shape
+      scrapeData?.data?.content ||     // alternate v1 field
+      scrapeData?.content ||           // alternate legacy
+      "";
 
     if (!pageContent.trim()) {
+      // Log the full response shape so we can diagnose future failures
       console.warn(`[JobResearch] Firecrawl returned empty content for ${careersUrl}`);
+      console.warn(`[JobResearch] Firecrawl raw response keys: ${Object.keys(scrapeData || {}).join(", ")}`);
+      if (scrapeData?.data) {
+        console.warn(`[JobResearch] Firecrawl data keys: ${Object.keys(scrapeData.data || {}).join(", ")}`);
+      }
+      console.warn(`[JobResearch] Firecrawl success flag: ${scrapeData?.success}`);
+      console.warn(`[JobResearch] Firecrawl status: ${scrapeData?.data?.statusCode || scrapeData?.statusCode}`);
       return [];
     }
 
     console.log(`[JobResearch] Firecrawl got ${pageContent.length} chars from ${careersUrl}`);
-    console.log(`[JobResearch] Content preview: ${pageContent.slice(0, 300).replace(/\n/g, " ")}`);
+    console.log(`[JobResearch] Content preview (first 500): ${pageContent.slice(0, 500).replace(/\n/g, " ")}`);
 
-    // Use GPT to extract matching job postings from scraped content
+    // Check if page content looks like a real job listing page
+    const lcContent = pageContent.toLowerCase();
+    const hasJobSignals =
+      lcContent.includes("apply") ||
+      lcContent.includes("job") ||
+      lcContent.includes("position") ||
+      lcContent.includes("opening") ||
+      lcContent.includes("hiring") ||
+      lcContent.includes("role");
+
+    if (!hasJobSignals) {
+      console.warn(`[JobResearch] Firecrawl content for ${careersUrl} doesn't look like a jobs page — skipping GPT extraction`);
+      console.warn(`[JobResearch] Page content sample: ${pageContent.slice(0, 200).replace(/\n/g, " ")}`);
+      return [];
+    }
+
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return [];
 
@@ -297,56 +331,66 @@ async function scrapeCareerPage(
       body: JSON.stringify({
         model: "gpt-4o",
         messages: [
-          { role: "system", content: "You are extracting job listings from a career page. Be inclusive — if there is any doubt whether a role matches, include it. Return only valid JSON arrays." },
+          {
+            role: "system",
+            content: "You are extracting job listings from a scraped career page. Be inclusive — if there is any doubt whether a role matches, include it. Return only valid JSON arrays. No markdown, no explanation.",
+          },
           {
             role: "user",
-            content: `Extract job postings from this career page that match: ${targetRoles}
+            content: `Extract job postings from this career page content that match: ${targetRoles}
 
+Page URL: ${careersUrl}
 Page content:
 ${pageContent.slice(0, 12000)}
 
-Instructions:
-- Be INCLUSIVE — if a job title is related to the target roles, include it
-- Account Executive, AE, Enterprise AE, Commercial AE, Strategic AE → all match
+Matching rules — be INCLUSIVE:
+- Account Executive, AE, Enterprise AE, Commercial AE, Strategic AE → match
 - Business Development, BD Manager, BDR → match
-- VP Sales, Director of Sales, Sales Manager → match senior roles
+- VP Sales, Director of Sales, Sales Manager → match
+- Customer Success Manager, CSM → match if target roles include CSM
 - When in doubt, include the role
 
-IMPORTANT — Extract the direct job application URL:
-- For Lever pages: URLs look like https://jobs.lever.co/company/uuid-string — extract the FULL URL including UUID
-- For Greenhouse pages: URLs look like https://boards.greenhouse.io/company/jobs/12345 — extract the FULL URL
-- Look for "Apply", "View Job", or the job title as a hyperlink — the href is the direct URL
-- If you see partial URLs like /jobs/12345, prepend the base domain to make it absolute
-- If no direct URL found, use the careers page URL as fallback
+URL extraction rules — CRITICAL:
+- For Lever pages: job URLs are like https://jobs.lever.co/company/uuid — extract the FULL URL
+- For Greenhouse pages: job URLs are like https://boards.greenhouse.io/company/jobs/12345 — extract FULL URL
+- Look for hyperlinks on job titles, "Apply Now", "View Job" buttons — the href IS the direct URL
+- If you see a relative URL like /jobs/12345, make it absolute using the page's base domain
+- If no direct URL is found, use the careers page URL as fallback
 
-Return a JSON array. Each object must have:
-- title: exact job title from the page (string)
-- description: 2-3 sentences about the role (string)
-- url: DIRECT application URL (full URL with https://, not a relative path) (string)
-- salary: salary range if mentioned, otherwise "" (string)
-- remote: true if remote/hybrid mentioned, false otherwise (boolean)
+Return a JSON array where each item has:
+- title (string): exact job title
+- description (string): 2-3 sentence summary of the role
+- url (string): FULL direct application URL starting with https://
+- salary (string): salary range if visible, otherwise ""
+- remote (boolean): true if remote or hybrid is mentioned
 
-If the page shows NO job listings, return [].
-Return ONLY the JSON array. No markdown.`
-          }
+If the page has NO matching job listings, return an empty array: []
+Return ONLY the JSON array.`,
+          },
         ],
         max_tokens: 2000,
         temperature: 0.1,
       }),
     });
 
-    if (!extractRes.ok) return [];
+    if (!extractRes.ok) {
+      console.warn(`[JobResearch] GPT extraction request failed: ${extractRes.status}`);
+      return [];
+    }
+
     const extractData = await extractRes.json() as any;
     let extractText = (extractData.choices?.[0]?.message?.content || "").trim()
-      .replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/```\s*$/i, "");
 
     try {
-      console.log(`[JobResearch] GPT extraction response: ${extractText.slice(0, 200)}`);
+      console.log(`[JobResearch] GPT extraction raw response: ${extractText.slice(0, 300)}`);
       const jobs = JSON.parse(extractText);
-      console.log(`[JobResearch] GPT extracted ${Array.isArray(jobs) ? jobs.length : 0} jobs`);
+      const count = Array.isArray(jobs) ? jobs.length : 0;
+      console.log(`[JobResearch] GPT extracted ${count} jobs from Firecrawl content`);
       return Array.isArray(jobs) ? jobs : [];
     } catch {
-      console.warn(`[JobResearch] Failed to parse job extraction response: ${extractText.slice(0, 100)}`);
+      console.warn(`[JobResearch] Failed to parse GPT extraction response: ${extractText.slice(0, 200)}`);
       return [];
     }
   } catch (err) {
@@ -415,14 +459,15 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
 
   const jobs: GeneratedJob[] = [];
 
-  // Step 2 — Scrape each company's career page
+  // Step 2 — Fetch jobs from each company via the appropriate ATS API or Firecrawl
   for (const company of targetCompanies) {
     if (jobs.length >= requestedCount) break;
 
-    console.log(`[JobResearch] Scraping ${company.name} — ${company.careersUrl}`);
+    const ats = (company as any).ats || "other";
+    console.log(`[JobResearch] Fetching ${company.name} via ${ats.toUpperCase()} — ${company.careersUrl}`);
 
     const scrapedJobs = await scrapeCareerPage(company.careersUrl, targetRoles);
-    console.log(`[JobResearch] Scrape result: ${scrapedJobs.length} matching jobs at ${company.name} (${company.careersUrl})`);
+    console.log(`[JobResearch] ${ats.toUpperCase()} result: ${scrapedJobs.length} matching jobs at ${company.name}`);
 
     // Step 3 — Enrich contact once per company
     let contact = { contactName: "", contactEmail: "", contactLinkedIn: "" };
@@ -445,6 +490,11 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
         break;
       }
 
+      // Source label reflects actual ATS used
+      const sourceLabel = ats === "greenhouse" ? "Greenhouse API"
+        : ats === "lever" ? "Lever API"
+        : "Firecrawl";
+
       jobs.push({
         companyName: company.name,
         companyId: `${slugify(company.name)}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
@@ -459,23 +509,23 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
         salary: job.salary || "Competitive",
         remote: job.remote || false,
         priority: getPriority(job.title),
-        source: "Apify",
+        source: sourceLabel,
       });
     }
   }
 
-  // If Apify found fewer than expected, supplement with GPT research
+  // Supplement with GPT fallback if needed
   if (jobs.length === 0) {
-    console.warn("[JobResearch] Firecrawl found 0 matching jobs — falling back to GPT research for all roles");
+    console.warn("[JobResearch] ATS APIs + Firecrawl found 0 matching jobs — falling back to GPT research");
     return fallbackGptResearch(targetRoles, targetCategories, requestedCount);
   } else if (jobs.length < requestedCount) {
-    console.log(`[JobResearch] Firecrawl found ${jobs.length}/${requestedCount} — supplementing with GPT`);
+    console.log(`[JobResearch] ATS APIs found ${jobs.length}/${requestedCount} — supplementing with GPT`);
     const remaining = requestedCount - jobs.length;
     const supplement = await fallbackGptResearch(targetRoles, targetCategories, remaining);
     jobs.push(...supplement);
   }
 
-  console.log(`[JobResearch] Total jobs found via Apify: ${jobs.length}`);
+  console.log(`[JobResearch] Total jobs found: ${jobs.length}`);
   return jobs;
 }
 
