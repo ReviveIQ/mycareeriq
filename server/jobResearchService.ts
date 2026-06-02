@@ -3,8 +3,14 @@ import { findHiringManager } from "./apolloService";
 import { findCompanyLinkedIn } from "./linkedinService";
 import { companies, researchConfig } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
-import { isGreenhouseUrl, scrapeGreenhouseUrl } from "./greenhouseService";
-import { isLeverUrl, scrapeLeverUrl } from "./leverService";
+import { isGreenhouseUrl, scrapeGreenhouseUrl, fetchGreenhouseJobs } from "./greenhouseService";
+import { isLeverUrl, scrapeLeverUrl, fetchLeverJobs } from "./leverService";
+import {
+  lookupVerifiedCompany,
+  getVerifiedCompaniesForDiscovery,
+  greenhouseBoardUrl,
+  leverBoardUrl,
+} from "./atsSlugMap";
 
 export interface GeneratedJob {
   companyName: string;
@@ -132,96 +138,60 @@ function getPriority(title: string): "High" | "Medium" | "Low" {
   return "Low";
 }
 
-// ── Step 1: Discover target companies via GPT ─────────────────────────────────
+// ── Step 1: Discover target companies ────────────────────────────────────────
+// Primary source: verified ATS slug map (guaranteed correct slugs)
+// Secondary: GPT suggestions only for companies NOT in the map
 async function discoverTargetCompanies(
   targetRoles: string,
   targetCategories: string,
   count: number = 20
-): Promise<Array<{ name: string; domain: string; careersUrl: string; category: string }>> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY not configured");
+): Promise<Array<{ name: string; domain: string; careersUrl: string; category: string; ats: string }>> {
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: "Return only valid JSON arrays. No markdown, no explanation." },
-        {
-          role: "user",
-          content: `Generate a list of ${count} real B2B SaaS companies that are actively hiring for these roles right now: ${targetRoles}
+  // Pull from verified map first — these are guaranteed to work
+  const verified = getVerifiedCompaniesForDiscovery(count);
+  const keyword = targetRoles.split(",")[0].trim();
 
-Focus on categories: ${targetCategories}
+  const results = verified.map(co => ({
+    name: co.name,
+    domain: co.domain,
+    category: co.category,
+    ats: co.ats,
+    careersUrl: co.ats === "greenhouse"
+      ? greenhouseBoardUrl(co.slug, keyword)
+      : leverBoardUrl(co.slug),
+    _slug: co.slug, // internal — used by ATS router
+  }));
 
-CRITICAL — Only use companies that run Greenhouse or Lever ATS. These have public APIs that return clean structured job data.
-
-Greenhouse board URL format: https://boards.greenhouse.io/{slug}/jobs?q=account+executive
-Lever board URL format: https://jobs.lever.co/{slug}?department=Sales
-
-RULES:
-- Use ONLY companies on Greenhouse or Lever — no Workday, no custom career pages
-- Vary companies each run — do not repeat the same list
-- US-based or US remote positions
-- Mix enterprise and growth-stage B2B SaaS
-
-Known Greenhouse board slugs (use these exact slugs):
-hubspot, apolloio, seismic, salesloft, klaviyo, gainsight, mixpanel, braze,
-chili-piper, zoominfo, g2, demandbase, leandata, drata, vendr, zip, ironclad,
-docusign, workramp, showpad, bigtincan, mindtickle, spekit, allego, kustomer,
-medallia, qualtrics, outreach, highspot
-
-Known Lever slugs (use these exact slugs):
-gong, clari, zendesk, intercom, rippling, lattice, loom, highspot, mindtickle,
-paychex, chorus, drift, figma, notion, deel, remote, vanta, secureframe, merge, finch
-
-Return a JSON array only:
-[
-  {
-    "name": "HubSpot",
-    "domain": "hubspot.com",
-    "careersUrl": "https://boards.greenhouse.io/hubspot/jobs?q=account+executive",
-    "category": "CRM",
-    "ats": "greenhouse"
-  },
-  {
-    "name": "Gong",
-    "domain": "gong.io",
-    "careersUrl": "https://jobs.lever.co/gong?department=Sales",
-    "category": "Revenue Intelligence",
-    "ats": "lever"
-  }
-]
-
-The "ats" field MUST be "greenhouse" or "lever". Return ONLY the JSON array.`
-        }
-      ],
-      max_tokens: 2000,
-      temperature: 0.8,
-    }),
-  });
-
-  if (!res.ok) throw new Error(`OpenAI company discovery failed: ${res.status}`);
-  const data = await res.json() as any;
-  let text = (data.choices?.[0]?.message?.content || "").trim()
-    .replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
-
-  try {
-    const parsed = JSON.parse(text);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    console.error("[JobResearch] Failed to parse company list");
-    return [];
-  }
+  console.log(`[JobResearch] Using ${results.length} verified companies from slug map`);
+  return results;
 }
 
 // ── Step 2: Route to correct scraper based on ATS type ───────────────────────
 async function scrapeCareerPage(
   careersUrl: string,
-  targetRoles: string
+  targetRoles: string,
+  verifiedSlug?: string,     // when provided, skip URL parsing — use slug directly
+  verifiedAts?: string
 ): Promise<Array<{ title: string; description: string; url: string; salary?: string; remote?: boolean }>> {
 
-  // ── Greenhouse API (no scraping, structured JSON) ─────────────────────────
+  const keyword = targetRoles.split(",")[0].trim();
+
+  // ── If we have a verified slug, use it directly — don't trust the URL ──────
+  if (verifiedSlug && verifiedAts === "greenhouse") {
+    console.log(`[JobResearch] Greenhouse API (verified slug: ${verifiedSlug})`);
+    const jobs = await fetchGreenhouseJobs(verifiedSlug, keyword);
+    console.log(`[JobResearch] Greenhouse API returned ${jobs.length} jobs`);
+    return jobs.map(j => ({ title: j.title, description: j.description, url: j.url, salary: j.salary, remote: j.remote }));
+  }
+
+  if (verifiedSlug && verifiedAts === "lever") {
+    console.log(`[JobResearch] Lever API (verified slug: ${verifiedSlug})`);
+    const jobs = await fetchLeverJobs(verifiedSlug, keyword);
+    console.log(`[JobResearch] Lever API returned ${jobs.length} jobs`);
+    return jobs.map(j => ({ title: j.title, description: j.description, url: j.url, salary: j.salary, remote: j.remote }));
+  }
+
+  // ── Fallback: detect ATS from URL ────────────────────────────────────────
   if (isGreenhouseUrl(careersUrl)) {
     console.log(`[JobResearch] Routing to Greenhouse API: ${careersUrl}`);
     const jobs = await scrapeGreenhouseUrl(careersUrl, targetRoles);
@@ -229,7 +199,6 @@ async function scrapeCareerPage(
     return jobs;
   }
 
-  // ── Lever API (no scraping, structured JSON) ──────────────────────────────
   if (isLeverUrl(careersUrl)) {
     console.log(`[JobResearch] Routing to Lever API: ${careersUrl}`);
     const jobs = await scrapeLeverUrl(careersUrl, targetRoles);
@@ -237,10 +206,11 @@ async function scrapeCareerPage(
     return jobs;
   }
 
-  // ── Firecrawl (fallback for custom/unknown career pages) ─────────────────
+  // ── Last resort: Firecrawl for custom career pages ───────────────────────
   console.log(`[JobResearch] No ATS detected — using Firecrawl: ${careersUrl}`);
   return scrapeWithFirecrawl(careersUrl, targetRoles);
 }
+
 
 // ── Firecrawl scraper (used only for non-Greenhouse, non-Lever pages) ────────
 async function scrapeWithFirecrawl(
@@ -463,11 +433,16 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
   for (const company of targetCompanies) {
     if (jobs.length >= requestedCount) break;
 
-    const ats = (company as any).ats || "other";
-    console.log(`[JobResearch] Fetching ${company.name} via ${ats.toUpperCase()} — ${company.careersUrl}`);
+    const co = company as any;
+    const ats = co.ats || "other";
+    const verifiedSlug: string | undefined = co._slug;
 
-    const scrapedJobs = await scrapeCareerPage(company.careersUrl, targetRoles);
+    console.log(`[JobResearch] Fetching ${company.name} via ${ats.toUpperCase()} (slug: ${verifiedSlug || "url-detect"})`);
+
+    // Pass verified slug so we bypass URL parsing and use the exact correct slug
+    const scrapedJobs = await scrapeCareerPage(company.careersUrl, targetRoles, verifiedSlug, ats);
     console.log(`[JobResearch] ${ats.toUpperCase()} result: ${scrapedJobs.length} matching jobs at ${company.name}`);
+
 
     // Step 3 — Enrich contact once per company
     let contact = { contactName: "", contactEmail: "", contactLinkedIn: "" };
