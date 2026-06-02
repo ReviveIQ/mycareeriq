@@ -30,7 +30,8 @@ export const applicationRouter = router({
           input.companyName,
           input.jobTitle,
           input.jobDescription,
-          input.contactName
+          input.contactName,
+          ctx.user.id
         );
 
         // Save to database as draft
