@@ -461,7 +461,7 @@ export default function Home() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="All">All Stages</SelectItem>
-                    {stageOrder.map((s) => (
+                    {stageOrder.filter(s => s && s.trim()).map((s) => (
                       <SelectItem key={s} value={s}>
                         {s}
                       </SelectItem>
