@@ -25,23 +25,27 @@ export const pipelineRouter = router({
       const jobs = Array.isArray(rawResult) ? rawResult : (rawResult?.rows ?? []);
       console.log("[PipelineRouter] getCompanies found:", jobs.length, "companies (raw SQL)");
 
-      // Transform to pipeline format — handle both Drizzle and raw SQL field names
-      const companies = jobs.map((job: any) => ({
-        id: job.id,
-        name: job.companyName || job.company_name || "",
-        category: job.category || "",
-        stage: (job.stage || "Research") as "Research" | "Outreach" | "Applied" | "Interviewing" | "Offer" | "Rejected",
-        role: job.jobTitle || job.job_title || "",
-        jobLink: job.jobLink || job.job_link || "",
-        contactName: job.contactName || job.contact_name || "",
-        contactTitle: "",
-        contactLinkedIn: job.linkedinUrl || job.linkedin_url || job.contactLinkedIn || "",
-        priority: (job.priority || "Medium") as "High" | "Medium" | "Low",
-        notes: job.notes || job.jobDescription || job.job_description || "",
-        remoteOk: Boolean(job.remote),
-        estSalary: job.salary || "",
-        companySize: job.companySize || job.company_size || "",
-      }));
+      // Transform to pipeline format
+      // TiDB raw SQL returns lowercase field names — handle both cases
+      const companies = jobs.map((job: any) => {
+        const get = (camel: string, lower: string) => job[camel] ?? job[lower] ?? job[camel.toLowerCase()] ?? "";
+        return {
+          id: job.id,
+          name: get("companyName", "companyname") || get("company_name", "company_name"),
+          category: get("category", "category") || "Uncategorized",
+          stage: (get("stage", "stage") || "Research") as "Research" | "Outreach" | "Applied" | "Interviewing" | "Offer" | "Rejected",
+          role: get("jobTitle", "jobtitle") || get("job_title", "job_title"),
+          jobLink: get("jobLink", "joblink") || get("job_link", "job_link"),
+          contactName: get("contactName", "contactname") || get("contact_name", "contact_name"),
+          contactTitle: "",
+          contactLinkedIn: get("linkedinUrl", "linkedinurl") || get("contactLinkedIn", "contactlinkedin"),
+          priority: (get("priority", "priority") || "Medium") as "High" | "Medium" | "Low",
+          notes: get("notes", "notes") || get("jobDescription", "jobdescription"),
+          remoteOk: Boolean(job.remote),
+          estSalary: get("salary", "salary"),
+          companySize: get("companySize", "companysize") || get("company_size", "company_size"),
+        };
+      });
 
       return companies;
     } catch (error) {
