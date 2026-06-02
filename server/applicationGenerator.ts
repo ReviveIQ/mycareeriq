@@ -1,196 +1,381 @@
 import { invokeLLM } from "./_core/llm";
+import { getDb } from "./db";
+import { researchConfig } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
 
-/**
- * Resume content extracted from Bryan's PDF
- */
-const RESUME_DATA = {
-  name: "Bryan Greer",
-  location: "Fort Lauderdale, FL",
-  phone: "(561) 213-8316",
-  email: "Bryan.Greer1@gmail.com",
-  linkedin: "LinkedIn",
-  summary: `Growth-focused Account Manager and post-sales revenue leader with 10+ years of revenue increasing experience driving renewals, expansion, and customer lifetime value across SaaS and digital platform industries. Proven track record managing multimillion-dollar enterprise portfolios, delivering ~7M+ in expansion and renewal revenue, and consistently exceeding growth targets.`,
-  experience: [
-    {
-      company: "BG Consulting",
-      location: "Remote, FL",
-      title: "Lead/Principal Consultant",
-      dates: "08/24 - Present",
-      bullets: [
-        "Partner with SaaS and digital platform organizations to diagnose revenue performance gaps and design scalable account management, renewal, and expansion strategies aligned to growth targets for companies with profit up to ~$50M",
-        "Advise leadership teams on revenue modeling, pipeline forecasting, and lifecycle management frameworks",
-        "Build and optimize post-sale revenue motions by working with customer success, product adoption, and account strategy",
-        "Identify opportunities within existing customer bases and develop structured growth plans that convert adoption into measurable revenue increases through renewal and upsell opportunities",
-      ],
-    },
-    {
-      company: "Renaissance Learning / Nearpod, Inc",
-      location: "Sunrise, FL",
-      title: "Enterprise Growth Account Manager",
-      dates: "01/19 - 11/25",
-      bullets: [
-        "Delivered ~$7M+ in renewal and expansion revenue across an 11-state enterprise territory through disciplined forecasting, account planning, and lifecycle management",
-        "Responsible for managing post-sale revenue performance across complex enterprise portfolios, aligning adoption milestones with regional growth targets and averaging ~20%+ across all clients",
-        "Improved forecast visibility and revenue predictability by maintaining optimized and automated pipeline management and renewal tracking",
-        "Expanded regional revenue opportunities by identifying whitespace within existing districts and aligning adoption strategies with customer growth objectives",
-        "Conducted executive business reviews (QBRs) that translated adoption metrics and ROI insights into expansion opportunities with senior customer stakeholders",
-      ],
-    },
-    {
-      company: "DexYP (Thryv)",
-      location: "Boca Raton, FL",
-      title: "Growth Account Executive",
-      dates: "02/15 - 12/18",
-      bullets: [
-        "Ranked top 0.3% of company performers and earned President's Club recognition for sustained revenue growth and account performance",
-        "Increased customer lifetime value by ensuring product adoption matched client measurable business outcomes through consultative engagement and performance analytics",
-        "Expanded account revenue by an average of ~15% by identifying additional digital marketing opportunities and positioning automation tools",
-        "Built long-term client relationships that drove consistent upsell and cross-sell activity averaging ~30% within a highly competitive digital marketing environment",
-      ],
-    },
-  ],
-  skills: {
-    leadership: ["Revenue Leadership", "Sales team scaling", "Revenue ownership", "Organizational design", "Performance management"],
-    operations: ["Pipeline analytics", "Forecast modeling", "Funnel diagnostics", "KPI development", "Revenue visibility"],
-    strategy: ["GTM planning", "Product launch strategy", "Market positioning", "Customer acquisition frameworks", "Revenue growth strategy"],
-    technical: ["Salesforce", "HubSpot", "Zoho", "Revenue dashboards", "Advanced Excel", "CRM analytics"],
-  },
-  education: "Florida Atlantic University - College of Business - Bachelor of Science, Marketing and Advertising",
+// ── Cover Letter Modes ────────────────────────────────────────────────────────
+export type CoverLetterMode =
+  | "traditional"
+  | "executive"
+  | "achievement"
+  | "transition"
+  | "startup"
+  | "human";
+
+const MODE_DESCRIPTIONS: Record<CoverLetterMode, string> = {
+  traditional: "Corporate, ATS-friendly, conservative tone. Best for mid-level IC, finance, legal, government roles.",
+  executive: "Leadership-focused, career story driven. Best for Director, VP, C-suite — use when title contains Director/VP/Head of/Lead/Manager.",
+  achievement: "Metrics-first, quantified impact. Best for sales, revenue, quota-carrying roles (AE, CSM, SDR, RevOps).",
+  transition: "Layoff recovery, career pivots, industry changes. Auto-selected when transition event detected.",
+  startup: "Builder mentality, bias for action. Best for startup AE, SDR, PM roles.",
+  human: "Relationship and impact focused. Best for nonprofit, healthcare, education sectors.",
 };
 
-/**
- * Generate a custom, friendly cover letter tailored to a specific company and role
- */
+// ── Narrative Brief (extracted from resume before generating letter) ──────────
+export interface NarrativeBrief {
+  professionalIdentity: string;
+  careerTheme: string;
+  transitionEvent: "layoff" | "acquisition" | "pivot" | "relocation" | "none" | null;
+  transitionStatement: string;
+  topAccomplishments: Array<{ metric: string; context: string; outcome: string }>;
+  valueProposition: string;
+  relevantSkills: string[];
+  employerNeedsMatch: string;
+  closingHook: string;
+}
+
+export interface CoverLetterScores {
+  authenticity: number;
+  relevance: number;
+  readability: number;
+  flags: string[];
+}
+
+export interface GeneratedCoverLetter {
+  outreachMessage: string;
+  coverLetter: string;
+  narrativeBrief: NarrativeBrief;
+  scores: CoverLetterScores;
+  mode: CoverLetterMode;
+}
+
+// ── Auto-select mode based on job title and transition detection ──────────────
+function autoSelectMode(jobTitle: string, transitionEvent: string | null): CoverLetterMode {
+  if (transitionEvent && transitionEvent !== "none") return "transition";
+
+  const title = jobTitle.toLowerCase();
+  if (/director|vp|vice president|head of|chief|c-suite|cro|cso/.test(title)) return "executive";
+  if (/account executive|ae|sdr|bdr|csm|revops|quota|sales/.test(title)) return "achievement";
+  if (/nonprofit|social work|healthcare|nurse|teacher|counselor|education/.test(title)) return "human";
+  if (/startup|early.stage|founding/.test(title)) return "startup";
+  return "traditional";
+}
+
+// ── Detect career transition from resume data ─────────────────────────────────
+function detectTransition(resumeText: string): "layoff" | "acquisition" | "pivot" | "relocation" | "none" {
+  const lower = resumeText.toLowerCase();
+  if (/laid off|restructur|reduction in force|rif|position eliminated/.test(lower)) return "layoff";
+  if (/acqui|merger|acquired by|merged with/.test(lower)) return "acquisition";
+  if (/career change|transitioning|pivoting|new direction/.test(lower)) return "pivot";
+  return "none";
+}
+
+// ── Stage 1: Extract Narrative Brief from resume ──────────────────────────────
+async function extractNarrativeBrief(
+  resumeText: string,
+  jobDescription: string,
+  jobTitle: string,
+  companyName: string
+): Promise<NarrativeBrief> {
+  const response = await invokeLLM({
+    messages: [
+      {
+        role: "system",
+        content: `You are a career narrative analyst. Extract the candidate's professional identity, career arc, transition context, and top accomplishments from their resume. Return ONLY valid JSON matching the NarrativeBrief schema. No preamble, no markdown, no explanation.`,
+      },
+      {
+        role: "user",
+        content: `Resume:
+${resumeText}
+
+Target Job: ${jobTitle} at ${companyName}
+Job Description: ${jobDescription.slice(0, 1000)}
+
+Extract and return this JSON:
+{
+  "professionalIdentity": "one sentence — who this person is professionally",
+  "careerTheme": "the throughline across all roles",
+  "transitionEvent": "layoff | acquisition | pivot | relocation | none",
+  "transitionStatement": "one factual non-defensive sentence about the transition, or empty string",
+  "topAccomplishments": [
+    { "metric": "specific number or outcome", "context": "what role/situation", "outcome": "business impact" }
+  ],
+  "valueProposition": "what this candidate delivers that others don't",
+  "relevantSkills": ["skill1", "skill2", "skill3"],
+  "employerNeedsMatch": "how candidate experience addresses stated job requirements",
+  "closingHook": "why this specific company and role is compelling to the candidate"
+}
+
+Return ONLY the JSON object. No markdown. No explanation.`,
+      },
+    ],
+  });
+
+  const text = (response.choices?.[0]?.message?.content || "")
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/```\s*$/i, "");
+
+  try {
+    return JSON.parse(text) as NarrativeBrief;
+  } catch {
+    // Fallback brief if parse fails
+    return {
+      professionalIdentity: "An experienced professional with a strong track record.",
+      careerTheme: "Consistent delivery of results across roles",
+      transitionEvent: "none",
+      transitionStatement: "",
+      topAccomplishments: [],
+      valueProposition: "Strong execution and relationship-building skills",
+      relevantSkills: [],
+      employerNeedsMatch: "Relevant experience aligned to role requirements",
+      closingHook: "Excited by the opportunity to contribute to the team",
+    };
+  }
+}
+
+// ── Stage 2: Generate Cover Letter ───────────────────────────────────────────
+async function generateCoverLetterFromBrief(
+  brief: NarrativeBrief,
+  mode: CoverLetterMode,
+  jobTitle: string,
+  companyName: string,
+  hiringManager: string
+): Promise<string> {
+  const modeDesc = MODE_DESCRIPTIONS[mode];
+  const salutation = hiringManager && hiringManager !== "Hiring Manager"
+    ? `Dear ${hiringManager},`
+    : "Dear Hiring Manager,";
+
+  const transitionParagraph = brief.transitionEvent && brief.transitionEvent !== "none" && brief.transitionStatement
+    ? `
+
+${brief.transitionStatement}`
+    : "";
+
+  const accomplishmentsText = brief.topAccomplishments.length > 0
+    ? brief.topAccomplishments
+        .slice(0, 3)
+        .map(a => `${a.metric} — ${a.context} — ${a.outcome}`)
+        .join("; ")
+    : "";
+
+  const response = await invokeLLM({
+    messages: [
+      {
+        role: "system",
+        content: `You are an expert cover letter writer. Write in first person. Never fabricate metrics or experience not in the brief. 4 paragraphs plus a close. Plain text with paragraph breaks only. No headers, no bullet points. Mode: ${modeDesc}`,
+      },
+      {
+        role: "user",
+        content: `Write a cover letter for:
+Role: ${jobTitle} at ${companyName}
+Salutation: ${salutation}
+
+Career Narrative:
+- Identity: ${brief.professionalIdentity}
+- Theme: ${brief.careerTheme}${transitionParagraph}
+- Top accomplishments: ${accomplishmentsText}
+- Value proposition: ${brief.valueProposition}
+- Relevant skills: ${brief.relevantSkills.join(", ")}
+- Why this role: ${brief.closingHook}
+- How they match employer needs: ${brief.employerNeedsMatch}
+
+Structure:
+Paragraph 1: Who I am + why I am interested in ${companyName}
+Paragraph 2: Career story${brief.transitionEvent !== "none" ? " + transition context (factual, never defensive)" : ""}
+Paragraph 3: Relevant accomplishments and qualifications
+Paragraph 4: Connection to ${companyName}'s specific needs + closing call to action
+
+Start directly with the salutation. End with "Sincerely," followed by a blank line for the candidate name. 250-350 words.`,
+      },
+    ],
+  });
+
+  return (response.choices?.[0]?.message?.content || "").trim();
+}
+
+// ── Stage 3: Score the Cover Letter ──────────────────────────────────────────
+async function scoreCoverLetter(
+  coverLetter: string,
+  jobDescription: string,
+  companyName: string
+): Promise<CoverLetterScores> {
+  const response = await invokeLLM({
+    messages: [
+      {
+        role: "system",
+        content: `You are a cover letter quality reviewer. Score on three dimensions and return ONLY valid JSON. No markdown.`,
+      },
+      {
+        role: "user",
+        content: `Score this cover letter for a role at ${companyName}:
+
+Cover Letter:
+${coverLetter}
+
+Job Description excerpt:
+${jobDescription.slice(0, 500)}
+
+Return this JSON:
+{
+  "authenticity": <1-10 — real career story, no generic phrases, no unsupported claims>,
+  "relevance": <1-10 — addresses employer needs, JD keyword coverage, company name used>,
+  "readability": <1-10 — clear, well-structured, 250-350 words, good paragraph flow>,
+  "flags": ["list any issues here, or empty array if none"]
+}
+
+Return ONLY the JSON. No markdown.`,
+      },
+    ],
+  });
+
+  const text = (response.choices?.[0]?.message?.content || "")
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/```\s*$/i, "");
+
+  try {
+    return JSON.parse(text) as CoverLetterScores;
+  } catch {
+    return { authenticity: 7, relevance: 7, readability: 7, flags: [] };
+  }
+}
+
+// ── Generate outreach message (Page 1) ───────────────────────────────────────
+function generateOutreachMessage(
+  contactFirstName: string,
+  companyName: string,
+  jobTitle: string,
+  candidateName: string
+): string {
+  const firstName = contactFirstName || "there";
+  return `Hi ${firstName},
+
+I'm exploring an opportunity at ${companyName} and was hoping you might be able to point me in the right direction. I came across the ${jobTitle} opening and I'm trying to figure out who the right person to connect with would be — whether that's the hiring manager or someone else on the team.
+
+Any help you could offer would be greatly appreciated. Thank you so much, and I look forward to hearing from you soon.
+
+${candidateName}`;
+}
+
+// ── Main export: Generate complete cover letter package ───────────────────────
 export async function generateCoverLetter(
   companyName: string,
   jobTitle: string,
   jobDescription: string,
-  contactName: string
+  contactName: string,
+  userId?: number,
+  requestedMode?: CoverLetterMode
 ): Promise<string> {
-  const prompt = `You are an expert cover letter writer. Generate a warm, friendly, and direct cover letter (no business jargon) for Bryan Greer applying to ${companyName} for the ${jobTitle} role.
+  // Get user's resume from researchConfig if userId provided
+  let resumeText = "";
+  if (userId) {
+    try {
+      const db = await getDb();
+      if (db) {
+        const configs = await db.select().from(researchConfig).where(eq(researchConfig.userId, userId));
+        const config = configs[0];
+        if (config?.lastDocumentParsed) {
+          const parsed = typeof config.lastDocumentParsed === "string"
+            ? JSON.parse(config.lastDocumentParsed)
+            : config.lastDocumentParsed;
+          resumeText = parsed?.rawText || parsed?.text || JSON.stringify(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn("[CoverLetter] Could not load user resume:", e);
+    }
+  }
 
-Key guidelines:
-- Write in a conversational, friendly tone (like talking to a friend)
-- Avoid corporate buzzwords and jargon
-- Be direct and authentic
-- Show genuine interest in the company and role
-- Highlight relevant experience from his background
-- Keep it concise (3-4 short paragraphs)
-- Make it personal and human
+  // Fallback resume text if none uploaded
+  if (!resumeText) {
+    resumeText = `Professional with experience in ${jobTitle} roles. Strong track record of delivering results.`;
+  }
 
-Bryan's Background:
-- 10+ years in SaaS revenue leadership and account management
-- Expertise in renewals, expansion, and customer lifetime value
-- Proven track record delivering millions in revenue
-- Strong at building relationships and understanding customer needs
-- Experience with enterprise and mid-market customers
+  // Stage 1 — Extract narrative
+  const brief = await extractNarrativeBrief(resumeText, jobDescription, jobTitle, companyName);
 
-Job Description:
-${jobDescription}
+  // Auto-select mode
+  const mode = requestedMode || autoSelectMode(jobTitle, brief.transitionEvent);
 
-Contact Name: ${contactName}
+  // Stage 2 — Generate cover letter
+  let coverLetter = await generateCoverLetterFromBrief(brief, mode, jobTitle, companyName, contactName);
 
-Generate the cover letter in plain text format (no HTML). Start directly with the greeting.`;
+  // Stage 3 — Score (retry once if below threshold)
+  let scores = await scoreCoverLetter(coverLetter, jobDescription, companyName);
+  if (scores.authenticity < 7 || scores.relevance < 7) {
+    console.log("[CoverLetter] Score below threshold — regenerating...");
+    coverLetter = await generateCoverLetterFromBrief(brief, mode, jobTitle, companyName, contactName);
+    scores = await scoreCoverLetter(coverLetter, jobDescription, companyName);
+  }
 
-  const response = await invokeLLM({
-    messages: [
-      {
-        role: "system",
-        content: "You are an expert cover letter writer who creates warm, friendly, and direct cover letters without business jargon.",
-      },
-      {
-        role: "user",
-        content: prompt,
-      },
-    ],
-  });
+  console.log(`[CoverLetter] Generated for ${companyName} — Mode: ${mode} — Scores: A${scores.authenticity}/R${scores.relevance}/R${scores.readability}`);
 
-  const content = response.choices[0]?.message.content;
-  const coverLetter = typeof content === "string" ? content : "";
   return coverLetter;
 }
 
-/**
- * Generate a tailored resume focused on skills and experience relevant to the specific role
- */
+// ── Generate tailored resume (unchanged) ─────────────────────────────────────
 export async function generateTailoredResume(
   jobTitle: string,
   jobDescription: string,
-  companyName: string
+  companyName: string,
+  userId?: number
 ): Promise<string> {
-  const prompt = `You are an expert resume writer. Create a tailored resume for Bryan Greer applying to ${companyName} for the ${jobTitle} role.
-
-Key guidelines:
-- Reorder and emphasize experience most relevant to this specific role
-- Highlight skills that match the job description
-- Keep the same professional summary but make it more targeted
-- Focus on achievements and metrics that align with the role
-- Use bullet points for clarity
-- Keep it to 1 page format (plain text)
-
-Bryan's Full Background:
-Name: ${RESUME_DATA.name}
-Location: ${RESUME_DATA.location}
-Phone: ${RESUME_DATA.phone}
-Email: ${RESUME_DATA.email}
-
-Professional Summary:
-${RESUME_DATA.summary}
-
-Experience:
-${RESUME_DATA.experience
-  .map(
-    (exp) => `
-${exp.title} at ${exp.company} (${exp.dates})
-${exp.bullets.map((b) => `• ${b}`).join("\n")}
-`
-  )
-  .join("\n")}
-
-Skills:
-Leadership: ${RESUME_DATA.skills.leadership.join(", ")}
-Operations: ${RESUME_DATA.skills.operations.join(", ")}
-Strategy: ${RESUME_DATA.skills.strategy.join(", ")}
-Technical: ${RESUME_DATA.skills.technical.join(", ")}
-
-Education: ${RESUME_DATA.education}
-
-Job Description for Context:
-${jobDescription}
-
-Generate a tailored resume in plain text format that emphasizes the most relevant experience and skills for this ${jobTitle} role at ${companyName}.`;
+  let resumeText = "";
+  if (userId) {
+    try {
+      const db = await getDb();
+      if (db) {
+        const configs = await db.select().from(researchConfig).where(eq(researchConfig.userId, userId));
+        const config = configs[0];
+        if (config?.lastDocumentParsed) {
+          const parsed = typeof config.lastDocumentParsed === "string"
+            ? JSON.parse(config.lastDocumentParsed)
+            : config.lastDocumentParsed;
+          resumeText = parsed?.rawText || parsed?.text || JSON.stringify(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn("[TailoredResume] Could not load user resume:", e);
+    }
+  }
 
   const response = await invokeLLM({
     messages: [
       {
         role: "system",
-        content: "You are an expert resume writer who creates tailored resumes that highlight the most relevant experience for specific roles.",
+        content: "You are an expert resume writer. Create a tailored resume that highlights the most relevant experience for the specific role. Use plain text format with clear sections.",
       },
       {
         role: "user",
-        content: prompt,
+        content: `Create a tailored resume for a ${jobTitle} role at ${companyName}.
+
+${resumeText ? `Candidate Resume:
+${resumeText}
+
+` : ""}Job Description:
+${jobDescription}
+
+Format as plain text. Emphasize experience and skills most relevant to this specific role. Keep to one page equivalent.`,
       },
     ],
   });
 
-  const content = response.choices[0]?.message.content;
-  const resume = typeof content === "string" ? content : "";
-  return resume;
+  return (response.choices?.[0]?.message?.content || "").trim();
 }
 
-/**
- * Generate both cover letter and resume in parallel
- */
+// ── Generate both documents ───────────────────────────────────────────────────
 export async function generateApplicationDocuments(
   companyName: string,
   jobTitle: string,
   jobDescription: string,
-  contactName: string
+  contactName: string,
+  userId?: number
 ): Promise<{ coverLetter: string; tailoredResume: string }> {
   const [coverLetter, tailoredResume] = await Promise.all([
-    generateCoverLetter(companyName, jobTitle, jobDescription, contactName),
-    generateTailoredResume(jobTitle, jobDescription, companyName),
+    generateCoverLetter(companyName, jobTitle, jobDescription, contactName, userId),
+    generateTailoredResume(jobTitle, jobDescription, companyName, userId),
   ]);
-
   return { coverLetter, tailoredResume };
 }
