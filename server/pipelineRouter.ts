@@ -19,14 +19,31 @@ export const pipelineRouter = router({
 
       // Use raw SQL to bypass any Drizzle type coercion issues
       const { sql } = await import("drizzle-orm");
+      // db.execute returns [RowDataPacket[], FieldPacket[]] in mysql2
+      // RowDataPacket objects have named fields — but result[0] is the rows array
       const rawResult = await db.execute(
         sql`SELECT * FROM companies WHERE userId = ${userId} ORDER BY createdAt DESC`
       ) as any;
-      const jobs = Array.isArray(rawResult) ? rawResult : (rawResult?.rows ?? []);
-      console.log("[PipelineRouter] getCompanies found:", jobs.length, "companies (raw SQL)");
+
+      // Parse mysql2 result format: either [rows[], fields[]] or rows[] directly
+      let jobs: any[] = [];
+      if (Array.isArray(rawResult) && rawResult.length >= 1) {
+        const first = rawResult[0];
+        if (Array.isArray(first)) {
+          // [rows[], fields[]] format — rows are in first element
+          jobs = first;
+        } else if (first && typeof first === "object" && ("companyName" in first || "id" in first)) {
+          // Already an array of row objects
+          jobs = rawResult;
+        }
+      } else if (rawResult?.rows) {
+        jobs = rawResult.rows;
+      }
+
+      console.log("[PipelineRouter] getCompanies found:", jobs.length, "companies");
       if (jobs.length > 0) {
-        console.log("[PipelineRouter] First row keys:", Object.keys(jobs[0]));
-        console.log("[PipelineRouter] First row sample:", JSON.stringify(jobs[0]).slice(0, 200));
+        const sample = jobs[0];
+        console.log("[PipelineRouter] First row:", JSON.stringify(sample).slice(0, 200));
       }
 
       // Transform to pipeline format
