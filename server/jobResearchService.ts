@@ -285,6 +285,7 @@ async function scrapeCareerPage(
     }
 
     console.log(`[JobResearch] Firecrawl got ${pageContent.length} chars from ${careersUrl}`);
+    console.log(`[JobResearch] Content preview: ${pageContent.slice(0, 300).replace(/\n/g, " ")}`);
 
     // Use GPT to extract matching job postings from scraped content
     const apiKey = process.env.OPENAI_API_KEY;
@@ -340,10 +341,12 @@ Return ONLY the JSON array. No markdown.`
       .replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
 
     try {
+      console.log(`[JobResearch] GPT extraction response: ${extractText.slice(0, 200)}`);
       const jobs = JSON.parse(extractText);
+      console.log(`[JobResearch] GPT extracted ${Array.isArray(jobs) ? jobs.length : 0} jobs`);
       return Array.isArray(jobs) ? jobs : [];
     } catch {
-      console.warn(`[JobResearch] Failed to parse job extraction response`);
+      console.warn(`[JobResearch] Failed to parse job extraction response: ${extractText.slice(0, 100)}`);
       return [];
     }
   } catch (err) {
