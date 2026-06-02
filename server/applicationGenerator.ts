@@ -294,9 +294,7 @@ export async function generateCoverLetter(
               e.experience ? `Experience: ${JSON.stringify(e.experience)}` : "",
               e.skills ? `Skills: ${JSON.stringify(e.skills)}` : "",
               e.education ? `Education: ${JSON.stringify(e.education)}` : "",
-            ].filter(Boolean).join("
-
-");
+            ].filter(Boolean).join("\n\n");
           }
         }
       }
@@ -360,9 +358,7 @@ export async function generateTailoredResume(
               e.summary ? `Summary: ${e.summary}` : "",
               e.experience ? `Experience: ${JSON.stringify(e.experience)}` : "",
               e.skills ? `Skills: ${JSON.stringify(e.skills)}` : "",
-            ].filter(Boolean).join("
-
-");
+            ].filter(Boolean).join("\n\n");
           }
         }
       }
