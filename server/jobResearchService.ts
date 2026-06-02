@@ -349,8 +349,14 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
   const configs = await db.select().from(researchConfig).where(eq(researchConfig.userId, userId));
   const config = configs[0];
 
-  const targetRoles = config?.targetRoles?.toString() || "Account Executive, Business Development Manager";
-  const targetCategories = config?.targetCategories?.toString() || "B2B SaaS, Enterprise Software";
+  const targetRoles = config?.targetRoles?.toString() || "";
+  const targetCategories = config?.targetCategories?.toString() || "";
+
+  // Don't run research if no roles configured — user needs to upload resume first
+  if (!targetRoles.trim()) {
+    console.log("[JobResearch] No target roles configured — skipping research. Upload a resume in Settings.");
+    return [];
+  }
   const requestedCount = Math.min(count || config?.rolesPerDay || 10, 30);
 
   console.log(`[JobResearch] Starting research — ${requestedCount} jobs for: ${targetRoles}`);
