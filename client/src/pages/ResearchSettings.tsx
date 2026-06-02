@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
+import { CategorySelector } from "@/components/CategorySelector";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,7 +17,7 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
   const [targetRoles, setTargetRoles] = useState("");
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [usHiringOnly, setUsHiringOnly] = useState(true);
-  const [targetCategories, setTargetCategories] = useState("");
+  const [targetCategories, setTargetCategories] = useState<string[]>([]);
   const [rolesPerDay, setRolesPerDay] = useState(30);
   const [enabled, setEnabled] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -33,7 +34,11 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
       setTargetRoles(config.targetRoles);
       setRemoteOnly(config.remoteOnly || false);
       setUsHiringOnly(config.usHiringOnly !== false);
-      setTargetCategories(config.targetCategories);
+      setTargetCategories(
+        config.targetCategories
+          ? config.targetCategories.split(",").map((c: string) => c.trim()).filter(Boolean)
+          : []
+      );
       setRolesPerDay(config.rolesPerDay);
       setEnabled(config.enabled === 1);
     }
@@ -46,7 +51,7 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
         targetRoles,
         remoteOnly,
         usHiringOnly,
-        targetCategories,
+        targetCategories: targetCategories.join(", "),
         rolesPerDay,
         enabled: enabled ? 1 : 0,
       });
@@ -62,7 +67,11 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
   const handleReset = () => {
     if (config) {
       setTargetRoles(config.targetRoles);
-      setTargetCategories(config.targetCategories);
+      setTargetCategories(
+        config.targetCategories
+          ? config.targetCategories.split(",").map((c: string) => c.trim()).filter(Boolean)
+          : []
+      );
       setRolesPerDay(config.rolesPerDay);
       setEnabled(config.enabled === 1);
     }
@@ -150,17 +159,15 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
         {/* Target Categories */}
         <div>
           <label className="block text-sm font-semibold text-slate-900 mb-2">
-            Target Categories
+            Target Industries & Categories
           </label>
           <p className="text-xs text-slate-500 mb-3">
-            Enter categories separated by commas (e.g., "SaaS, Revenue Intelligence, Sales Enablement")
+            Select the industries you want to target. Research will focus on companies in these categories. Search for anything — from SaaS to zookeeping.
           </p>
-          <textarea
-            value={targetCategories}
-            onChange={(e) => setTargetCategories(e.target.value)}
-            className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
-            rows={3}
-            placeholder="SaaS, Revenue Intelligence, Sales Enablement"
+          <CategorySelector
+            selected={targetCategories}
+            onChange={setTargetCategories}
+            maxSelections={10}
           />
         </div>
 
