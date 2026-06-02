@@ -150,7 +150,7 @@ export function registerAuthRoutes(app: Express) {
     }
 
     const redirectUri = `${req.protocol}://${req.get("host")}/api/auth/linkedin/callback`;
-    const scope = "openid profile email";
+    const scope = "openid profile email r_liteprofile";
     const state = crypto.randomBytes(16).toString("hex");
 
     // Store state in cookie for CSRF protection
@@ -264,6 +264,21 @@ export function registerAuthRoutes(app: Express) {
       const cookieOptions = getSessionCookieOptions(req);
       res.clearCookie("linkedin_oauth_state");
       res.cookie("reviveiq_session", token, { ...cookieOptions, maxAge: 365 * 24 * 60 * 60 * 1000 });
+
+      // Store LinkedIn access token for profile API calls (expires in 60 days)
+      // Save to users table via raw SQL
+      try {
+        const db2 = await import("../db");
+        const dbConn = await db2.getDb();
+        if (dbConn) {
+          await (dbConn as any).execute(
+            "UPDATE users SET linkedinAccessToken = ? WHERE id = ?",
+            [accessToken, user.id]
+          );
+        }
+      } catch (e) {
+        // Non-critical — user can still log in without stored token
+      }
 
       // Redirect to frontend with token in URL so client can store it
       res.redirect(`${frontendUrl}/?linkedin_token=${encodeURIComponent(token)}`);
