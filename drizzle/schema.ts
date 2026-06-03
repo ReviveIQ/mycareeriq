@@ -22,6 +22,13 @@ export const users = mysqlTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
   passwordHash: varchar("passwordHash", { length: 255 }),
   linkedinAccessToken: varchar("linkedinAccessToken", { length: 1000 }),
+  // Stripe subscription
+  stripeCustomerId: varchar("stripeCustomerId", { length: 255 }),
+  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }),
+  plan: mysqlEnum("plan", ["free", "pro"]).default("free").notNull(),
+  planInterval: varchar("planInterval", { length: 20 }), // "month" | "year"
+  planStatus: varchar("planStatus", { length: 50 }).default("active"),
+  planExpiresAt: timestamp("planExpiresAt"),
 });
 
 export type User = typeof users.$inferSelect;

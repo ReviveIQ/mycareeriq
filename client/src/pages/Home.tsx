@@ -2,7 +2,7 @@
 // DM Sans (headers) + Inter (body), off-white background, deep indigo accent
 // CRM-like interface with status badges, filter chips, and sortable columns
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { stageColors, priorityColors, categoryColors, getCategoryColor, stageOrder, exportToCSV, type PipelineStage, type Company, type CompanyCategory } from "@/lib/pipelineData";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +57,7 @@ import { toast } from "sonner";
 import GenerateApplication from "./GenerateApplication";
 import ApplicationHistory from "./ApplicationHistory";
 import ResearchSettings from "./ResearchSettings";
+import PricingPage from "./PricingPage";
 import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
@@ -66,6 +67,31 @@ type SortDir = "asc" | "desc";
 
 const STAGE_CHART_COLORS = ["#94a3b8", "#f59e0b", "#6366f1", "#8b5cf6", "#10b981", "#ef4444"];
 const CATEGORY_CHART_COLORS = ["#6366f1", "#8b5cf6", "#14b8a6", "#ec4899", "#f97316", "#06b6d4", "#0ea5e9", "#84cc16", "#10b981", "#f43f5e"];
+
+// Small badge showing plan status in header
+function SubscriptionBadge({ onUpgrade }: { onUpgrade: () => void }) {
+  const { data: sub } = trpc.subscription.getStatus.useQuery();
+  if (!sub) return null;
+
+  if (sub.isPro) {
+    return (
+      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 border border-indigo-200 rounded-full">
+        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+        <span className="text-xs font-semibold text-indigo-700">Pro</span>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={onUpgrade}
+      className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 rounded-full transition-colors group"
+    >
+      <span className="text-xs font-medium text-slate-500 group-hover:text-indigo-600">Free</span>
+      <span className="text-xs font-semibold text-indigo-600">Upgrade →</span>
+    </button>
+  );
+}
 
 export default function Home() {
   const [search, setSearch] = useState("");
@@ -81,9 +107,26 @@ export default function Home() {
   const [sortField, setSortField] = useState<SortField>("priority");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-  const [activeTab, setActiveTab] = useState<"pipeline" | "analytics" | "generate" | "history" | "settings">("pipeline");
+  const [activeTab, setActiveTab] = useState<"pipeline" | "analytics" | "generate" | "history" | "settings" | "pricing">("pipeline");
   const [isRunning, setIsRunning] = useState(false);
   const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
+
+  // Handle Stripe redirect back after checkout
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get("payment");
+    const plan = params.get("plan");
+    if (payment === "success") {
+      window.history.replaceState({}, "", window.location.pathname);
+      const label = plan?.includes("annual") ? "Pro Annual" : "Pro Monthly";
+      toast.success(`🎉 Welcome to ${label}! Unlimited research runs activated.`, { duration: 6000 });
+      utils.subscription.getStatus.invalidate();
+    } else if (payment === "canceled") {
+      window.history.replaceState({}, "", window.location.pathname);
+      toast.info("Checkout canceled — your plan wasn't changed.");
+    }
+  }, []);
 
   // Fetch pipeline data from tRPC
   const { data: pipelineData = [], isLoading } = trpc.pipeline.getCompanies.useQuery();
@@ -162,7 +205,6 @@ export default function Home() {
     setSelectedCompany(null);
     setConfirmRemoveId(null);
   };
-  const utils = trpc.useUtils();
 
   const categories = useMemo(() => {
     const cats = Array.from(new Set(pipelineData.map((c) => c.category).filter(Boolean)));
@@ -260,7 +302,17 @@ export default function Home() {
       const result = await runResearch.mutateAsync();
 
       if (result.rateLimited) {
-        toast.error(result.message);
+        if ((result as any).requiresUpgrade) {
+          toast.error("Free plan limit reached — upgrade to Pro for unlimited research", {
+            action: {
+              label: "Upgrade →",
+              onClick: () => setActiveTab("pricing"),
+            },
+            duration: 8000,
+          });
+        } else {
+          toast.error(result.message);
+        }
         setIsRunning(false);
         return;
       }
@@ -377,13 +429,16 @@ export default function Home() {
               {rateLimitStatus && (
                 <span className="text-[10px] text-slate-500 leading-none">
                   {rateLimitStatus.canRunNow
-                    ? `${rateLimitStatus.runsThisMonth}/${rateLimitStatus.monthlyLimit} used`
-                    : rateLimitStatus.hoursUntilNextRun > 0
+                    ? `${rateLimitStatus.runsThisMonth}/${rateLimitStatus.monthlyLimit === 9999 ? "∞" : rateLimitStatus.monthlyLimit} used`
+                    : (rateLimitStatus.hoursUntilNextRun ?? 0) > 0
                       ? `${rateLimitStatus.hoursUntilNextRun}h cooldown`
                       : `Limit reached`}
                 </span>
               )}
             </div>
+
+            {/* Plan badge */}
+            <SubscriptionBadge onUpgrade={() => setActiveTab("pricing")} />
 
             {/* User menu with logout */}
             <div className="relative">
@@ -483,7 +538,7 @@ export default function Home() {
 
         {/* Tab Navigation */}
         <div className="flex gap-1 bg-slate-100 p-1 rounded-lg w-fit">
-          {(["pipeline", "analytics", "generate", "history", "settings"] as const).map((tab) => (
+          {(["pipeline", "analytics", "generate", "history", "settings", "pricing"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -1020,6 +1075,13 @@ export default function Home() {
               setActiveTab("pipeline");
               handleRunNow();
             }}
+          />
+        )}
+
+        {activeTab === "pricing" && (
+          <PricingPage
+            trigger="upgrade_cta"
+            onClose={() => setActiveTab("pipeline")}
           />
         )}
       </main>

@@ -63,15 +63,24 @@ export const monitoringRouter = router({
 
     const now = new Date();
 
-    // Get rate limit state
+    // Get rate limit state — also check user plan
     const rows = await db.execute(
       sql`SELECT lastRunAt, runsThisMonth, monthlyRunsResetAt, monthlyRunLimit FROM researchConfig WHERE userId = ${userId} LIMIT 1`
     ) as any;
     const row = Array.isArray(rows) ? rows[0] : (rows?.rows?.[0] ?? null);
 
+    // Get user plan to determine actual limit
+    const userRows = await db.execute(
+      sql`SELECT plan, planStatus, planExpiresAt FROM users WHERE id = ${userId} LIMIT 1`
+    ) as any;
+    const userRow = Array.isArray(userRows) ? userRows[0] : (userRows?.rows?.[0] ?? null);
+    const { isPro } = await import("./stripeService");
+    const userIsPro = isPro({ plan: userRow?.plan, planStatus: userRow?.planStatus, planExpiresAt: userRow?.planExpiresAt ? new Date(userRow.planExpiresAt) : null });
+
     const lastRunAt = row?.lastRunAt ? new Date(row.lastRunAt) : null;
     const runsThisMonth = Number(row?.runsThisMonth ?? 0);
-    const monthlyLimit = Number(row?.monthlyRunLimit ?? 60);
+    // Pro = unlimited (9999), Free = 3 runs/month
+    const monthlyLimit = userIsPro ? 9999 : 3;
     const resetAt = row?.monthlyRunsResetAt ? new Date(row.monthlyRunsResetAt) : null;
 
     // Check 20-minute cooldown
@@ -105,16 +114,20 @@ export const monitoringRouter = router({
 
     if (currentRuns >= monthlyLimit) {
       const daysLeft = resetAt ? Math.ceil((resetAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 30;
+      const message = userIsPro
+        ? `Monthly limit reached (${monthlyLimit} runs). Resets in ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`
+        : `Free plan limit reached (${monthlyLimit} runs/month). Upgrade to Pro for unlimited research runs.`;
       return {
         success: false,
         jobsResearched: 0,
         jobsAdded: 0,
         executionTimeMs: 0,
-        message: `Monthly limit reached (${monthlyLimit} runs). Resets in ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`,
+        message,
         rateLimited: true,
         monthlyLimitReached: true,
         runsThisMonth: currentRuns,
         monthlyLimit,
+        requiresUpgrade: !userIsPro,
       };
     }
 
