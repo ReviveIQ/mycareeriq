@@ -421,10 +421,20 @@ function matchesCountryFilter(location: string, targetCountries: string): boolea
 
     // For US: state code is the primary signal — ", FL" or "(FL)" or "Florida"
     if (country === "US") {
+      const isUSRemote =
+        loc.includes("remote - us") ||
+        loc.includes("remote - united states") ||
+        loc.includes("remote u.s.") ||
+        loc.includes("remote us") ||
+        loc.includes("us remote") ||
+        loc.includes("remote, us") ||
+        (loc.includes("remote") && (loc.includes("united states") || loc.includes("u.s.")));
+
+      // Remote US roles are accessible from any state — always pass when US is selected
+      if (isUSRemote) return true;
+
       const isUS = countryKeywords.some(k => loc.includes(k)) ||
-        // Matches "City, ST" pattern — check for any 2-letter state code after comma+space
-        /,\s*[a-z]{2}(\s|$|\()/.test(loc) ||
-        loc.includes("remote");
+        /,\s*[a-z]{2}(\s|$|\()/.test(loc);
 
       if (!isUS) continue;
 
@@ -434,17 +444,12 @@ function matchesCountryFilter(location: string, targetCountries: string): boolea
       // Check state codes: ", FL" or "(FL)" or full name "Florida"
       for (const state of states) {
         const stateName = (US_STATE_NAMES[state] || "").toLowerCase();
-        // ", FL" — city, state format
         if (loc.includes(`, ${state.toLowerCase()}`)) return true;
-        // "(FL)" or "FL)" — parenthetical
         if (loc.includes(`(${state.toLowerCase()}`)) return true;
-        // Full state name
         if (stateName && loc.includes(stateName)) return true;
-        // "remote, fl" or "fl remote"
         if (loc.includes(`remote, ${state.toLowerCase()}`) ||
             loc.includes(`${state.toLowerCase()} remote`)) return true;
       }
-      // US matched but no state matched
       continue;
     }
 

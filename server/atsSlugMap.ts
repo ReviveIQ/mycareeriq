@@ -29,7 +29,7 @@ export const VERIFIED_GREENHOUSE: VerifiedCompany[] = [
   // CRM & Sales
   { name: "HubSpot", domain: "hubspot.com", ats: "greenhouse", slug: "hubspot", category: "CRM" },
   { name: "Apollo.io", domain: "apollo.io", ats: "greenhouse", slug: "apolloio", category: "Sales Intelligence" },
-  { name: "Outreach", domain: "outreach.io", ats: "greenhouse", slug: "outreach", category: "Sales Engagement" },
+  { name: "Outreach", domain: "outreach.io", ats: "ashby", slug: "outreach", category: "Sales Engagement" },
   { name: "Gong", domain: "gong.io", ats: "greenhouse", slug: "gong", category: "Revenue Intelligence" },
   { name: "Clari", domain: "clari.com", ats: "greenhouse", slug: "clari", category: "Revenue Intelligence" },
   { name: "Demandbase", domain: "demandbase.com", ats: "greenhouse", slug: "demandbase", category: "Account-Based Marketing" },
@@ -53,7 +53,7 @@ export const VERIFIED_GREENHOUSE: VerifiedCompany[] = [
 
   // Customer Success & Support
   { name: "Gainsight", domain: "gainsight.com", ats: "greenhouse", slug: "gainsight", category: "Customer Success" },
-  { name: "Medallia", domain: "medallia.com", ats: "greenhouse", slug: "medallia", category: "Customer Experience" },
+  { name: "Medallia", domain: "medallia.com", ats: "ashby", slug: "medallia", category: "Customer Experience" },
   { name: "Qualtrics", domain: "qualtrics.com", ats: "greenhouse", slug: "qualtrics", category: "Customer Experience" },
   { name: "Kustomer", domain: "kustomer.com", ats: "greenhouse", slug: "kustomer", category: "Customer Support" },
   { name: "Intercom", domain: "intercom.com", ats: "greenhouse", slug: "intercom", category: "Customer Support" },
