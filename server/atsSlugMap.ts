@@ -49,7 +49,8 @@ export const VERIFIED_GREENHOUSE: VerifiedCompany[] = [
 
   // Marketing & Growth
   { name: "Klaviyo", domain: "klaviyo.com", ats: "greenhouse", slug: "klaviyo", category: "Marketing Automation" },
-  { name: "Braze", domain: "braze.com", ats: "greenhouse", slug: "braze", category: "Marketing Automation" },
+  // Braze — 79 jobs all city-specific (NYC/Chicago/Austin/SF/London), zero FL or remote
+  // { name: "Braze"
   { name: "Drift", domain: "drift.com", ats: "ashby", slug: "drift", category: "Marketing Automation" },
 
   // Customer Success & Support
@@ -120,11 +121,12 @@ export const VERIFIED_ASHBY: VerifiedCompany[] = [
   { name: "Qualified", domain: "qualified.com", ats: "ashby", slug: "qualified", category: "Revenue Intelligence" },
   { name: "Mutiny", domain: "mutinyhq.com", ats: "ashby", slug: "mutiny", category: "Marketing Automation" },
   { name: "Pocus", domain: "pocus.com", ats: "ashby", slug: "pocus", category: "Revenue Operations" },
-  { name: "Goldcast", domain: "goldcast.io", ats: "ashby", slug: "goldcast", category: "Marketing Automation" },
+  // Goldcast — Ashby 404
+  // { name: "Goldcast"
   { name: "Clearbit", domain: "clearbit.com", ats: "greenhouse", slug: "clearbit", category: "Sales Intelligence" },
   { name: "Crossbeam", domain: "crossbeam.com", ats: "ashby", slug: "crossbeam", category: "Revenue Operations" },
   { name: "Workato", domain: "workato.com", ats: "ashby", slug: "workato", category: "B2B SaaS" },
-  { name: "Fivetran", domain: "fivetran.com", ats: "ashby", slug: "fivetran", category: "Data & Analytics" },
+  { name: "Fivetran", domain: "fivetran.com", ats: "greenhouse", slug: "fivetran", category: "Data & Analytics" },
   { name: "dbt Labs", domain: "getdbt.com", ats: "ashby", slug: "dbtlabs", category: "Data & Analytics" },
   { name: "Hex", domain: "hex.tech", ats: "ashby", slug: "hex", category: "Data & Analytics" },
   { name: "Airbyte", domain: "airbyte.com", ats: "ashby", slug: "airbyte", category: "Data & Analytics" },
