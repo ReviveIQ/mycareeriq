@@ -39,20 +39,20 @@ export const VERIFIED_GREENHOUSE: VerifiedCompany[] = [
 
   // Sales Enablement
   { name: "Seismic", domain: "seismic.com", ats: "greenhouse", slug: "seismicsoftware", category: "Sales Enablement" },
-  { name: "Highspot", domain: "highspot.com", ats: "greenhouse", slug: "highspot", category: "Sales Enablement" },
+  { name: "Highspot", domain: "highspot.com", ats: "ashby", slug: "highspot", category: "Sales Enablement" },
   { name: "Mindtickle", domain: "mindtickle.com", ats: "greenhouse", slug: "mindtickle", category: "Sales Enablement" },
   { name: "Showpad", domain: "showpad.com", ats: "greenhouse", slug: "showpad", category: "Sales Enablement" },
   { name: "Allego", domain: "allego.com", ats: "greenhouse", slug: "allego", category: "Sales Enablement" },
   { name: "WorkRamp", domain: "workramp.com", ats: "greenhouse", slug: "workramp2", category: "Sales Enablement" },
-  { name: "Spekit", domain: "spekit.com", ats: "greenhouse", slug: "spekit", category: "Sales Enablement" },
+  { name: "Spekit", domain: "spekit.com", ats: "ashby", slug: "spekit", category: "Sales Enablement" },
 
   // Marketing & Growth
   { name: "Klaviyo", domain: "klaviyo.com", ats: "greenhouse", slug: "klaviyo", category: "Marketing Automation" },
   { name: "Braze", domain: "braze.com", ats: "greenhouse", slug: "braze", category: "Marketing Automation" },
-  { name: "Drift", domain: "drift.com", ats: "greenhouse", slug: "drift", category: "Marketing Automation" },
+  { name: "Drift", domain: "drift.com", ats: "ashby", slug: "drift", category: "Marketing Automation" },
 
   // Customer Success & Support
-  { name: "Gainsight", domain: "gainsight.com", ats: "greenhouse", slug: "gainsight", category: "Customer Success" },
+  { name: "Gainsight", domain: "gainsight.com", ats: "ashby", slug: "gainsight", category: "Customer Success" },
   { name: "Medallia", domain: "medallia.com", ats: "ashby", slug: "medallia", category: "Customer Experience" },
   { name: "Qualtrics", domain: "qualtrics.com", ats: "greenhouse", slug: "qualtrics", category: "Customer Experience" },
   { name: "Kustomer", domain: "kustomer.com", ats: "greenhouse", slug: "kustomer", category: "Customer Support" },
@@ -72,18 +72,19 @@ export const VERIFIED_GREENHOUSE: VerifiedCompany[] = [
   // HR Tech
   { name: "Paychex", domain: "paychex.com", ats: "greenhouse", slug: "paychex", category: "HR Technology" },
   { name: "Deel", domain: "letsdeel.com", ats: "greenhouse", slug: "deel", category: "HR Technology" },
-  { name: "Remote", domain: "remote.com", ats: "greenhouse", slug: "remotecom", category: "HR Technology" },
+  // Remote.com omitted — staffing platform returns 250+ global roles, too noisy
+  // { name: "Remote", domain: "remote.com", ats: "greenhouse", slug: "remotecom", category: "HR Technology" },
 
   // Legal & Compliance
   { name: "Ironclad", domain: "ironcladapp.com", ats: "greenhouse", slug: "ironclad", category: "Legal Tech" },
 
   // Procurement & Finance
   { name: "Vendr", domain: "vendr.com", ats: "greenhouse", slug: "vendr", category: "B2B SaaS" },
-  { name: "Zip", domain: "ziphq.com", ats: "greenhouse", slug: "zip", category: "B2B SaaS" },
+  { name: "Zip", domain: "ziphq.com", ats: "ashby", slug: "zip", category: "B2B SaaS" },
 
   // Developer Tools
   { name: "Merge", domain: "merge.dev", ats: "greenhouse", slug: "merge", category: "Developer Tools" },
-  { name: "Chorus.ai", domain: "chorus.ai", ats: "greenhouse", slug: "chorus", category: "Revenue Intelligence" },
+  { name: "Chorus.ai", domain: "chorus.ai", ats: "ashby", slug: "chorus", category: "Revenue Intelligence" },
   { name: "Secureframe", domain: "secureframe.com", ats: "greenhouse", slug: "secureframe", category: "Cybersecurity" },
 ];
 
@@ -99,7 +100,7 @@ export const VERIFIED_LEVER: VerifiedCompany[] = [
 // These were failing as Greenhouse (404s in Railway logs) — now correctly on Ashby.
 export const VERIFIED_ASHBY: VerifiedCompany[] = [
   // Previously failing as Greenhouse — now on Ashby
-  { name: "Rippling", domain: "rippling.com", ats: "ashby", slug: "rippling", category: "HR Technology" },
+  { name: "Rippling", domain: "rippling.com", ats: "greenhouse", slug: "rippling", category: "HR Technology" },
   { name: "Vanta", domain: "vanta.com", ats: "ashby", slug: "vanta", category: "Cybersecurity" },
   { name: "Drata", domain: "drata.com", ats: "ashby", slug: "drata", category: "Cybersecurity" },
 
@@ -118,14 +119,14 @@ export const VERIFIED_ASHBY: VerifiedCompany[] = [
   { name: "Mutiny", domain: "mutinyhq.com", ats: "ashby", slug: "mutiny", category: "Marketing Automation" },
   { name: "Pocus", domain: "pocus.com", ats: "ashby", slug: "pocus", category: "Revenue Operations" },
   { name: "Goldcast", domain: "goldcast.io", ats: "ashby", slug: "goldcast", category: "Marketing Automation" },
-  { name: "Clearbit", domain: "clearbit.com", ats: "ashby", slug: "clearbit", category: "Sales Intelligence" },
+  { name: "Clearbit", domain: "clearbit.com", ats: "greenhouse", slug: "clearbit", category: "Sales Intelligence" },
   { name: "Crossbeam", domain: "crossbeam.com", ats: "ashby", slug: "crossbeam", category: "Revenue Operations" },
   { name: "Workato", domain: "workato.com", ats: "ashby", slug: "workato", category: "B2B SaaS" },
   { name: "Fivetran", domain: "fivetran.com", ats: "ashby", slug: "fivetran", category: "Data & Analytics" },
   { name: "dbt Labs", domain: "getdbt.com", ats: "ashby", slug: "dbtlabs", category: "Data & Analytics" },
   { name: "Hex", domain: "hex.tech", ats: "ashby", slug: "hex", category: "Data & Analytics" },
   { name: "Airbyte", domain: "airbyte.com", ats: "ashby", slug: "airbyte", category: "Data & Analytics" },
-  { name: "Census", domain: "getcensus.com", ats: "ashby", slug: "census", category: "Revenue Operations" },
+  { name: "Census", domain: "getcensus.com", ats: "ashby", slug: "get-census", category: "Revenue Operations" },
   { name: "Hightouch", domain: "hightouch.com", ats: "ashby", slug: "hightouch", category: "Revenue Operations" },
   { name: "Persona", domain: "withpersona.com", ats: "ashby", slug: "persona", category: "B2B SaaS" },
   { name: "Navattic", domain: "navattic.com", ats: "ashby", slug: "navattic", category: "Sales Enablement" },
