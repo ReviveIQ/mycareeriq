@@ -150,7 +150,7 @@ export function registerAuthRoutes(app: Express) {
     }
 
     const redirectUri = `${req.protocol}://${req.get("host")}/api/auth/linkedin/callback`;
-    const scope = "openid profile email r_liteprofile";
+    const scope = "openid profile email";
     const state = crypto.randomBytes(16).toString("hex");
 
     // Store state in cookie for CSRF protection
