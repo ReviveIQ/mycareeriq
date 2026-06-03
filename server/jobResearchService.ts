@@ -1,10 +1,11 @@
 import { getDb } from "./db";
-import { findHiringManager } from "./apolloService";
+import { findHiringManager, findJobPoster } from "./apolloService";
 import { findCompanyLinkedIn } from "./linkedinService";
 import { companies, researchConfig } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { fetchGreenhouseJobs } from "./greenhouseService";
 import { fetchLeverJobs } from "./leverService";
+import { fetchAshbyJobs } from "./ashbyService";
 import { getVerifiedCompaniesForDiscovery, VerifiedCompany } from "./atsSlugMap";
 
 export interface GeneratedJob {
@@ -168,6 +169,18 @@ async function fetchAllJobsFromCompany(
         };
       });
     }
+
+    if (company.ats === "ashby") {
+      const jobs = await fetchAshbyJobs(company.slug, keyword);
+      return jobs.map(j => ({
+        title: j.title,
+        description: j.description,
+        url: j.url,
+        salary: j.salary,
+        remote: j.remote,
+        jobId: j.jobId,
+      }));
+    }
   } catch (err) {
     console.warn(`[JobResearch] Failed to fetch from ${company.name}:`, err);
   }
@@ -296,15 +309,39 @@ Return ONLY the JSON array. One entry per job. Keep reasons under 10 words.`
 }
 
 // ── Step 4: Enrich contact via Apollo ────────────────────────────────────────
-async function enrichContact(companyName: string, domain: string): Promise<{
+// Primary: find the recruiter/TA who posted the role (best outreach target)
+// Fallback: find a sales leader if no recruiter found
+async function enrichContact(companyName: string, domain: string, jobTitle?: string): Promise<{
   contactName: string;
   contactEmail: string;
   contactLinkedIn: string;
+  contactTitle: string;
 }> {
-  if (!process.env.APOLLO_API_KEY) return { contactName: "", contactEmail: "", contactLinkedIn: "" };
-  const contact = await findHiringManager(companyName, domain);
-  if (!contact) return { contactName: "", contactEmail: "", contactLinkedIn: "" };
-  return { contactName: contact.name, contactEmail: contact.email, contactLinkedIn: contact.linkedinUrl };
+  if (!process.env.APOLLO_API_KEY) return { contactName: "", contactEmail: "", contactLinkedIn: "", contactTitle: "" };
+
+  // Try recruiter/TA first — they own the requisition
+  const jobPoster = await findJobPoster(companyName, domain, jobTitle);
+  if (jobPoster) {
+    return {
+      contactName: jobPoster.name,
+      contactEmail: jobPoster.email,
+      contactLinkedIn: jobPoster.linkedinUrl,
+      contactTitle: jobPoster.title,
+    };
+  }
+
+  // Fall back to sales leader if no recruiter found
+  const leader = await findHiringManager(companyName, domain);
+  if (leader) {
+    return {
+      contactName: leader.name,
+      contactEmail: leader.email,
+      contactLinkedIn: leader.linkedinUrl,
+      contactTitle: leader.title,
+    };
+  }
+
+  return { contactName: "", contactEmail: "", contactLinkedIn: "", contactTitle: "" };
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -398,14 +435,14 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
 
   // ── Phase 3: Enrich contacts for selected companies ──────────────────────────
   // Enrich in parallel, capped to avoid rate limits
-  const enrichedContacts = new Map<string, { contactName: string; contactEmail: string; contactLinkedIn: string }>();
+  const enrichedContacts = new Map<string, { contactName: string; contactEmail: string; contactLinkedIn: string; contactTitle: string }>();
   await Promise.all(
     selected.map(async job => {
       const key = job.companyName.toLowerCase();
       if (!enrichedContacts.has(key)) {
         const co = toFetch.find(c => c.name.toLowerCase() === key);
         if (co) {
-          const contact = await enrichContact(co.name, co.domain);
+          const contact = await enrichContact(co.name, co.domain, job.title);
           enrichedContacts.set(key, contact);
         }
       }
@@ -417,18 +454,21 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
 
   for (const job of selected) {
     const contact = enrichedContacts.get(job.companyName.toLowerCase()) ||
-      { contactName: "", contactEmail: "", contactLinkedIn: "" };
+      { contactName: "", contactEmail: "", contactLinkedIn: "", contactTitle: "" };
 
     let linkedinUrl = "";
     try { linkedinUrl = await findCompanyLinkedIn(job.companyName); } catch { /* non-critical */ }
 
     const sourceLabel = job.ats === "greenhouse" ? "Greenhouse API"
       : job.ats === "lever" ? "Lever API"
+      : job.ats === "ashby" ? "Ashby API"
       : "Firecrawl";
+
+    const contactNote = contact.contactTitle ? ` | Contact: ${contact.contactTitle}` : "";
+    const fitNote = job.fitScore ? ` | Fit: ${job.fitScore}/10` : "";
 
     results.push({
       companyName: job.companyName,
-      // companyId uses the real ATS job ID, not a random string
       companyId: `${slugify(job.companyName)}-${job.jobId || Date.now()}`,
       jobTitle: job.title,
       category: standardizeCategory(job.category),
@@ -437,7 +477,7 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
       linkedinUrl,
       contactLinkedIn: contact.contactLinkedIn,
       jobDescription: job.description,
-      jobLink: job.url,    // real ATS URL with real job ID, never falls back
+      jobLink: job.url,
       salary: job.salary || "Competitive",
       remote: job.remote || false,
       priority: getPriority(job.title),
@@ -523,7 +563,6 @@ export async function addJobsToPipeline(jobs: GeneratedJob[], userId: number = 1
   let addedCount = 0;
   for (const job of jobs) {
     try {
-      const fitNote = job.fitScore ? ` | Fit score: ${job.fitScore}/10` : "";
       await db.insert(companies).values({
         userId,
         companyId: job.companyId,
@@ -540,7 +579,7 @@ export async function addJobsToPipeline(jobs: GeneratedJob[], userId: number = 1
         companySize: "",
         priority: job.priority,
         stage: "Research",
-        notes: `Source: ${job.source}${fitNote}`,
+        notes: `Source: ${job.source}${job.fitScore ? ` | Fit: ${job.fitScore}/10` : ""}`,
       });
       addedCount++;
     } catch (err: any) {
