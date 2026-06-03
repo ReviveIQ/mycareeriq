@@ -20,14 +20,18 @@ export const researchConfigRouter = router({
         .limit(1);
 
       if (config.length === 0) {
-        // Return default config if none exists
+        // No config yet — user hasn't uploaded a resume. Return empty fields.
         return {
           id: 0,
           userId: ctx.user.id,
-          targetRoles: "Enterprise Account Manager,Account Executive,Sales Manager",
-          targetCategories: "SaaS,Revenue Intelligence,Sales Enablement",
-          rolesPerDay: 30,
+          targetRoles: "",
+          targetCategories: "",
+          targetCompanies: "",
+          rolesPerDay: 10,
           enabled: 1,
+          documentType: "resume",
+          documentFileName: null,
+          lastDocumentParsed: null,
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -67,15 +71,14 @@ export const researchConfigRouter = router({
           .limit(1);
 
         if (existing.length === 0) {
-          // Create new config
+          // Create new config with whatever the user/resume provided — no hardcoded defaults
           await db.insert(researchConfig).values({
             userId: ctx.user.id,
-            targetRoles: input.targetRoles || "Enterprise Account Manager,Account Executive,Sales Manager",
-            targetCategories: input.targetCategories || "SaaS,Revenue Intelligence,Sales Enablement",
-            rolesPerDay: input.rolesPerDay || 30,
+            targetRoles: input.targetRoles || "",
+            targetCategories: input.targetCategories || "",
+            targetCompanies: "",
+            rolesPerDay: input.rolesPerDay || 10,
             enabled: input.enabled !== undefined ? input.enabled : 1,
-            remoteOnly: input.remoteOnly || false,
-            usHiringOnly: input.usHiringOnly !== undefined ? input.usHiringOnly : true,
           });
         } else {
           // Update existing config
