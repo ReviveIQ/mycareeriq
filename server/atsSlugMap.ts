@@ -29,11 +29,12 @@ export const VERIFIED_GREENHOUSE: VerifiedCompany[] = [
   // CRM & Sales
   { name: "HubSpot", domain: "hubspot.com", ats: "greenhouse", slug: "hubspot", category: "CRM" },
   { name: "Apollo.io", domain: "apollo.io", ats: "greenhouse", slug: "apolloio", category: "Sales Intelligence" },
-  { name: "Outreach", domain: "outreach.io", ats: "ashby", slug: "outreach", category: "Sales Engagement" },
+  // Outreach — 404 on Greenhouse and Ashby, skipped
+  // { name: "Outreach", category: "Sales Engagement" },
   { name: "Gong", domain: "gong.io", ats: "greenhouse", slug: "gong", category: "Revenue Intelligence" },
   { name: "Clari", domain: "clari.com", ats: "greenhouse", slug: "clari", category: "Revenue Intelligence" },
   { name: "Demandbase", domain: "demandbase.com", ats: "greenhouse", slug: "demandbase", category: "Account-Based Marketing" },
-  { name: "LeanData", domain: "leandata.com", ats: "greenhouse", slug: "leandata", category: "Revenue Operations" },
+  { name: "LeanData", domain: "leandata.com", ats: "ashby", slug: "leandata", category: "Revenue Operations" },
   { name: "Bombora", domain: "bombora.com", ats: "greenhouse", slug: "bombora", category: "Sales Intelligence" },
   { name: "Chili Piper", domain: "chilipiper.com", ats: "greenhouse", slug: "chili-piper", category: "Revenue Operations" },
 
@@ -57,7 +58,7 @@ export const VERIFIED_GREENHOUSE: VerifiedCompany[] = [
   { name: "Qualtrics", domain: "qualtrics.com", ats: "greenhouse", slug: "qualtrics", category: "Customer Experience" },
   { name: "Kustomer", domain: "kustomer.com", ats: "greenhouse", slug: "kustomer", category: "Customer Support" },
   { name: "Intercom", domain: "intercom.com", ats: "greenhouse", slug: "intercom", category: "Customer Support" },
-  { name: "Zendesk", domain: "zendesk.com", ats: "greenhouse", slug: "zendesk", category: "Customer Support" },
+  { name: "Zendesk", domain: "zendesk.com", ats: "ashby", slug: "zendesk", category: "Customer Support" },
 
   // Data & Analytics
   { name: "Mixpanel", domain: "mixpanel.com", ats: "greenhouse", slug: "mixpanel", category: "Data & Analytics" },
@@ -105,7 +106,8 @@ export const VERIFIED_ASHBY: VerifiedCompany[] = [
   { name: "Drata", domain: "drata.com", ats: "ashby", slug: "drata", category: "Cybersecurity" },
 
   // Growth-stage SaaS on Ashby
-  { name: "Ramp", domain: "ramp.com", ats: "ashby", slug: "ramp", category: "FinTech" },
+  // Ramp removed — NYC HQ only, no remote roles, wastes a pool slot for FL users
+  // { name: "Ramp",
   { name: "Brex", domain: "brex.com", ats: "ashby", slug: "brex", category: "FinTech" },
   { name: "Retool", domain: "retool.com", ats: "ashby", slug: "retool", category: "Developer Tools" },
   { name: "Linear", domain: "linear.app", ats: "ashby", slug: "linear", category: "Productivity" },
