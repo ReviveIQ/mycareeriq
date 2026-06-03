@@ -38,19 +38,81 @@ function stripJsonFences(raw: string): string {
   return text.trim();
 }
 
-function extractTextFromBuffer(buffer: Buffer, mimeType: string): string {
-  // Extract readable text from the buffer
-  // For PDFs, try to get UTF-8 text content
-  // For DOCX, extract what we can
+async function extractTextFromBuffer(buffer: Buffer, mimeType: string, fileName: string): Promise<string> {
+  const isDocx = mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    || fileName.toLowerCase().endsWith(".docx");
+  const isPdf = mimeType === "application/pdf" || fileName.toLowerCase().endsWith(".pdf");
+
+  // ── DOCX: use mammoth for proper XML extraction ───────────────────────────
+  if (isDocx) {
+    try {
+      const mammoth = await import("mammoth");
+      const result = await mammoth.extractRawText({ buffer });
+      const text = result.value?.trim() || "";
+      if (text.length > 50) {
+        console.log(`[DocumentIntake] mammoth extracted ${text.length} chars from DOCX`);
+        return text.slice(0, 8000);
+      }
+      console.warn("[DocumentIntake] mammoth returned empty text — falling back to raw extraction");
+    } catch (err) {
+      console.warn("[DocumentIntake] mammoth failed:", err);
+    }
+  }
+
+  // ── PDF: extract readable text streams ───────────────────────────────────
+  // PDFs embed text in streams between BT/ET markers. We extract those.
+  if (isPdf) {
+    try {
+      const raw = buffer.toString("latin1"); // latin1 preserves byte values
+      // Extract text from PDF content streams (between BT...ET blocks)
+      const textChunks: string[] = [];
+      const btEtRegex = /BT([\s\S]*?)ET/g;
+      let match;
+      while ((match = btEtRegex.exec(raw)) !== null) {
+        const block = match[1];
+        // Extract string literals: (text) and <hex>
+        const strRegex = /\(([^)]*)\)|<([0-9a-fA-F]+)>/g;
+        let strMatch;
+        while ((strMatch = strRegex.exec(block)) !== null) {
+          if (strMatch[1]) {
+            // Parenthetical string — unescape PDF escape sequences
+            const decoded = strMatch[1]
+              .replace(/\\n/g, "\n").replace(/\\r/g, "\r").replace(/\\t/g, "\t")
+              .replace(/\\\(/g, "(").replace(/\\\)/g, ")").replace(/\\\\/g, "\\");
+            textChunks.push(decoded);
+          } else if (strMatch[2]) {
+            // Hex string — decode pairs
+            const hex = strMatch[2];
+            let decoded = "";
+            for (let i = 0; i < hex.length - 1; i += 2) {
+              const code = parseInt(hex.slice(i, i + 2), 16);
+              if (code >= 32 && code < 127) decoded += String.fromCharCode(code);
+            }
+            if (decoded.trim()) textChunks.push(decoded);
+          }
+        }
+      }
+
+      const pdfText = textChunks.join(" ").replace(/\s+/g, " ").trim();
+      if (pdfText.length > 50) {
+        console.log(`[DocumentIntake] PDF stream extraction: ${pdfText.length} chars`);
+        return pdfText.slice(0, 8000);
+      }
+      console.warn("[DocumentIntake] PDF stream extraction yielded little text — trying raw fallback");
+    } catch (err) {
+      console.warn("[DocumentIntake] PDF extraction error:", err);
+    }
+  }
+
+  // ── Fallback: strip non-printable bytes ──────────────────────────────────
+  // Works reasonably for text-embedded PDFs and plain text files
   const raw = buffer.toString("utf-8");
-  
-  // Remove non-printable characters but keep spaces, newlines, tabs
   const cleaned = raw
     .replace(/[^\x20-\x7E\n\r\t]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  
-  // Return up to 8000 chars to stay within token limits
+
+  console.log(`[DocumentIntake] Raw fallback extraction: ${cleaned.length} chars`);
   return cleaned.slice(0, 8000);
 }
 
@@ -79,7 +141,7 @@ export const documentIntakeRouter = router({
       }
 
       // Extract text content from the document
-      const textContent = extractTextFromBuffer(buffer, input.mimeType);
+      const textContent = await extractTextFromBuffer(buffer, input.mimeType, input.fileName);
       
       if (!textContent || textContent.length < 50) {
         throw new TRPCError({ 
