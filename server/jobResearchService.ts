@@ -346,43 +346,110 @@ async function enrichContact(companyName: string, domain: string, jobTitle?: str
 }
 
 // ── Location filter ───────────────────────────────────────────────────────────
-// Maps country codes to location string patterns we'd see from ATS APIs
-const COUNTRY_PATTERNS: Record<string, string[]> = {
-  US: ["united states", "usa", ", ca", ", ny", ", tx", ", fl", ", wa", ", il", ", ga",
-       ", ma", ", co", ", az", ", nc", ", oh", ", pa", ", nj", ", mi", ", mn", ", or",
-       "san francisco", "new york", "los angeles", "chicago", "austin", "seattle",
-       "boston", "denver", "atlanta", "miami", "dallas", "houston", "portland",
-       "remote, us", "remote - us", "us remote", "u.s.", "u.s.a"],
-  UK: ["united kingdom", "london", "manchester", "birmingham", "edinburgh", "bristol",
-       "leeds", "glasgow", ", uk", " uk ", "england", "scotland", "wales",
-       "remote, uk", "uk remote"],
-  CA: ["canada", "toronto", "vancouver", "montreal", "calgary", "ottawa",
-       ", on", ", bc", ", ab", ", qc", "remote, canada", "canada remote"],
-  AU: ["australia", "sydney", "melbourne", "brisbane", "perth", "adelaide",
-       ", nsw", ", vic", ", qld", ", wa", "remote, australia"],
-  DE: ["germany", "berlin", "munich", "hamburg", "frankfurt", "cologne", "münchen"],
+// targetCountries format: "US:FL,CA,TX|UK|REMOTE"
+// - Pipe-separated country blocks
+// - Each block: "COUNTRYCODE" or "COUNTRYCODE:ST1,ST2,ST3"
+// - State codes match ", FL" / "(FL)" / "Florida" patterns in location strings
+// - Remote is always additive — included if REMOTE in list
+
+const US_STATE_NAMES: Record<string, string> = {
+  AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",
+  CO: "Colorado", CT: "Connecticut", DE: "Delaware", FL: "Florida", GA: "Georgia",
+  HI: "Hawaii", ID: "Idaho", IL: "Illinois", IN: "Indiana", IA: "Iowa",
+  KS: "Kansas", KY: "Kentucky", LA: "Louisiana", ME: "Maine", MD: "Maryland",
+  MA: "Massachusetts", MI: "Michigan", MN: "Minnesota", MS: "Mississippi",
+  MO: "Missouri", MT: "Montana", NE: "Nebraska", NV: "Nevada", NH: "New Hampshire",
+  NJ: "New Jersey", NM: "New Mexico", NY: "New York", NC: "North Carolina",
+  ND: "North Dakota", OH: "Ohio", OK: "Oklahoma", OR: "Oregon", PA: "Pennsylvania",
+  RI: "Rhode Island", SC: "South Carolina", SD: "South Dakota", TN: "Tennessee",
+  TX: "Texas", UT: "Utah", VT: "Vermont", VA: "Virginia", WA: "Washington",
+  WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming", DC: "District of Columbia",
+};
+
+const COUNTRY_KEYWORDS: Record<string, string[]> = {
+  US: ["united states", "usa", "u.s.", "u.s.a", "us remote", "remote, us", "remote - us", "remote - united states"],
+  UK: ["united kingdom", "london", "manchester", "birmingham", "edinburgh", "bristol", "leeds", ", uk", "uk remote", "england", "scotland", "wales"],
+  CA: ["canada", "toronto", "vancouver", "montreal", "calgary", "ottawa", "remote, canada"],
+  AU: ["australia", "sydney", "melbourne", "brisbane", "perth", "remote, australia"],
+  DE: ["germany", "berlin", "munich", "hamburg", "frankfurt"],
   FR: ["france", "paris", "lyon", "marseille"],
-  NL: ["netherlands", "amsterdam", "rotterdam", "the hague"],
+  NL: ["netherlands", "amsterdam", "rotterdam"],
   REMOTE: ["remote", "anywhere", "worldwide", "global", "work from anywhere"],
 };
 
-function matchesCountryFilter(location: string, countryList: string[]): boolean {
-  // No filter = accept everything
-  if (countryList.length === 0) return true;
+/**
+ * Parse the targetCountries string into a structured filter object.
+ * Format examples:
+ *   "US"              → { US: [], UK: [] } — all US locations
+ *   "US:FL,CA,TX"     → { US: ["FL","CA","TX"] } — US, specific states
+ *   "US:FL,CA|REMOTE" → { US: ["FL","CA"], REMOTE: [] }
+ *   "UK|US:NY,CA"     → { UK: [], US: ["NY","CA"] }
+ */
+function parseCountryFilter(raw: string): Record<string, string[]> {
+  if (!raw?.trim()) return {};
+  const result: Record<string, string[]> = {};
+  const blocks = raw.split("|").map(b => b.trim()).filter(Boolean);
+  for (const block of blocks) {
+    const [country, statesRaw] = block.split(":");
+    const code = country.trim().toUpperCase();
+    const states = statesRaw
+      ? statesRaw.split(",").map(s => s.trim().toUpperCase()).filter(Boolean)
+      : [];
+    result[code] = states;
+  }
+  return result;
+}
+
+function matchesCountryFilter(location: string, targetCountries: string): boolean {
+  const filter = parseCountryFilter(targetCountries);
+  if (Object.keys(filter).length === 0) return true; // no filter = accept all
 
   const loc = location.toLowerCase().trim();
+  if (!loc) return true; // empty location = permissive
 
-  // Empty location — be permissive, don't discard
-  if (!loc) return true;
+  // Always allow remote if REMOTE is in filter
+  if (filter["REMOTE"] !== undefined) {
+    const remoteKeywords = COUNTRY_KEYWORDS["REMOTE"] || [];
+    if (remoteKeywords.some(k => loc.includes(k))) return true;
+  }
 
-  for (const country of countryList) {
-    const patterns = COUNTRY_PATTERNS[country] || [];
+  for (const [country, states] of Object.entries(filter)) {
+    if (country === "REMOTE") continue;
 
-    // Remote is always included if "REMOTE" in list or if any other country + remote
-    if (country === "REMOTE" && COUNTRY_PATTERNS.REMOTE.some(p => loc.includes(p))) return true;
+    // Check if location matches country
+    const countryKeywords = COUNTRY_KEYWORDS[country] || [];
 
-    // Check country-specific patterns
-    if (patterns.some(p => loc.includes(p))) return true;
+    // For US: state code is the primary signal — ", FL" or "(FL)" or "Florida"
+    if (country === "US") {
+      const isUS = countryKeywords.some(k => loc.includes(k)) ||
+        // Matches "City, ST" pattern — check for any 2-letter state code after comma+space
+        /,\s*[a-z]{2}(\s|$|\()/.test(loc) ||
+        loc.includes("remote");
+
+      if (!isUS) continue;
+
+      // If no state filter, any US location passes
+      if (states.length === 0) return true;
+
+      // Check state codes: ", FL" or "(FL)" or full name "Florida"
+      for (const state of states) {
+        const stateName = (US_STATE_NAMES[state] || "").toLowerCase();
+        // ", FL" — city, state format
+        if (loc.includes(`, ${state.toLowerCase()}`)) return true;
+        // "(FL)" or "FL)" — parenthetical
+        if (loc.includes(`(${state.toLowerCase()}`)) return true;
+        // Full state name
+        if (stateName && loc.includes(stateName)) return true;
+        // "remote, fl" or "fl remote"
+        if (loc.includes(`remote, ${state.toLowerCase()}`) ||
+            loc.includes(`${state.toLowerCase()} remote`)) return true;
+      }
+      // US matched but no state matched
+      continue;
+    }
+
+    // Non-US countries — keyword match
+    if (countryKeywords.some(k => loc.includes(k))) return true;
   }
 
   return false;
@@ -406,10 +473,7 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
   }
 
   const requestedCount = Math.min(count || config?.rolesPerDay || 10, 30);
-  const countryList = targetCountries
-    ? targetCountries.split(",").map((c: string) => c.trim().toUpperCase()).filter(Boolean)
-    : [];
-  console.log(`[JobResearch] Starting research — ${requestedCount} jobs for: ${targetRoles} | Countries: ${countryList.length ? countryList.join(", ") : "All"}`);
+  console.log(`[JobResearch] Starting research — ${requestedCount} jobs for: ${targetRoles} | Location filter: ${targetCountries || "none"}`);
 
   // Load candidate profile from parsed resume for fit scoring
   const parsedResume = (config as any)?.lastDocumentParsed || null;
@@ -442,10 +506,10 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
       console.log(`[JobResearch] ${company.name} (${company.ats}): ${raw.length} jobs fetched`);
     }
     for (const job of raw) {
-      // Apply country filter — skip jobs not in the user's selected countries
+      // Apply country/state filter
       const jobLocation = (job as any).location || "";
-      if (!matchesCountryFilter(jobLocation, countryList)) {
-        console.log(`[JobResearch] Skipping ${company.name} "${job.title}" — location "${jobLocation}" outside [${countryList.join(",")}]`);
+      if (!matchesCountryFilter(jobLocation, targetCountries)) {
+        console.log(`[JobResearch] Filtered: ${company.name} "${job.title}" — "${jobLocation}" not in [${targetCountries}]`);
         continue;
       }
       allRawJobs.push({

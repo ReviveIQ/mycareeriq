@@ -15,7 +15,8 @@ interface ResearchSettingsProps {
 
 export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {}) {
   const [targetRoles, setTargetRoles] = useState("");
-  const [targetCountries, setTargetCountries] = useState<string[]>(["US"]);
+  const [selectedCountries, setSelectedCountries] = useState<string[]>(["US"]);
+  const [usStates, setUsStates] = useState(""); // e.g. "FL, CA, NY"
   const [targetCategories, setTargetCategories] = useState<string[]>([]);
   const [rolesPerDay, setRolesPerDay] = useState(10);
   const [enabled, setEnabled] = useState(true);
@@ -34,9 +35,37 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
   ];
 
   const toggleCountry = (code: string) => {
-    setTargetCountries(prev =>
+    setSelectedCountries(prev =>
       prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code]
     );
+  };
+
+  // Build the pipe-separated targetCountries string from UI state
+  // Format: "US:FL,CA,TX|UK|REMOTE"
+  const buildTargetCountries = (): string => {
+    return selectedCountries.map(code => {
+      if (code === "US" && usStates.trim()) {
+        const states = usStates.split(/[,\s]+/).map(s => s.trim().toUpperCase()).filter(s => s.length === 2);
+        return states.length > 0 ? `US:${states.join(",")}` : "US";
+      }
+      return code;
+    }).join("|");
+  };
+
+  // Parse stored targetCountries string back into UI state
+  const parseTargetCountries = (raw: string) => {
+    if (!raw?.trim()) return { countries: ["US"], states: "" };
+    const countries: string[] = [];
+    let states = "";
+    const blocks = raw.split("|").map(b => b.trim()).filter(Boolean);
+    for (const block of blocks) {
+      const [country, statesRaw] = block.split(":");
+      countries.push(country.trim().toUpperCase());
+      if (country.trim().toUpperCase() === "US" && statesRaw) {
+        states = statesRaw.split(",").map(s => s.trim()).join(", ");
+      }
+    }
+    return { countries, states };
   };
 
   // Fetch current configuration
@@ -48,10 +77,9 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
   useEffect(() => {
     if (config) {
       setTargetRoles(config.targetRoles);
-      const countries = (config as any).targetCountries
-        ? (config as any).targetCountries.split(",").map((c: string) => c.trim()).filter(Boolean)
-        : ["US"];
-      setTargetCountries(countries);
+      const { countries, states } = parseTargetCountries((config as any).targetCountries || "US");
+      setSelectedCountries(countries);
+      setUsStates(states);
       setTargetCategories(
         config.targetCategories
           ? config.targetCategories.split(",").map((c: string) => c.trim()).filter(Boolean)
@@ -67,7 +95,7 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
     try {
       await updateConfig.mutateAsync({
         targetRoles,
-        targetCountries: targetCountries.join(","),
+        targetCountries: buildTargetCountries(),
         targetCategories: targetCategories.join(", "),
         rolesPerDay,
         enabled: enabled ? 1 : 0,
@@ -84,10 +112,9 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
   const handleReset = () => {
     if (config) {
       setTargetRoles(config.targetRoles);
-      const countries = (config as any).targetCountries
-        ? (config as any).targetCountries.split(",").map((c: string) => c.trim()).filter(Boolean)
-        : ["US"];
-      setTargetCountries(countries);
+      const { countries, states } = parseTargetCountries((config as any).targetCountries || "US");
+      setSelectedCountries(countries);
+      setUsStates(states);
       setTargetCategories(
         config.targetCategories
           ? config.targetCategories.split(",").map((c: string) => c.trim()).filter(Boolean)
@@ -224,11 +251,11 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
             Job Locations
           </label>
           <p className="text-xs text-slate-500 mb-3">
-            Only show roles in these countries. Select multiple. Leave all unselected for worldwide.
+            Select countries to search. Leave all unselected for worldwide.
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 mb-4">
             {COUNTRY_OPTIONS.map(({ code, label }) => {
-              const selected = targetCountries.includes(code);
+              const selected = selectedCountries.includes(code);
               return (
                 <button
                   key={code}
@@ -245,8 +272,37 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
               );
             })}
           </div>
-          {targetCountries.length === 0 && (
-            <p className="text-xs text-amber-600 mt-2">
+
+          {/* State filter — only shown when US is selected */}
+          {selectedCountries.includes("US") && (
+            <div className="pl-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                US States <span className="font-normal text-slate-400">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={usStates}
+                onChange={e => setUsStates(e.target.value)}
+                placeholder="FL, CA, NY, TX — leave blank for all states"
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                Enter 2-letter state codes separated by commas. Matches "Miami, FL", "Austin, TX", etc.
+              </p>
+              {usStates.trim() && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {usStates.split(/[,\s]+/).map(s => s.trim().toUpperCase()).filter(s => s.length === 2).map(state => (
+                    <span key={state} className="px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs rounded-full font-medium">
+                      {state}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {selectedCountries.length === 0 && (
+            <p className="text-xs text-amber-600 mt-1">
               No countries selected — pipeline will include roles from all locations.
             </p>
           )}
