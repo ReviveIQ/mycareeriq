@@ -526,8 +526,8 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
   console.log(`[JobResearch] Total raw jobs across all companies: ${allRawJobs.length}`);
 
   if (allRawJobs.length === 0) {
-    console.warn("[JobResearch] No jobs fetched from any ATS — falling back to GPT research");
-    return fallbackGptResearch(targetRoles, targetCategories, requestedCount);
+    console.warn("[JobResearch] No jobs fetched from ATS APIs. Check location filter settings and try again.");
+    return [];
   }
 
   // ── Phase 2: Score all jobs for fit in one GPT call ─────────────────────────
@@ -604,14 +604,19 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
     });
   }
 
-  // Supplement with GPT fallback only if well short of target
-  if (results.length < Math.floor(requestedCount * 0.5)) {
-    console.log(`[JobResearch] Only ${results.length} qualifying jobs — supplementing with GPT`);
-    const supplement = await fallbackGptResearch(targetRoles, targetCategories, requestedCount - results.length);
-    results.push(...supplement);
+  // Never fall back to GPT-generated job listings.
+  // GPT invents plausible-sounding but fake job URLs that 404 when clicked.
+  // Better to return fewer real results than fake ones.
+  // If ATS APIs returned 0, it usually means:
+  //   1. Location filter is too narrow (try adding more states or Remote)
+  //   2. All companies in the current pool have been seen before
+  //   3. Ashby/Greenhouse returned no matching titles this run
+  if (results.length === 0) {
+    console.warn("[JobResearch] 0 qualifying jobs from ATS APIs — returning empty. Check location filter and run again.");
+  } else {
+    console.log(`[JobResearch] Final: ${results.length} real ATS jobs added to pipeline`);
   }
 
-  console.log(`[JobResearch] Final: ${results.length} targeted jobs added to pipeline`);
   return results;
 }
 
