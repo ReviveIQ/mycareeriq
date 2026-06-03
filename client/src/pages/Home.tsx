@@ -491,6 +491,89 @@ export default function Home() {
 
         {activeTab === "pipeline" && (
           <>
+            {/* Timeline panel — shown only when pipeline is empty */}
+            {pipelineData.length === 0 && !isLoading && (
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-5 border-b border-slate-100">
+                  <h3 className="text-sm font-bold text-slate-900">Your pipeline builds over days, not seconds</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    The candidates who get offers didn't spray and pray — they built a targeted list and worked it.
+                  </p>
+                </div>
+                <div className="divide-y divide-slate-50">
+                  {[
+                    {
+                      day: "Day 1",
+                      title: "Upload your resume",
+                      body: "We score it, extract your target roles and industries, and configure your research profile. This is the foundation — garbage in, garbage out.",
+                      status: pipelineData.length === 0 ? "current" : "done",
+                      color: "#6366f1",
+                    },
+                    {
+                      day: "Days 1–2",
+                      title: "We research companies hiring for your roles",
+                      body: "We pull live job postings from Greenhouse, Ashby, and Lever — scored for fit against your resume. No made-up listings, no stale data.",
+                      status: "upcoming",
+                      color: "#3b82f6",
+                    },
+                    {
+                      day: "Days 2–3",
+                      title: "Contacts are identified and outreach is prepared",
+                      body: "We find the recruiter or talent partner at each company. Your outreach message is ready to send — warm, specific, human.",
+                      status: "upcoming",
+                      color: "#2563eb",
+                    },
+                    {
+                      day: "Day 5+",
+                      title: "You start having real conversations",
+                      body: "Work your pipeline daily. Move companies through stages. The system gets more targeted the more you use it.",
+                      status: "upcoming",
+                      color: "#1d4ed8",
+                    },
+                  ].map((step, i) => (
+                    <div key={i} className="flex gap-4 px-6 py-4">
+                      <div className="flex flex-col items-center gap-1 flex-shrink-0 pt-0.5">
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                          style={{ background: step.status === "upcoming" ? "#e2e8f0" : step.color }}
+                        >
+                          <span style={{ color: step.status === "upcoming" ? "#94a3b8" : "white" }}>
+                            {i + 1}
+                          </span>
+                        </div>
+                        {i < 3 && (
+                          <div className="w-px flex-1 min-h-[16px]" style={{ background: "#e2e8f0" }} />
+                        )}
+                      </div>
+                      <div className="pb-4">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span
+                            className="text-xs font-bold uppercase tracking-wide"
+                            style={{ color: step.status === "upcoming" ? "#94a3b8" : step.color }}
+                          >
+                            {step.day}
+                          </span>
+                          {step.status === "current" && (
+                            <span className="text-xs bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-full px-2 py-0.5 font-medium">
+                              You are here
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm font-semibold text-slate-800 mb-0.5">{step.title}</p>
+                        <p className="text-xs text-slate-500 leading-relaxed">{step.body}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                  <p className="text-xs text-slate-500">
+                    Go to <button onClick={() => setActiveTab("settings")} className="text-indigo-600 font-medium underline">Settings</button> to upload your resume and start the clock.
+                  </p>
+                  <span className="text-xs text-slate-400">Pipeline auto-runs daily at 8am EST</span>
+                </div>
+              </div>
+            )}
+
             {/* Filters */}
             <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
               <div className="flex flex-wrap gap-3 items-center">

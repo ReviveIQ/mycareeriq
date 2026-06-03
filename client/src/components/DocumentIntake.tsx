@@ -12,13 +12,14 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import {
   CheckCircle2,
+  ExternalLink,
   FileText,
   Loader2,
   Plus,
   Upload,
   X,
 } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { toast } from "sonner";
 
 const SUPPORTED_MIMES = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword"];
@@ -86,12 +87,25 @@ export function DocumentIntake({
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [extracted, setExtracted] = useState<Record<string, unknown> | null>(null);
+  const [resumeScore, setResumeScore] = useState<any>(null);
   const [targetRoles, setTargetRoles] = useState<string[]>([]);
   const [targetIndustries, setTargetIndustries] = useState<string[]>([]);
   const [newRole, setNewRole] = useState("");
   const [newIndustry, setNewIndustry] = useState("");
+  const [analyzingStage, setAnalyzingStage] = useState(0);
+
+  // Analyzing stage labels — shown sequentially during processing
+  const ANALYZING_STAGES = [
+    "Reading your resume...",
+    "Analyzing career progression...",
+    "Extracting measurable achievements...",
+    "Scoring ATS compatibility...",
+    "Identifying keyword gaps...",
+    "Building your target role profile...",
+  ];
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const stageIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const parseMutation = trpc.documentIntake.parse.useMutation();
   const applyMutation = trpc.documentIntake.applyToConfig.useMutation();
@@ -99,6 +113,24 @@ export function DocumentIntake({
 
   const isAnalyzing = parseMutation.isPending;
   const isApplying = applyMutation.isPending;
+
+  // Cycle through analyzing stages while processing
+  useEffect(() => {
+    if (isAnalyzing) {
+      setAnalyzingStage(0);
+      stageIntervalRef.current = setInterval(() => {
+        setAnalyzingStage(prev => Math.min(prev + 1, ANALYZING_STAGES.length - 1));
+      }, 1800);
+    } else {
+      if (stageIntervalRef.current) {
+        clearInterval(stageIntervalRef.current);
+        stageIntervalRef.current = null;
+      }
+    }
+    return () => {
+      if (stageIntervalRef.current) clearInterval(stageIntervalRef.current);
+    };
+  }, [isAnalyzing]);
 
   // ---- Drag & drop handlers ----
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -147,6 +179,7 @@ export function DocumentIntake({
   const clearFile = () => {
     setFile(null);
     setExtracted(null);
+    setResumeScore(null);
     setTargetRoles([]);
     setTargetIndustries([]);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -164,10 +197,14 @@ export function DocumentIntake({
         fileName: file.name,
         mimeType,
         documentType,
-        workspaceId,
       });
 
       setExtracted(result.extracted);
+
+      // Capture resume score if returned
+      if ((result as any).resumeScore) {
+        setResumeScore((result as any).resumeScore);
+      }
 
       // Populate editable tag lists for resume documents.
       const ex = result.extracted as {
@@ -300,37 +337,47 @@ export function DocumentIntake({
         </div>
       )}
 
-      {/* Analyze button */}
-      {file && !extracted && (
-        <div className="flex gap-3">
-          <Button
-            onClick={handleAnalyze}
-            disabled={isAnalyzing}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white"
-          >
-            {isAnalyzing ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Analyzing your document...
-              </>
-            ) : (
-              <>
-                <Upload className="w-4 h-4 mr-2" />
-                Analyze Document
-              </>
-            )}
-          </Button>
-          <Button variant="outline" onClick={clearFile} disabled={isAnalyzing}>
-            Cancel
-          </Button>
+      {/* Staged analyzing progress */}
+      {file && !extracted && isAnalyzing && (
+        <div className="border border-indigo-100 rounded-xl p-6 bg-indigo-50 space-y-4">
+          <div className="flex items-center gap-3">
+            <Loader2 className="w-5 h-5 text-indigo-600 animate-spin flex-shrink-0" />
+            <p className="text-sm font-semibold text-indigo-900">
+              {ANALYZING_STAGES[analyzingStage]}
+            </p>
+          </div>
+          {/* Stage progress dots */}
+          <div className="flex gap-1.5">
+            {ANALYZING_STAGES.map((_, i) => (
+              <div
+                key={i}
+                className="h-1 rounded-full transition-all duration-500"
+                style={{
+                  flex: i <= analyzingStage ? 2 : 1,
+                  background: i <= analyzingStage ? "#4f46e5" : "#e0e7ff",
+                }}
+              />
+            ))}
+          </div>
+          <p className="text-xs text-indigo-500">
+            This takes 15–20 seconds. We're doing real work — not just pattern matching.
+          </p>
         </div>
       )}
 
-      {/* Loading state when no file panel yet (defensive) */}
-      {!file && isAnalyzing && (
-        <div className="flex items-center gap-2 text-sm text-slate-600">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          Analyzing your document...
+      {/* Analyze button — hidden while analyzing in progress */}
+      {file && !extracted && !isAnalyzing && (
+        <div className="flex gap-3">
+          <Button
+            onClick={handleAnalyze}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Analyze Resume
+          </Button>
+          <Button variant="outline" onClick={clearFile}>
+            Cancel
+          </Button>
         </div>
       )}
 
@@ -351,6 +398,101 @@ export function DocumentIntake({
 
           {summary?.summary && (
             <p className="text-sm text-slate-700 italic">"{summary.summary}"</p>
+          )}
+
+          {/* ── Resume Score Card ─────────────────────────────────────── */}
+          {resumeScore && documentType === "resume" && (
+            <div className="rounded-xl border border-slate-200 overflow-hidden">
+              {/* Score header */}
+              <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold"
+                    style={{
+                      background: resumeScore.overallScore >= 8 ? "#dcfce7" : resumeScore.overallScore >= 6 ? "#fef9c3" : "#fee2e2",
+                      color: resumeScore.overallScore >= 8 ? "#15803d" : resumeScore.overallScore >= 6 ? "#a16207" : "#b91c1c",
+                    }}
+                  >
+                    {resumeScore.overallScore}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">Resume Score</p>
+                    <p className="text-xs text-slate-500">
+                      {resumeScore.overallScore >= 8
+                        ? "Strong — ready to run your pipeline"
+                        : resumeScore.overallScore >= 6
+                        ? "Decent — a few improvements would help"
+                        : "Needs work — this may be holding you back"}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs text-slate-400 font-medium">/ 10</span>
+              </div>
+
+              {/* Dimension bars */}
+              <div className="divide-y divide-slate-100">
+                {Object.values(resumeScore.dimensions || {}).map((dim: any) => (
+                  <div key={dim.label} className="px-4 py-3 flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                          {dim.flag && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />}
+                          {dim.label}
+                        </span>
+                        <span
+                          className="text-xs font-bold"
+                          style={{ color: dim.score >= 8 ? "#15803d" : dim.score >= 6 ? "#a16207" : "#b91c1c" }}
+                        >
+                          {dim.score}/10
+                        </span>
+                      </div>
+                      {/* Bar */}
+                      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mb-1.5">
+                        <div
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{
+                            width: `${dim.score * 10}%`,
+                            background: dim.score >= 8 ? "#22c55e" : dim.score >= 6 ? "#eab308" : "#ef4444",
+                          }}
+                        />
+                      </div>
+                      <p className="text-xs text-slate-500 leading-relaxed">{dim.reason}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Top issue + CTA */}
+              {resumeScore.recommendTransformation && (
+                <div className="px-4 py-4 bg-blue-50 border-t border-blue-100">
+                  <p className="text-xs text-slate-600 mb-3">
+                    <span className="font-semibold text-slate-800">Biggest opportunity: </span>
+                    {resumeScore.topIssue}
+                  </p>
+                  <a
+                    href="https://resumeiq.reviveiqi.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                  >
+                    Transform with ResumeIQ
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                  <p className="text-xs text-slate-400 mt-2">
+                    ResumeIQ rewrites every bullet with measurable impact — ATS-optimized, ready to get callbacks. First one free.
+                  </p>
+                </div>
+              )}
+
+              {/* Strong resume — no CTA needed */}
+              {!resumeScore.recommendTransformation && (
+                <div className="px-4 py-3 bg-emerald-50 border-t border-emerald-100">
+                  <p className="text-xs text-emerald-700 font-medium">
+                    ✓ Your resume is in good shape. Run your pipeline with confidence.
+                  </p>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Target Roles */}

@@ -150,6 +150,90 @@ export const documentIntakeRouter = router({
       
       console.log(`[DocumentIntake] Successfully parsed for: ${extracted.candidateName}`);
 
+      // ── Resume scoring (only for resume documents) ───────────────────────
+      let resumeScore: Record<string, unknown> | null = null;
+      if (input.documentType === "resume" || input.documentType === "cv") {
+        try {
+          const scoreRes = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model: "gpt-4o",
+              messages: [
+                {
+                  role: "system",
+                  content: `You are an expert resume reviewer and ATS specialist. Score this resume honestly and critically. Return ONLY valid JSON, no markdown.`,
+                },
+                {
+                  role: "user",
+                  content: `Score this resume on four dimensions. Be direct and critical — a score of 7+ means genuinely strong, not just present.
+
+Resume text:
+${textContent}
+
+Return this exact JSON structure:
+{
+  "overallScore": <number 1-10>,
+  "dimensions": {
+    "atsFormat": {
+      "score": <number 1-10>,
+      "label": "ATS Format",
+      "reason": "<one sentence — what specifically is good or bad about the format>",
+      "flag": <true if this is blocking, false if acceptable>
+    },
+    "bulletQuality": {
+      "score": <number 1-10>,
+      "label": "Bullet Quality",
+      "reason": "<one sentence — do bullets have metrics, strong verbs, outcomes>",
+      "flag": <true if most bullets lack numbers or start with weak verbs>
+    },
+    "keywordAlignment": {
+      "score": <number 1-10>,
+      "label": "Keyword Alignment",
+      "reason": "<one sentence — does the resume use language recruiters search for>",
+      "flag": <true if keywords are generic or missing>
+    },
+    "completeness": {
+      "score": <number 1-10>,
+      "label": "Completeness",
+      "reason": "<one sentence — what's missing: dates, contact info, summary, etc>",
+      "flag": <true if critical sections are missing>
+    }
+  },
+  "topIssue": "<the single most impactful thing holding this resume back — one sentence>",
+  "recommendTransformation": <true if overallScore <= 7 OR any dimension.flag is true>
+}
+
+Scoring guide:
+- 9-10: Genuinely excellent, would pass ATS and impress recruiters
+- 7-8: Good, minor improvements would help
+- 5-6: Needs work, several issues
+- 3-4: Significant problems, likely getting filtered
+- 1-2: Major structural issues, needs complete rework
+
+Return ONLY the JSON object.`,
+                },
+              ],
+              max_tokens: 600,
+              temperature: 0.1,
+            }),
+          });
+
+          if (scoreRes.ok) {
+            const scoreData = await scoreRes.json() as any;
+            const scoreText = (scoreData.choices?.[0]?.message?.content || "").trim()
+              .replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
+            resumeScore = JSON.parse(scoreText);
+            console.log(`[DocumentIntake] Resume scored: ${(resumeScore as any)?.overallScore}/10`);
+          }
+        } catch (err) {
+          console.warn("[DocumentIntake] Resume scoring failed (non-blocking):", err);
+        }
+      }
+
       // Persist to researchConfig
       const db = await getDb();
       if (db) {
@@ -161,7 +245,8 @@ export const documentIntakeRouter = router({
             documentType: input.documentType, 
             parsedAt: new Date().toISOString(), 
             rawText: textContent,
-            extracted 
+            extracted,
+            resumeScore,
           };
 
           if (existing.length === 0) {
@@ -194,6 +279,7 @@ export const documentIntakeRouter = router({
         fileName: input.fileName,
         parsedAt: new Date().toISOString(),
         extracted,
+        resumeScore,
       };
     }),
 
