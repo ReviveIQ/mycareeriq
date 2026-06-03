@@ -410,6 +410,14 @@ function matchesCountryFilter(location: string, targetCountries: string): boolea
   const loc = location.toLowerCase().trim();
   if (!loc) return true; // empty location = permissive
 
+  // Handle semicolon or pipe-separated multi-location strings
+  // e.g. "San Francisco, CA; USA, Remote" or "Chicago, IL | New York, NY"
+  const locationParts = loc.split(/[;|]/).map(p => p.trim()).filter(Boolean);
+  // If any part matches, the whole location passes
+  if (locationParts.length > 1) {
+    return locationParts.some(part => matchesCountryFilter(part, targetCountries));
+  }
+
   // Always allow remote if REMOTE is in filter
   if (filter["REMOTE"] !== undefined) {
     const remoteKeywords = COUNTRY_KEYWORDS["REMOTE"] || [];
@@ -431,9 +439,12 @@ function matchesCountryFilter(location: string, targetCountries: string): boolea
         loc.includes("remote u.s.") ||
         loc.includes("remote us") ||
         loc.includes("us remote") ||
+        loc.includes("usa, remote") ||               // "USA, Remote"
+        loc.includes("remote, usa") ||               // "Remote, USA"
         loc.includes("remote, us") ||
         loc.includes("north america") ||             // North America includes US
-        (loc.includes("remote") && (loc.includes("united states") || loc.includes("u.s.")));
+        loc.includes("usa remote") ||                // "USA Remote"
+        (loc.includes("remote") && (loc.includes("united states") || loc.includes("u.s.") || loc.includes("usa")));
 
       // Remote US roles are accessible from any state — always pass when US is selected
       if (isUSRemote) return true;

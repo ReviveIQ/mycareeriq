@@ -31,7 +31,7 @@ export const VERIFIED_GREENHOUSE: VerifiedCompany[] = [
   { name: "Apollo.io", domain: "apollo.io", ats: "greenhouse", slug: "apolloio", category: "Sales Intelligence" },
   // Outreach — 404 on Greenhouse and Ashby, skipped
   // { name: "Outreach", category: "Sales Engagement" },
-  { name: "Gong", domain: "gong.io", ats: "greenhouse", slug: "gong", category: "Revenue Intelligence" },
+  { name: "Gong", domain: "gong.io", ats: "ashby", slug: "gong", category: "Revenue Intelligence" },
   { name: "Clari", domain: "clari.com", ats: "greenhouse", slug: "clari", category: "Revenue Intelligence" },
   { name: "Demandbase", domain: "demandbase.com", ats: "greenhouse", slug: "demandbase", category: "Account-Based Marketing" },
   { name: "LeanData", domain: "leandata.com", ats: "ashby", slug: "leandata", category: "Revenue Operations" },
@@ -126,7 +126,8 @@ export const VERIFIED_ASHBY: VerifiedCompany[] = [
   { name: "Pocus", domain: "pocus.com", ats: "ashby", slug: "pocus", category: "Revenue Operations" },
   // Goldcast — Ashby 404
   // { name: "Goldcast"
-  { name: "Clearbit", domain: "clearbit.com", ats: "greenhouse", slug: "clearbit", category: "Sales Intelligence" },
+  // Clearbit acquired by HubSpot, no longer independent
+  // { name: "Clearbit", category: "Sales Intelligence" },
   { name: "Crossbeam", domain: "crossbeam.com", ats: "ashby", slug: "crossbeam", category: "Revenue Operations" },
   { name: "Workato", domain: "workato.com", ats: "ashby", slug: "workato", category: "B2B SaaS" },
   { name: "Fivetran", domain: "fivetran.com", ats: "greenhouse", slug: "fivetran", category: "Data & Analytics" },
