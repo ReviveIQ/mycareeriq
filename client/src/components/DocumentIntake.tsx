@@ -106,6 +106,7 @@ export function DocumentIntake({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const stageIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const parseMutation = trpc.documentIntake.parse.useMutation();
   const applyMutation = trpc.documentIntake.applyToConfig.useMutation();
@@ -113,6 +114,31 @@ export function DocumentIntake({
 
   const isAnalyzing = parseMutation.isPending;
   const isApplying = applyMutation.isPending;
+
+  // SSO handoff to ResumeIQ — passes the user's session across apps
+  const handleTransformWithResumeIQ = async () => {
+    setIsRedirecting(true);
+    try {
+      const token = localStorage.getItem("reviveiq_auth_token");
+      if (token) {
+        const res = await fetch("/api/auth/cross-app-token", {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const { token: crossToken } = await res.json();
+          window.open(`https://resumeiq.reviveiqi.com/app?handoff=${encodeURIComponent(crossToken)}`, "_blank");
+          return;
+        }
+      }
+      // Fallback if not authenticated
+      window.open("https://resumeiq.reviveiqi.com/app", "_blank");
+    } catch {
+      window.open("https://resumeiq.reviveiqi.com/app", "_blank");
+    } finally {
+      setIsRedirecting(false);
+    }
+  };
 
   // Cycle through analyzing stages while processing
   useEffect(() => {
@@ -469,17 +495,19 @@ export function DocumentIntake({
                     <span className="font-semibold text-slate-800">Biggest opportunity: </span>
                     {resumeScore.topIssue}
                   </p>
-                  <a
-                    href="https://resumeiq.reviveiqi.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                  <button
+                    onClick={handleTransformWithResumeIQ}
+                    disabled={isRedirecting}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-semibold rounded-lg transition-colors"
                   >
-                    Transform with ResumeIQ
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
+                    {isRedirecting ? (
+                      <><Loader2 className="w-3 h-3 animate-spin" /> Opening ResumeIQ...</>
+                    ) : (
+                      <><ExternalLink className="w-3 h-3" /> Transform with ResumeIQ — Free</>
+                    )}
+                  </button>
                   <p className="text-xs text-slate-400 mt-2">
-                    ResumeIQ rewrites every bullet with measurable impact — ATS-optimized, ready to get callbacks. First one free.
+                    Your first transformation is free. Takes about 30 seconds.
                   </p>
                 </div>
               )}

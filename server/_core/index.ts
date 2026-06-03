@@ -269,6 +269,36 @@ async function startServer() {
   registerAuthRoutes(app);
   registerResumeIQRoutes(app);
 
+  // ── Cross-app SSO handoff ─────────────────────────────────────────────────
+  // Generates a short-lived signed token so a logged-in MyCareerIQ user can
+  // be automatically signed into ResumeIQ without re-authenticating.
+  // Token expires in 5 minutes and can only be used once (nonce in payload).
+  app.post("/api/auth/cross-app-token", async (req: any, res: any) => {
+    try {
+      const authHeader = req.headers.authorization || "";
+      const token = authHeader.replace("Bearer ", "").trim();
+      if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+      const { verifySessionToken } = await import("./auth");
+      const user = await verifySessionToken(token);
+      if (!user) { res.status(401).json({ error: "Invalid session" }); return; }
+
+      const secret = process.env.CROSS_APP_SECRET || process.env.JWT_SECRET || "cross-app-secret";
+      const crypto = await import("crypto");
+      const nonce = crypto.randomBytes(16).toString("hex");
+      const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+      const payload = JSON.stringify({ email: user.email, name: user.name, nonce, expiresAt });
+      const sig = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+      const crossToken = Buffer.from(JSON.stringify({ payload, sig })).toString("base64url");
+
+      console.log(`[CrossApp] SSO token issued for ${user.email}`);
+      res.json({ token: crossToken });
+    } catch (err) {
+      console.error("[CrossApp] Token generation failed:", err);
+      res.status(500).json({ error: "Failed to generate SSO token" });
+    }
+  });
+
   app.post("/api/scheduled/sendDigest", sendDigestEmailHandler);
   app.post("/api/scheduled/jobResearch", jobResearchHandler);
 
