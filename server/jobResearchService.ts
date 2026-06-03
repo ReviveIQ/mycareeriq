@@ -3,14 +3,9 @@ import { findHiringManager } from "./apolloService";
 import { findCompanyLinkedIn } from "./linkedinService";
 import { companies, researchConfig } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
-import { isGreenhouseUrl, scrapeGreenhouseUrl, fetchGreenhouseJobs } from "./greenhouseService";
-import { isLeverUrl, scrapeLeverUrl, fetchLeverJobs } from "./leverService";
-import {
-  lookupVerifiedCompany,
-  getVerifiedCompaniesForDiscovery,
-  greenhouseBoardUrl,
-  leverBoardUrl,
-} from "./atsSlugMap";
+import { fetchGreenhouseJobs } from "./greenhouseService";
+import { fetchLeverJobs } from "./leverService";
+import { getVerifiedCompaniesForDiscovery, VerifiedCompany } from "./atsSlugMap";
 
 export interface GeneratedJob {
   companyName: string;
@@ -27,103 +22,31 @@ export interface GeneratedJob {
   priority: "High" | "Medium" | "Low";
   source: string;
   contactLinkedIn: string;
+  fitScore?: number;
 }
 
-// Standard B2B SaaS category taxonomy — maps to industry-standard classifications
+// ── Category taxonomy ─────────────────────────────────────────────────────────
 const STANDARD_CATEGORIES: Record<string, string> = {
-  // CRM & Sales
-  "crm": "CRM",
-  "customer relationship management": "CRM",
-  "sales crm": "CRM",
-
-  // Sales Engagement & Enablement
-  "sales engagement": "Sales Engagement",
-  "sales enablement": "Sales Enablement",
-  "sales intelligence": "Sales Intelligence",
-  "sales technology": "Sales Technology",
-  "sales automation": "Sales Engagement",
-  "revenue intelligence": "Revenue Intelligence",
-  "conversation intelligence": "Revenue Intelligence",
-  "revenue operations": "Revenue Operations",
-  "revops": "Revenue Operations",
-
-  // Marketing
-  "marketing automation": "Marketing Automation",
-  "marketing technology": "Marketing Technology",
-  "martech": "Marketing Technology",
-  "demand generation": "Marketing Automation",
-  "account-based marketing": "Account-Based Marketing",
-  "abm": "Account-Based Marketing",
-
-  // Customer Success
-  "customer success": "Customer Success",
-  "customer experience": "Customer Experience",
-  "customer support": "Customer Support",
-  "help desk": "Customer Support",
-
-  // HR & Workforce
-  "hr tech": "HR Technology",
-  "hr technology": "HR Technology",
-  "human resources": "HR Technology",
-  "workforce management": "HR Technology",
-  "talent management": "HR Technology",
-  "recruiting": "HR Technology",
-
-  // Data & Analytics
-  "data analytics": "Data & Analytics",
-  "business intelligence": "Business Intelligence",
-  "bi": "Business Intelligence",
-
-  // Security
-  "cybersecurity": "Cybersecurity",
-  "security": "Cybersecurity",
-  "identity": "Identity & Access",
-
-  // Finance & Billing
-  "fintech": "FinTech",
-  "billing": "Billing & Payments",
-  "payments": "Billing & Payments",
-  "subscription management": "Billing & Payments",
-  "financial technology": "FinTech",
-
-  // EdTech
-  "edtech": "EdTech",
-  "education technology": "EdTech",
-  "learning management": "EdTech",
-  "lms": "EdTech",
-
-  // Collaboration & Productivity
-  "collaboration": "Collaboration",
-  "productivity": "Productivity",
-  "project management": "Project Management",
-
-  // DevOps & Engineering
-  "devops": "DevOps",
-  "developer tools": "Developer Tools",
-
-  // Vertical SaaS
-  "healthcare": "Healthcare Tech",
-  "legal tech": "Legal Tech",
-  "real estate tech": "Real Estate Tech",
-  "proptech": "Real Estate Tech",
-
-  // General
-  "b2b saas": "B2B SaaS",
-  "enterprise software": "Enterprise Software",
-  "cloud": "Cloud Infrastructure",
-  "infrastructure": "Cloud Infrastructure",
-  "platform": "Platform",
+  "crm": "CRM", "customer relationship management": "CRM",
+  "sales engagement": "Sales Engagement", "sales enablement": "Sales Enablement",
+  "sales intelligence": "Sales Intelligence", "revenue intelligence": "Revenue Intelligence",
+  "conversation intelligence": "Revenue Intelligence", "revenue operations": "Revenue Operations",
+  "revops": "Revenue Operations", "marketing automation": "Marketing Automation",
+  "account-based marketing": "Account-Based Marketing", "abm": "Account-Based Marketing",
+  "customer success": "Customer Success", "customer experience": "Customer Experience",
+  "customer support": "Customer Support", "hr tech": "HR Technology",
+  "hr technology": "HR Technology", "data analytics": "Data & Analytics",
+  "cybersecurity": "Cybersecurity", "fintech": "FinTech",
+  "billing": "Billing & Payments", "edtech": "EdTech",
+  "b2b saas": "B2B SaaS", "enterprise software": "Enterprise Software",
 };
 
 function standardizeCategory(raw: string): string {
   const lower = (raw || "").toLowerCase().trim();
-  // Direct match
   if (STANDARD_CATEGORIES[lower]) return STANDARD_CATEGORIES[lower];
-  // Partial match
   for (const [key, value] of Object.entries(STANDARD_CATEGORIES)) {
     if (lower.includes(key) || key.includes(lower)) return value;
   }
-  // Title case the raw value as fallback
   return raw.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
 }
 
@@ -138,253 +61,250 @@ function getPriority(title: string): "High" | "Medium" | "Low" {
   return "Low";
 }
 
-// ── Step 1: Discover target companies ────────────────────────────────────────
-// Primary source: verified ATS slug map (guaranteed correct slugs)
-// Secondary: GPT suggestions only for companies NOT in the map
-async function discoverTargetCompanies(
-  targetRoles: string,
-  targetCategories: string,
-  count: number = 20
-): Promise<Array<{ name: string; domain: string; careersUrl: string; category: string; ats: string }>> {
+// ── Step 1: Extract candidate profile from resume ────────────────────────────
+// Runs once per research session. Returns a compact profile string used to
+// score every job for fit. No GPT call if resume is missing.
+async function extractCandidateProfile(parsedResume: any): Promise<string> {
+  if (!parsedResume) return "";
 
-  // Pull from verified map first — these are guaranteed to work
-  const verified = getVerifiedCompaniesForDiscovery(count);
-  const keyword = targetRoles.split(",")[0].trim();
-
-  const results = verified.map(co => ({
-    name: co.name,
-    domain: co.domain,
-    category: co.category,
-    ats: co.ats,
-    careersUrl: co.ats === "greenhouse"
-      ? greenhouseBoardUrl(co.slug, keyword)
-      : leverBoardUrl(co.slug),
-    _slug: co.slug, // internal — used by ATS router
-  }));
-
-  console.log(`[JobResearch] Using ${results.length} verified companies from slug map`);
-  return results;
-}
-
-// ── Step 2: Route to correct scraper based on ATS type ───────────────────────
-async function scrapeCareerPage(
-  careersUrl: string,
-  targetRoles: string,
-  verifiedSlug?: string,     // when provided, skip URL parsing — use slug directly
-  verifiedAts?: string
-): Promise<Array<{ title: string; description: string; url: string; salary?: string; remote?: boolean }>> {
-
-  const keyword = targetRoles.split(",")[0].trim();
-
-  // ── If we have a verified slug, use it directly — don't trust the URL ──────
-  if (verifiedSlug && verifiedAts === "greenhouse") {
-    console.log(`[JobResearch] Greenhouse API (verified slug: ${verifiedSlug})`);
-    const jobs = await fetchGreenhouseJobs(verifiedSlug, keyword);
-    console.log(`[JobResearch] Greenhouse API returned ${jobs.length} jobs`);
-    return jobs.map(j => ({ title: j.title, description: j.description, url: j.url, salary: j.salary, remote: j.remote }));
-  }
-
-  if (verifiedSlug && verifiedAts === "lever") {
-    console.log(`[JobResearch] Lever API (verified slug: ${verifiedSlug})`);
-    const jobs = await fetchLeverJobs(verifiedSlug, keyword);
-    console.log(`[JobResearch] Lever API returned ${jobs.length} jobs`);
-    return jobs.map(j => ({ title: j.title, description: j.description, url: j.url, salary: j.salary, remote: j.remote }));
-  }
-
-  // ── Fallback: detect ATS from URL ────────────────────────────────────────
-  if (isGreenhouseUrl(careersUrl)) {
-    console.log(`[JobResearch] Routing to Greenhouse API: ${careersUrl}`);
-    const jobs = await scrapeGreenhouseUrl(careersUrl, targetRoles);
-    console.log(`[JobResearch] Greenhouse API returned ${jobs.length} jobs`);
-    return jobs;
-  }
-
-  if (isLeverUrl(careersUrl)) {
-    console.log(`[JobResearch] Routing to Lever API: ${careersUrl}`);
-    const jobs = await scrapeLeverUrl(careersUrl, targetRoles);
-    console.log(`[JobResearch] Lever API returned ${jobs.length} jobs`);
-    return jobs;
-  }
-
-  // ── Last resort: Firecrawl for custom career pages ───────────────────────
-  console.log(`[JobResearch] No ATS detected — using Firecrawl: ${careersUrl}`);
-  return scrapeWithFirecrawl(careersUrl, targetRoles);
-}
-
-
-// ── Firecrawl scraper (used only for non-Greenhouse, non-Lever pages) ────────
-async function scrapeWithFirecrawl(
-  careersUrl: string,
-  targetRoles: string
-): Promise<Array<{ title: string; description: string; url: string; salary?: string; remote?: boolean }>> {
-  const firecrawlKey = process.env.FIRECRAWL_API_KEY;
-  if (!firecrawlKey) {
-    console.warn("[JobResearch] FIRECRAWL_API_KEY not set — skipping Firecrawl scrape");
-    return [];
-  }
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return "";
 
   try {
-    console.log(`[JobResearch] Firecrawl scraping: ${careersUrl}`);
-
-    const scrapeRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${firecrawlKey}`,
-      },
-      body: JSON.stringify({
-        url: careersUrl,
-        formats: ["markdown"],
-        onlyMainContent: true,
-        timeout: 30000,
-        waitFor: 3000,
-        actions: [
-          { type: "wait", milliseconds: 3000 }
-        ],
-      }),
-      signal: AbortSignal.timeout(40000),
-    });
-
-    if (!scrapeRes.ok) {
-      const errText = await scrapeRes.text();
-      console.warn(`[JobResearch] Firecrawl HTTP ${scrapeRes.status} for ${careersUrl} — ${errText.slice(0, 300)}`);
-      return [];
-    }
-
-    const scrapeData = await scrapeRes.json() as any;
-
-    // ── FIX: Firecrawl v1 wraps content in scrapeData.data, not scrapeData directly
-    const pageContent: string =
-      scrapeData?.data?.markdown ||   // v1 response shape
-      scrapeData?.markdown ||          // legacy shape
-      scrapeData?.data?.content ||     // alternate v1 field
-      scrapeData?.content ||           // alternate legacy
-      "";
-
-    if (!pageContent.trim()) {
-      // Log the full response shape so we can diagnose future failures
-      console.warn(`[JobResearch] Firecrawl returned empty content for ${careersUrl}`);
-      console.warn(`[JobResearch] Firecrawl raw response keys: ${Object.keys(scrapeData || {}).join(", ")}`);
-      if (scrapeData?.data) {
-        console.warn(`[JobResearch] Firecrawl data keys: ${Object.keys(scrapeData.data || {}).join(", ")}`);
-      }
-      console.warn(`[JobResearch] Firecrawl success flag: ${scrapeData?.success}`);
-      console.warn(`[JobResearch] Firecrawl status: ${scrapeData?.data?.statusCode || scrapeData?.statusCode}`);
-      return [];
-    }
-
-    console.log(`[JobResearch] Firecrawl got ${pageContent.length} chars from ${careersUrl}`);
-    console.log(`[JobResearch] Content preview (first 500): ${pageContent.slice(0, 500).replace(/\n/g, " ")}`);
-
-    // Check if page content looks like a real job listing page
-    const lcContent = pageContent.toLowerCase();
-    const hasJobSignals =
-      lcContent.includes("apply") ||
-      lcContent.includes("job") ||
-      lcContent.includes("position") ||
-      lcContent.includes("opening") ||
-      lcContent.includes("hiring") ||
-      lcContent.includes("role");
-
-    if (!hasJobSignals) {
-      console.warn(`[JobResearch] Firecrawl content for ${careersUrl} doesn't look like a jobs page — skipping GPT extraction`);
-      console.warn(`[JobResearch] Page content sample: ${pageContent.slice(0, 200).replace(/\n/g, " ")}`);
-      return [];
-    }
-
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return [];
-
-    const extractRes = await fetch("https://api.openai.com/v1/chat/completions", {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: "gpt-4o",
         messages: [
-          {
-            role: "system",
-            content: "You are extracting job listings from a scraped career page. Be inclusive — if there is any doubt whether a role matches, include it. Return only valid JSON arrays. No markdown, no explanation.",
-          },
+          { role: "system", content: "You are a resume analyst. Return only a compact JSON object. No markdown." },
           {
             role: "user",
-            content: `Extract job postings from this career page content that match: ${targetRoles}
+            content: `Analyze this resume and extract the candidate's professional profile.
 
-Page URL: ${careersUrl}
-Page content:
-${pageContent.slice(0, 12000)}
+Resume data: ${JSON.stringify(parsedResume).slice(0, 4000)}
 
-Matching rules — be INCLUSIVE:
-- Account Executive, AE, Enterprise AE, Commercial AE, Strategic AE → match
-- Business Development, BD Manager, BDR → match
-- VP Sales, Director of Sales, Sales Manager → match
-- Customer Success Manager, CSM → match if target roles include CSM
-- When in doubt, include the role
-
-URL extraction rules — CRITICAL:
-- For Lever pages: job URLs are like https://jobs.lever.co/company/uuid — extract the FULL URL
-- For Greenhouse pages: job URLs are like https://boards.greenhouse.io/company/jobs/12345 — extract FULL URL
-- Look for hyperlinks on job titles, "Apply Now", "View Job" buttons — the href IS the direct URL
-- If you see a relative URL like /jobs/12345, make it absolute using the page's base domain
-- If no direct URL is found, use the careers page URL as fallback
-
-Return a JSON array where each item has:
-- title (string): exact job title
-- description (string): 2-3 sentence summary of the role
-- url (string): FULL direct application URL starting with https://
-- salary (string): salary range if visible, otherwise ""
-- remote (boolean): true if remote or hybrid is mentioned
-
-If the page has NO matching job listings, return an empty array: []
-Return ONLY the JSON array.`,
-          },
+Return JSON only:
+{
+  "name": "string",
+  "currentTitle": "most recent job title",
+  "seniorityLevel": "IC | Manager | Director | VP | C-Suite",
+  "yearsExperience": number,
+  "industries": ["list", "of", "industries"],
+  "coreSkills": ["top 5 skills"],
+  "companySizeFit": ["SMB", "Mid-Market", "Enterprise"] (which sizes based on their history),
+  "targetTitles": ["3-5 realistic next-step titles for this person"],
+  "notAFit": ["titles clearly too junior or senior to suggest"]
+}`
+          }
         ],
-        max_tokens: 2000,
-        temperature: 0.1,
+        max_tokens: 500,
+        temperature: 0,
       }),
+      signal: AbortSignal.timeout(15000),
     });
 
-    if (!extractRes.ok) {
-      console.warn(`[JobResearch] GPT extraction request failed: ${extractRes.status}`);
-      return [];
-    }
-
-    const extractData = await extractRes.json() as any;
-    let extractText = (extractData.choices?.[0]?.message?.content || "").trim()
-      .replace(/^```(?:json)?\s*/i, "")
-      .replace(/```\s*$/i, "");
-
-    try {
-      console.log(`[JobResearch] GPT extraction raw response: ${extractText.slice(0, 300)}`);
-      const jobs = JSON.parse(extractText);
-      const count = Array.isArray(jobs) ? jobs.length : 0;
-      console.log(`[JobResearch] GPT extracted ${count} jobs from Firecrawl content`);
-      return Array.isArray(jobs) ? jobs : [];
-    } catch {
-      console.warn(`[JobResearch] Failed to parse GPT extraction response: ${extractText.slice(0, 200)}`);
-      return [];
-    }
+    if (!res.ok) return "";
+    const data = await res.json() as any;
+    const text = (data.choices?.[0]?.message?.content || "").trim()
+      .replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
+    const profile = JSON.parse(text);
+    console.log(`[JobResearch] Candidate profile: ${profile.currentTitle}, ${profile.seniorityLevel}, ${profile.yearsExperience}yr`);
+    return JSON.stringify(profile);
   } catch (err) {
-    console.warn(`[JobResearch] Firecrawl scrape error for ${careersUrl}:`, err);
-    return [];
+    console.warn("[JobResearch] Profile extraction failed:", err);
+    return "";
   }
 }
 
-// ── Step 3: Enrich with Apollo.io contact ────────────────────────────────────
+// ── Step 2: Fetch ALL jobs from a company ATS board ──────────────────────────
+// Returns raw jobs with real job IDs and absolute URLs. No filtering here —
+// fit scoring handles that in Step 3.
+interface RawJob {
+  title: string;
+  description: string;
+  url: string;        // real job URL with actual job ID from ATS
+  salary: string;
+  remote: boolean;
+  jobId: string;      // ATS-native job ID (e.g. "8044511")
+}
+
+async function fetchAllJobsFromCompany(
+  company: VerifiedCompany,
+  targetRoles: string
+): Promise<RawJob[]> {
+  const keyword = targetRoles.split(",")[0].trim();
+
+  try {
+    if (company.ats === "greenhouse") {
+      const jobs = await fetchGreenhouseJobs(company.slug, keyword);
+      return jobs.map(j => {
+        // Extract real job ID from the absolute URL
+        // e.g. https://boards.greenhouse.io/salesloft/jobs/8044511 → "8044511"
+        const idMatch = j.url.match(/\/jobs\/(\d+)/);
+        return {
+          title: j.title,
+          description: j.description,
+          url: j.url,           // this is already j.absolute_url — real URL with real ID
+          salary: j.salary,
+          remote: j.remote,
+          jobId: idMatch?.[1] || String(j.url.split("/").pop() || ""),
+        };
+      });
+    }
+
+    if (company.ats === "lever") {
+      const jobs = await fetchLeverJobs(company.slug, keyword);
+      return jobs.map(j => {
+        // Lever job URLs: https://jobs.lever.co/gong/uuid-string
+        const idMatch = j.url.match(/lever\.co\/[^/]+\/([a-f0-9-]{36})/);
+        return {
+          title: j.title,
+          description: j.description,
+          url: j.url,
+          salary: j.salary,
+          remote: j.remote,
+          jobId: idMatch?.[1] || "",
+        };
+      });
+    }
+  } catch (err) {
+    console.warn(`[JobResearch] Failed to fetch from ${company.name}:`, err);
+  }
+
+  return [];
+}
+
+// ── Step 3: Fit-score all jobs against candidate profile ─────────────────────
+// Single GPT call scores all candidates' jobs across all companies at once.
+// Returns only jobs with score >= 7, capped at 1 per company (best fit wins).
+interface ScoredJob extends RawJob {
+  companyName: string;
+  companySlug: string;
+  companyDomain: string;
+  category: string;
+  ats: string;
+  fitScore: number;
+  fitReason: string;
+}
+
+type RawJobWithCompany = RawJob & {
+  companyName: string;
+  companySlug: string;
+  companyDomain: string;
+  category: string;
+  ats: string;
+};
+
+async function scoreJobsForFit(
+  rawJobs: RawJobWithCompany[],
+  candidateProfile: string,
+  targetRoles: string
+): Promise<ScoredJob[]> {
+  if (rawJobs.length === 0) return [];
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return rawJobs.map(j => ({ ...j, fitScore: 7, fitReason: "unscored" }));
+  }
+
+  // Build compact job list for scoring (title + company + first 150 chars of description)
+  const jobList = rawJobs.map((j, i) => ({
+    idx: i,
+    company: j.companyName,
+    title: j.title,
+    desc: j.description.slice(0, 150),
+    remote: j.remote,
+  }));
+
+  console.log(`[JobResearch] Fit-scoring ${rawJobs.length} jobs against candidate profile...`);
+
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: "You are a job-fit evaluator. Return only valid JSON. No markdown." },
+          {
+            role: "user",
+            content: `Score each job for fit against this candidate profile.
+
+Candidate profile:
+${candidateProfile || `Searching for: ${targetRoles}`}
+
+Jobs to score:
+${JSON.stringify(jobList)}
+
+Scoring rules:
+- 9-10: Near-perfect match — title, seniority, and industry all align
+- 7-8: Good fit — title matches, minor seniority or industry gap
+- 5-6: Possible stretch — title adjacent, significant seniority gap, or wrong industry
+- 1-4: Poor fit — wrong function, too junior, too senior, or clearly mismatched
+
+Additional rules:
+- If candidateProfile.companySizeFit includes "SMB", include SMB-stage company roles
+- If candidateProfile.companySizeFit includes "Enterprise", favor larger co roles
+- Mark as 3 or below if the title is in notAFit list
+- Penalize roles that require an industry the candidate has NO experience in
+- Favor roles that match at least 2 of candidate's coreSkills
+
+Return a JSON array:
+[
+  { "idx": 0, "score": 8, "reason": "AE role matches 7yr SaaS sales background" },
+  { "idx": 1, "score": 4, "reason": "SDR role is too junior for VP-level background" }
+]
+
+Return ONLY the JSON array. One entry per job. Keep reasons under 10 words.`
+          }
+        ],
+        max_tokens: 1500,
+        temperature: 0,
+      }),
+      signal: AbortSignal.timeout(20000),
+    });
+
+    if (!res.ok) {
+      console.warn(`[JobResearch] Fit scoring GPT call failed: ${res.status}`);
+      return rawJobs.map(j => ({ ...j, fitScore: 7, fitReason: "unscored" }));
+    }
+
+    const data = await res.json() as any;
+    const text = (data.choices?.[0]?.message?.content || "").trim()
+      .replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
+
+    const scores: Array<{ idx: number; score: number; reason: string }> = JSON.parse(text);
+    const scoreMap = new Map(scores.map(s => [s.idx, s]));
+
+    const scored: ScoredJob[] = rawJobs.map((j, i) => ({
+      ...j,
+      fitScore: scoreMap.get(i)?.score ?? 5,
+      fitReason: scoreMap.get(i)?.reason ?? "",
+    }));
+
+    // Log score distribution
+    const high = scored.filter(j => j.fitScore >= 7).length;
+    const low = scored.filter(j => j.fitScore < 7).length;
+    console.log(`[JobResearch] Fit scores: ${high} qualifying (≥7), ${low} filtered out (<7)`);
+
+    return scored;
+  } catch (err) {
+    console.warn("[JobResearch] Fit scoring failed, passing all through:", err);
+    return rawJobs.map(j => ({ ...j, fitScore: 7, fitReason: "unscored" }));
+  }
+}
+
+// ── Step 4: Enrich contact via Apollo ────────────────────────────────────────
 async function enrichContact(companyName: string, domain: string): Promise<{
   contactName: string;
   contactEmail: string;
   contactLinkedIn: string;
 }> {
   if (!process.env.APOLLO_API_KEY) return { contactName: "", contactEmail: "", contactLinkedIn: "" };
-
   const contact = await findHiringManager(companyName, domain);
   if (!contact) return { contactName: "", contactEmail: "", contactLinkedIn: "" };
-
-  return {
-    contactName: contact.name,
-    contactEmail: contact.email,
-    contactLinkedIn: contact.linkedinUrl,
-  };
+  return { contactName: contact.name, contactEmail: contact.email, contactLinkedIn: contact.linkedinUrl };
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -398,113 +318,146 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
   const targetRoles = config?.targetRoles?.toString() || "";
   const targetCategories = config?.targetCategories?.toString() || "";
 
-  // Don't run research if no roles configured — user needs to upload resume first
   if (!targetRoles.trim()) {
-    console.log("[JobResearch] No target roles configured — skipping research. Upload a resume in Settings.");
+    console.log("[JobResearch] No target roles configured — upload a resume in Settings.");
     return [];
   }
-  const requestedCount = Math.min(count || config?.rolesPerDay || 10, 30);
 
+  const requestedCount = Math.min(count || config?.rolesPerDay || 10, 30);
   console.log(`[JobResearch] Starting research — ${requestedCount} jobs for: ${targetRoles}`);
 
-  // Get existing companies in pipeline to avoid duplicates
+  // Load candidate profile from parsed resume for fit scoring
+  const parsedResume = (config as any)?.lastDocumentParsed || null;
+  const candidateProfile = await extractCandidateProfile(parsedResume);
+
+  // Track which companies are already in pipeline (skip entirely if already there)
   const existingRows = await db.select({ companyName: companies.companyName })
     .from(companies)
     .where(eq(companies.userId, userId));
+  const existingCompanies = new Set(existingRows.map(r => r.companyName.toLowerCase()));
+  console.log(`[JobResearch] ${existingCompanies.size} companies already in pipeline — will skip`);
 
-  // Count how many roles each company already has in pipeline
-  const companyRoleCounts: Record<string, number> = {};
-  for (const row of existingRows) {
-    const name = (row.companyName || "").toLowerCase();
-    companyRoleCounts[name] = (companyRoleCounts[name] || 0) + 1;
-  }
-  const MAX_ROLES_PER_COMPANY = 2;
+  // ── Phase 1: Fetch all raw jobs from verified ATS companies ─────────────────
+  // Pull more companies than needed — fit scoring will filter down
+  const poolSize = Math.min(requestedCount * 3, 30); // fetch 3x, keep best
+  const verifiedCompanies = getVerifiedCompaniesForDiscovery(poolSize);
 
-  console.log(`[JobResearch] ${Object.keys(companyRoleCounts).length} companies already in pipeline`);
+  // Skip companies already in pipeline
+  const toFetch = verifiedCompanies.filter(
+    co => !existingCompanies.has(co.name.toLowerCase())
+  );
+  console.log(`[JobResearch] Fetching from ${toFetch.length} companies (${poolSize - toFetch.length} skipped, already in pipeline)`);
 
-  // Step 1 — Discover companies
-  const companyCount = Math.min(Math.ceil(requestedCount / 2), 15);
-  const targetCompanies = await discoverTargetCompanies(targetRoles, targetCategories, companyCount);
-  console.log(`[JobResearch] Discovered ${targetCompanies.length} target companies`);
+  // Collect all raw jobs tagged with their source company
+  const allRawJobs: RawJobWithCompany[] = [];
 
-  const jobs: GeneratedJob[] = [];
-
-  // Step 2 — Fetch jobs from each company via the appropriate ATS API or Firecrawl
-  for (const company of targetCompanies) {
-    if (jobs.length >= requestedCount) break;
-
-    const co = company as any;
-    const ats = co.ats || "other";
-    const verifiedSlug: string | undefined = co._slug;
-
-    console.log(`[JobResearch] Fetching ${company.name} via ${ats.toUpperCase()} (slug: ${verifiedSlug || "url-detect"})`);
-
-    // Pass verified slug so we bypass URL parsing and use the exact correct slug
-    const scrapedJobs = await scrapeCareerPage(company.careersUrl, targetRoles, verifiedSlug, ats);
-    console.log(`[JobResearch] ${ats.toUpperCase()} result: ${scrapedJobs.length} matching jobs at ${company.name}`);
-
-
-    // Step 3 — Enrich contact once per company
-    let contact = { contactName: "", contactEmail: "", contactLinkedIn: "" };
-    if (scrapedJobs.length > 0) {
-      contact = await enrichContact(company.name, company.domain);
+  for (const company of toFetch) {
+    const raw = await fetchAllJobsFromCompany(company, targetRoles);
+    if (raw.length > 0) {
+      console.log(`[JobResearch] ${company.name} (${company.ats}): ${raw.length} jobs fetched`);
     }
-
-    // Step 4 — Build LinkedIn URL
-    let linkedinUrl = "";
-    try { linkedinUrl = await findCompanyLinkedIn(company.name); } catch { /* non-critical */ }
-
-    for (const job of scrapedJobs) {
-      if (jobs.length >= requestedCount) break;
-
-      // Skip if this company already has max roles in pipeline
-      const existingCount = companyRoleCounts[(company.name || "").toLowerCase()] || 0;
-      const addedThisRun = jobs.filter(j => j.companyName.toLowerCase() === company.name.toLowerCase()).length;
-      if (existingCount + addedThisRun >= MAX_ROLES_PER_COMPANY) {
-        console.log(`[JobResearch] Skipping ${company.name} — already has ${existingCount + addedThisRun} roles`);
-        break;
-      }
-
-      // Source label reflects actual ATS used
-      const sourceLabel = ats === "greenhouse" ? "Greenhouse API"
-        : ats === "lever" ? "Lever API"
-        : "Firecrawl";
-
-      jobs.push({
+    for (const job of raw) {
+      allRawJobs.push({
+        ...job,
         companyName: company.name,
-        companyId: `${slugify(company.name)}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-        jobTitle: job.title,
-        category: standardizeCategory(company.category),
-        contactName: contact.contactName,
-        contactEmail: contact.contactEmail,
-        linkedinUrl,
-        contactLinkedIn: contact.contactLinkedIn,
-        jobDescription: job.description,
-        jobLink: job.url || company.careersUrl,
-        salary: job.salary || "Competitive",
-        remote: job.remote || false,
-        priority: getPriority(job.title),
-        source: sourceLabel,
+        companySlug: company.slug,
+        companyDomain: company.domain,
+        category: company.category,
+        ats: company.ats,
       });
     }
   }
 
-  // Supplement with GPT fallback if needed
-  if (jobs.length === 0) {
-    console.warn("[JobResearch] ATS APIs + Firecrawl found 0 matching jobs — falling back to GPT research");
+  console.log(`[JobResearch] Total raw jobs across all companies: ${allRawJobs.length}`);
+
+  if (allRawJobs.length === 0) {
+    console.warn("[JobResearch] No jobs fetched from any ATS — falling back to GPT research");
     return fallbackGptResearch(targetRoles, targetCategories, requestedCount);
-  } else if (jobs.length < requestedCount) {
-    console.log(`[JobResearch] ATS APIs found ${jobs.length}/${requestedCount} — supplementing with GPT`);
-    const remaining = requestedCount - jobs.length;
-    const supplement = await fallbackGptResearch(targetRoles, targetCategories, remaining);
-    jobs.push(...supplement);
   }
 
-  console.log(`[JobResearch] Total jobs found: ${jobs.length}`);
-  return jobs;
+  // ── Phase 2: Score all jobs for fit in one GPT call ─────────────────────────
+  const scored = await scoreJobsForFit(allRawJobs, candidateProfile, targetRoles);
+
+  // Filter to qualifying jobs (score >= 7), then keep best 1 per company
+  const qualifying = scored
+    .filter(j => j.fitScore >= 7)
+    .sort((a, b) => b.fitScore - a.fitScore);
+
+  // Best 1 per company
+  const seenCompanies = new Set<string>();
+  const selected: typeof qualifying = [];
+  for (const job of qualifying) {
+    if (selected.length >= requestedCount) break;
+    const key = job.companyName.toLowerCase();
+    if (seenCompanies.has(key)) continue;
+    seenCompanies.add(key);
+    selected.push(job);
+  }
+
+  console.log(`[JobResearch] ${qualifying.length} qualifying jobs → ${selected.length} selected (1 per company, best fit)`);
+
+  // ── Phase 3: Enrich contacts for selected companies ──────────────────────────
+  // Enrich in parallel, capped to avoid rate limits
+  const enrichedContacts = new Map<string, { contactName: string; contactEmail: string; contactLinkedIn: string }>();
+  await Promise.all(
+    selected.map(async job => {
+      const key = job.companyName.toLowerCase();
+      if (!enrichedContacts.has(key)) {
+        const co = toFetch.find(c => c.name.toLowerCase() === key);
+        if (co) {
+          const contact = await enrichContact(co.name, co.domain);
+          enrichedContacts.set(key, contact);
+        }
+      }
+    })
+  );
+
+  // ── Phase 4: Build final GeneratedJob list ───────────────────────────────────
+  const results: GeneratedJob[] = [];
+
+  for (const job of selected) {
+    const contact = enrichedContacts.get(job.companyName.toLowerCase()) ||
+      { contactName: "", contactEmail: "", contactLinkedIn: "" };
+
+    let linkedinUrl = "";
+    try { linkedinUrl = await findCompanyLinkedIn(job.companyName); } catch { /* non-critical */ }
+
+    const sourceLabel = job.ats === "greenhouse" ? "Greenhouse API"
+      : job.ats === "lever" ? "Lever API"
+      : "Firecrawl";
+
+    results.push({
+      companyName: job.companyName,
+      // companyId uses the real ATS job ID, not a random string
+      companyId: `${slugify(job.companyName)}-${job.jobId || Date.now()}`,
+      jobTitle: job.title,
+      category: standardizeCategory(job.category),
+      contactName: contact.contactName,
+      contactEmail: contact.contactEmail,
+      linkedinUrl,
+      contactLinkedIn: contact.contactLinkedIn,
+      jobDescription: job.description,
+      jobLink: job.url,    // real ATS URL with real job ID, never falls back
+      salary: job.salary || "Competitive",
+      remote: job.remote || false,
+      priority: getPriority(job.title),
+      source: sourceLabel,
+      fitScore: job.fitScore,
+    });
+  }
+
+  // Supplement with GPT fallback only if well short of target
+  if (results.length < Math.floor(requestedCount * 0.5)) {
+    console.log(`[JobResearch] Only ${results.length} qualifying jobs — supplementing with GPT`);
+    const supplement = await fallbackGptResearch(targetRoles, targetCategories, requestedCount - results.length);
+    results.push(...supplement);
+  }
+
+  console.log(`[JobResearch] Final: ${results.length} targeted jobs added to pipeline`);
+  return results;
 }
 
-// ── Fallback: GPT-generated listings (used only when Apify finds nothing) ────
+// ── Fallback: GPT-generated listings (when ATS returns nothing) ───────────────
 async function fallbackGptResearch(targetRoles: string, targetCategories: string, count: number): Promise<GeneratedJob[]> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY not configured");
@@ -520,15 +473,14 @@ async function fallbackGptResearch(targetRoles: string, targetCategories: string
           role: "user",
           content: `Generate ${count} realistic job postings for: ${targetRoles} in ${targetCategories}.
 
-Use only real B2B SaaS companies. For jobLink use a FILTERED ATS URL that goes directly to job listings — NOT a generic /careers page:
-- Lever: https://jobs.lever.co/{company-slug}?department=Sales
-- Greenhouse: https://boards.greenhouse.io/{company-slug}/jobs?q=account+executive
-Prefer Lever and Greenhouse companies. Avoid Workday.
+Mix company sizes: include SMB (50-200 employees), Mid-Market (200-2000), and Enterprise (2000+).
+Use only real B2B SaaS companies on Greenhouse or Lever ATS.
+jobLink must be a real Greenhouse or Lever board URL — no made-up IDs.
 
-Return JSON array with: companyName, jobTitle, category, jobDescription (2 sentences), jobLink (filtered ATS URL), salary, remote (bool), priority (High/Medium/Low). No markdown.`
+Return JSON array: companyName, jobTitle, category, jobDescription (2 sentences), jobLink, salary, remote (bool), priority (High/Medium/Low). No markdown.`
         }
       ],
-      max_tokens: 3000,
+      max_tokens: 2000,
       temperature: 0.4,
     }),
   });
@@ -555,7 +507,7 @@ Return JSON array with: companyName, jobTitle, category, jobDescription (2 sente
       jobLink: j.jobLink || "",
       salary: j.salary || "Competitive",
       remote: j.remote === true,
-      priority: ["High","Medium","Low"].includes(j.priority) ? j.priority : getPriority(j.jobTitle || ""),
+      priority: ["High", "Medium", "Low"].includes(j.priority) ? j.priority : getPriority(j.jobTitle || ""),
       source: "GPT Research",
     }));
   } catch {
@@ -563,7 +515,7 @@ Return JSON array with: companyName, jobTitle, category, jobDescription (2 sente
   }
 }
 
-// ── Add jobs to pipeline DB ────────────────────────────────────────────────────
+// ── Add jobs to pipeline DB ───────────────────────────────────────────────────
 export async function addJobsToPipeline(jobs: GeneratedJob[], userId: number = 1): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -571,6 +523,7 @@ export async function addJobsToPipeline(jobs: GeneratedJob[], userId: number = 1
   let addedCount = 0;
   for (const job of jobs) {
     try {
+      const fitNote = job.fitScore ? ` | Fit score: ${job.fitScore}/10` : "";
       await db.insert(companies).values({
         userId,
         companyId: job.companyId,
@@ -587,7 +540,7 @@ export async function addJobsToPipeline(jobs: GeneratedJob[], userId: number = 1
         companySize: "",
         priority: job.priority,
         stage: "Research",
-        notes: `Source: ${job.source}`,
+        notes: `Source: ${job.source}${fitNote}`,
       });
       addedCount++;
     } catch (err: any) {
