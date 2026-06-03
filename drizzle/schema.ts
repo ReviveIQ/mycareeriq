@@ -155,6 +155,9 @@ export const researchConfig = mysqlTable("researchConfig", {
   // Empty = no filter (all locations)
   targetCountries: varchar("targetCountries", { length: 255 }),
 
+  // Work arrangement filter: "remote", "hybrid", "onsite" — comma-separated, empty = all
+  workArrangement: varchar("workArrangement", { length: 100 }),
+
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

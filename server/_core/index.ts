@@ -178,6 +178,8 @@ async function runMigrations() {
       `ALTER TABLE researchConfig ADD COLUMN lastDocumentParsed json`,
       // targetCountries for location filtering (comma-separated: US,UK,CA,AU,remote)
       `ALTER TABLE researchConfig ADD COLUMN targetCountries varchar(255)`,
+      // workArrangement filter: remote, hybrid, onsite (comma-separated, empty = all)
+      `ALTER TABLE researchConfig ADD COLUMN workArrangement varchar(100)`,
       // workspaceInvitations table
       `CREATE TABLE IF NOT EXISTS workspaceInvitations (
         id int AUTO_INCREMENT NOT NULL,

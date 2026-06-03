@@ -52,7 +52,8 @@ export const researchConfigRouter = router({
         targetCategories: z.string().optional(),
         rolesPerDay: z.number().min(1).max(100).optional(),
         enabled: z.number().optional(),
-        targetCountries: z.string().optional(), // comma-separated: "US,UK,CA,AU,remote" or "" for all
+        targetCountries: z.string().optional(),
+        workArrangement: z.string().optional(), // "remote,hybrid,onsite" or "" for all
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -85,6 +86,7 @@ export const researchConfigRouter = router({
           if (input.rolesPerDay !== undefined) updateData.rolesPerDay = input.rolesPerDay;
           if (input.enabled !== undefined) updateData.enabled = input.enabled;
           if (input.targetCountries !== undefined) updateData.targetCountries = input.targetCountries;
+          if (input.workArrangement !== undefined) updateData.workArrangement = input.workArrangement;
 
           await db
             .update(researchConfig)

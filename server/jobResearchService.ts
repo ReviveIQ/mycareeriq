@@ -466,6 +466,10 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
   const targetRoles = config?.targetRoles?.toString() || "";
   const targetCategories = config?.targetCategories?.toString() || "";
   const targetCountries = ((config as any)?.targetCountries || "US").toString().trim();
+  const workArrangement = ((config as any)?.workArrangement || "").toString().trim().toLowerCase();
+  const arrangementFilter = workArrangement
+    ? workArrangement.split(",").map((a: string) => a.trim()).filter(Boolean)
+    : []; // empty = accept all
 
   if (!targetRoles.trim()) {
     console.log("[JobResearch] No target roles configured — upload a resume in Settings.");
@@ -511,6 +515,24 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
       if (!matchesCountryFilter(jobLocation, targetCountries)) {
         console.log(`[JobResearch] Filtered: ${company.name} "${job.title}" — "${jobLocation}" not in [${targetCountries}]`);
         continue;
+      }
+
+      // Apply work arrangement filter
+      if (arrangementFilter.length > 0) {
+        const loc = jobLocation.toLowerCase();
+        const isRemote = job.remote || loc.includes("remote") || loc.includes("anywhere");
+        const isHybrid = loc.includes("hybrid");
+        const isOnsite = !isRemote && !isHybrid;
+
+        const matches =
+          (arrangementFilter.includes("remote") && isRemote) ||
+          (arrangementFilter.includes("hybrid") && isHybrid) ||
+          (arrangementFilter.includes("onsite") && isOnsite);
+
+        if (!matches) {
+          console.log(`[JobResearch] Filtered: ${company.name} "${job.title}" — arrangement "${jobLocation}" not in [${workArrangement}]`);
+          continue;
+        }
       }
       allRawJobs.push({
         ...job,

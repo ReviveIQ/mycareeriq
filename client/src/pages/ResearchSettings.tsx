@@ -16,7 +16,8 @@ interface ResearchSettingsProps {
 export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {}) {
   const [targetRoles, setTargetRoles] = useState("");
   const [selectedCountries, setSelectedCountries] = useState<string[]>(["US"]);
-  const [usStates, setUsStates] = useState(""); // e.g. "FL, CA, NY"
+  const [usStates, setUsStates] = useState("");
+  const [workArrangement, setWorkArrangement] = useState<string[]>([]); // empty = all
   const [targetCategories, setTargetCategories] = useState<string[]>([]);
   const [rolesPerDay, setRolesPerDay] = useState(10);
   const [enabled, setEnabled] = useState(true);
@@ -80,6 +81,10 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
       const { countries, states } = parseTargetCountries((config as any).targetCountries || "US");
       setSelectedCountries(countries);
       setUsStates(states);
+      const arrangement = (config as any).workArrangement
+        ? (config as any).workArrangement.split(",").map((a: string) => a.trim()).filter(Boolean)
+        : [];
+      setWorkArrangement(arrangement);
       setTargetCategories(
         config.targetCategories
           ? config.targetCategories.split(",").map((c: string) => c.trim()).filter(Boolean)
@@ -96,6 +101,7 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
       await updateConfig.mutateAsync({
         targetRoles,
         targetCountries: buildTargetCountries(),
+        workArrangement: workArrangement.join(","),
         targetCategories: targetCategories.join(", "),
         rolesPerDay,
         enabled: enabled ? 1 : 0,
@@ -308,6 +314,46 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
           )}
         </div>
 
+        {/* Work Arrangement Filter */}
+        <div>
+          <label className="block text-sm font-semibold text-slate-900 mb-1">
+            Work Arrangement
+          </label>
+          <p className="text-xs text-slate-500 mb-3">
+            Filter by how the job is structured. Leave all unselected to include everything.
+          </p>
+          <div className="flex gap-2">
+            {[
+              { code: "remote", label: "🌐 Remote" },
+              { code: "hybrid", label: "🏠 Hybrid" },
+              { code: "onsite", label: "🏢 On-site" },
+            ].map(({ code, label }) => {
+              const selected = workArrangement.includes(code);
+              return (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() =>
+                    setWorkArrangement(prev =>
+                      prev.includes(code) ? prev.filter(a => a !== code) : [...prev, code]
+                    )
+                  }
+                  className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
+                    selected
+                      ? "bg-indigo-600 border-indigo-600 text-white"
+                      : "bg-white border-slate-200 text-slate-600 hover:border-indigo-400"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          {workArrangement.length === 0 && (
+            <p className="text-xs text-slate-400 mt-2">All arrangements included</p>
+          )}
+        </div>
+
         {/* Enable/Disable Toggle */}
         <div>
           <label className="block text-sm font-semibold text-slate-900 mb-3">
@@ -395,7 +441,7 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
           <div>
             <p className="text-slate-600 font-medium">Target Categories:</p>
             <p className="text-slate-900 font-mono text-xs mt-1 bg-white p-2 rounded border border-slate-200">
-              {targetCategories || "Not set"}
+              {targetCategories.length > 0 ? targetCategories.join(", ") : "Not set"}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-4 pt-2">
