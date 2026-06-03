@@ -2,7 +2,7 @@
 // DM Sans (headers) + Inter (body), off-white background, deep indigo accent
 // CRM-like interface with status badges, filter chips, and sortable columns
 
-export type PipelineStage = "Research" | "Outreach" | "Applied" | "Interviewing" | "Offer" | "Rejected";
+export type PipelineStage = "Research" | "Outreach" | "Applied" | "Interviewing" | "Offer" | "Rejected" | "Dismissed";
 
 export type CompanyCategory = string;
 
@@ -33,6 +33,7 @@ export const stageColors: Record<PipelineStage, string> = {
   Interviewing: "bg-violet-50 text-violet-700 border-violet-200",
   Offer: "bg-emerald-50 text-emerald-700 border-emerald-200",
   Rejected: "bg-red-50 text-red-600 border-red-200",
+  Dismissed: "bg-slate-50 text-slate-400 border-slate-100",
 };
 
 export const priorityColors: Record<"High" | "Medium" | "Low", string> = {
@@ -103,6 +104,7 @@ export const stageOrder: PipelineStage[] = [
   "Interviewing",
   "Offer",
   "Rejected",
+  "Dismissed",
 ];
 
 export function exportToCSV(companies: Company[], filename = "bryan-pipeline.csv"): void {

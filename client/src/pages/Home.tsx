@@ -126,6 +126,7 @@ export default function Home() {
   const { data: rateLimitStatus, refetch: refetchRateLimit } = trpc.monitoring.getRateLimitStatus.useQuery();
   const updateStage = trpc.pipeline.updateStage.useMutation();
   const deleteCompany = trpc.pipeline.deleteCompany.useMutation();
+  const [confirmRemoveId, setConfirmRemoveId] = useState<number | null>(null);
 
   const handleAddToPipeline = async (company: Company) => {
     if (!company.id) return;
@@ -137,11 +138,29 @@ export default function Home() {
 
   const handleDismiss = async (company: Company) => {
     if (!company.id) return;
+    await updateStage.mutateAsync({ id: company.id as number, stage: "Dismissed" });
+    await utils.pipeline.getCompanies.invalidate();
+    toast.success(`${(company as any).companyName || company.name} dismissed — find it under the Dismissed filter`, {
+      action: {
+        label: "Undo",
+        onClick: async () => {
+          await updateStage.mutateAsync({ id: company.id as number, stage: "Research" });
+          await utils.pipeline.getCompanies.invalidate();
+        },
+      },
+    });
+    setSelectedCompany(null);
+    setConfirmRemoveId(null);
+  };
+
+  const handleRemove = async (company: Company) => {
+    if (!company.id) return;
     await deleteCompany.mutateAsync({ id: company.id as number });
     await utils.pipeline.getCompanies.invalidate();
     await utils.pipeline.getCompanyCount.invalidate();
-    toast.success(`${company.name} dismissed`);
+    toast.success(`${(company as any).companyName || company.name} permanently removed`);
     setSelectedCompany(null);
+    setConfirmRemoveId(null);
   };
   const utils = trpc.useUtils();
 
@@ -152,6 +171,10 @@ export default function Home() {
 
   const filtered = useMemo(() => {
     let data = [...pipelineData];
+    // Hide dismissed from main view unless explicitly filtered to Dismissed
+    if (stageFilter !== ("Dismissed" as any)) {
+      data = data.filter(c => c.stage !== ("Dismissed" as any));
+    }
     if (search) {
       const q = search.toLowerCase();
       data = data.filter(
@@ -1002,7 +1025,7 @@ export default function Home() {
       </main>
 
       {/* Company Detail Modal */}
-      <Dialog open={!!selectedCompany} onOpenChange={() => setSelectedCompany(null)}>
+      <Dialog open={!!selectedCompany} onOpenChange={() => { setSelectedCompany(null); setConfirmRemoveId(null); }}>
         <DialogContent className="max-w-lg">
           {selectedCompany && (
             <>
@@ -1116,16 +1139,87 @@ export default function Home() {
                     >
                       {updateStage.isPending ? "Adding..." : "✓ Add to Pipeline"}
                     </button>
+
+                    {/* Dismiss / Remove flow */}
+                    {confirmRemoveId === selectedCompany.id ? (
+                      // Confirmation state — show Remove and Cancel
+                      <div className="flex gap-2 flex-1">
+                        <button
+                          onClick={() => handleRemove(selectedCompany)}
+                          disabled={deleteCompany.isPending}
+                          className="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {deleteCompany.isPending ? "Removing..." : "🗑 Remove permanently"}
+                        </button>
+                        <button
+                          onClick={() => setConfirmRemoveId(null)}
+                          className="px-4 py-2.5 text-sm text-slate-500 hover:text-slate-700 border border-slate-200 rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      // Default state — show Dismiss button with Remove option
+                      <div className="flex gap-2 flex-1">
+                        <button
+                          onClick={() => handleDismiss(selectedCompany)}
+                          disabled={updateStage.isPending}
+                          className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          ✕ Dismiss
+                        </button>
+                        <button
+                          onClick={() => setConfirmRemoveId(selectedCompany.id as number)}
+                          className="px-3 py-2.5 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 border border-slate-200 hover:border-red-200 rounded-lg transition-colors"
+                          title="Permanently remove this job"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                  </>
+                ) : selectedCompany.stage === "Dismissed" ? (
+                  // Dismissed — show restore and remove options
+                  <>
                     <button
-                      onClick={() => handleDismiss(selectedCompany)}
-                      disabled={deleteCompany.isPending}
-                      className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50"
+                      onClick={async () => {
+                        await updateStage.mutateAsync({ id: selectedCompany.id as number, stage: "Research" });
+                        await utils.pipeline.getCompanies.invalidate();
+                        toast.success(`${(selectedCompany as any).companyName || selectedCompany.name} restored to Research`);
+                        setSelectedCompany(null);
+                      }}
+                      disabled={updateStage.isPending}
+                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50"
                     >
-                      {deleteCompany.isPending ? "Removing..." : "✕ Dismiss"}
+                      ↩ Restore to Research
                     </button>
+                    {confirmRemoveId === selectedCompany.id ? (
+                      <div className="flex gap-2 flex-1">
+                        <button
+                          onClick={() => handleRemove(selectedCompany)}
+                          disabled={deleteCompany.isPending}
+                          className="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {deleteCompany.isPending ? "Removing..." : "🗑 Confirm Remove"}
+                        </button>
+                        <button
+                          onClick={() => setConfirmRemoveId(null)}
+                          className="px-4 py-2.5 text-sm text-slate-500 hover:text-slate-700 border border-slate-200 rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmRemoveId(selectedCompany.id as number)}
+                        className="px-4 py-2.5 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 border border-slate-200 hover:border-red-200 rounded-lg transition-colors"
+                      >
+                        🗑 Remove
+                      </button>
+                    )}
                   </>
                 ) : (
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex gap-2 flex-wrap items-center">
                     {["Outreach", "Applied", "Interviewing", "Offer", "Rejected"].map((s) => (
                       <button
                         key={s}
@@ -1145,6 +1239,14 @@ export default function Home() {
                         {s}
                       </button>
                     ))}
+                    {/* Dismiss from any active stage */}
+                    <button
+                      onClick={() => handleDismiss(selectedCompany)}
+                      disabled={updateStage.isPending}
+                      className="text-xs px-3 py-1.5 rounded-full font-medium text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors border border-dashed border-slate-200"
+                    >
+                      ✕ Dismiss
+                    </button>
                   </div>
                 )}
               </div>
