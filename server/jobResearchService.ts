@@ -7,6 +7,7 @@ import { fetchGreenhouseJobs } from "./greenhouseService";
 import { fetchLeverJobs } from "./leverService";
 import { fetchAshbyJobs } from "./ashbyService";
 import { getVerifiedCompaniesForDiscovery, VerifiedCompany } from "./atsSlugMap";
+import { discoverCompaniesForCandidate } from "./companyDiscoveryService";
 
 export interface GeneratedJob {
   companyName: string;
@@ -91,11 +92,13 @@ Return JSON only:
   "currentTitle": "most recent job title",
   "seniorityLevel": "IC | Manager | Director | VP | C-Suite",
   "yearsExperience": number,
-  "industries": ["list", "of", "industries"],
+  "industries": ["list of industries from their history"],
   "coreSkills": ["top 5 skills"],
-  "companySizeFit": ["SMB", "Mid-Market", "Enterprise"] (which sizes based on their history),
+  "companySizeFit": ["SMB", "Mid-Market", "Enterprise"],
   "targetTitles": ["3-5 realistic next-step titles for this person"],
-  "notAFit": ["titles clearly too junior or senior to suggest"]
+  "notAFit": ["titles clearly too junior or senior"],
+  "companiesWorkedAt": ["list of past company names — used to find ecosystem peers"],
+  "productsOrTechSold": ["CRM", "RevIntel", "HR Tech", "Security" etc — what space they know]
 }`
           }
         ],
@@ -497,16 +500,35 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
   const existingCompanies = new Set(existingRows.map(r => r.companyName.toLowerCase()));
   console.log(`[JobResearch] ${existingCompanies.size} companies already in pipeline — will skip`);
 
-  // ── Phase 1: Fetch all raw jobs from verified ATS companies ─────────────────
-  // Pull more companies than needed — fit scoring will filter down
-  const poolSize = Math.min(requestedCount * 3, 30); // fetch 3x, keep best
-  const verifiedCompanies = getVerifiedCompaniesForDiscovery(poolSize);
+  // ── Phase 1: Discover companies matched to THIS candidate's resume ──────────
+  // Use resume-driven discovery: GPT suggests companies based on their background,
+  // each suggestion is validated against live ATS APIs before use.
+  // Falls back to static verified map if discovery yields too few results.
+  const poolSize = Math.min(requestedCount * 3, 30);
+
+  // Parse candidate profile for company discovery
+  let profileForDiscovery: any = {};
+  try {
+    if (candidateProfile) profileForDiscovery = JSON.parse(candidateProfile);
+  } catch { /* use empty profile */ }
+
+  // Get static fallback companies for supplementing
+  const staticFallback = getVerifiedCompaniesForDiscovery(poolSize);
+
+  // Discover companies based on resume — resume-specific pool
+  const allCompanies = await discoverCompaniesForCandidate(
+    profileForDiscovery,
+    targetRoles,
+    targetCategories,
+    poolSize,
+    staticFallback
+  );
 
   // Skip companies already in pipeline
-  const toFetch = verifiedCompanies.filter(
+  const toFetch = allCompanies.filter(
     co => !existingCompanies.has(co.name.toLowerCase())
   );
-  console.log(`[JobResearch] Fetching from ${toFetch.length} companies (${poolSize - toFetch.length} skipped, already in pipeline)`);
+  console.log(`[JobResearch] Fetching from ${toFetch.length} resume-matched companies (${allCompanies.length - toFetch.length} skipped, already in pipeline)`);
 
   // Collect all raw jobs tagged with their source company
   const allRawJobs: RawJobWithCompany[] = [];
