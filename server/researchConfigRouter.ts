@@ -20,7 +20,6 @@ export const researchConfigRouter = router({
         .limit(1);
 
       if (config.length === 0) {
-        // No config yet — user hasn't uploaded a resume. Return empty fields.
         return {
           id: 0,
           userId: ctx.user.id,
@@ -32,6 +31,7 @@ export const researchConfigRouter = router({
           documentType: "resume",
           documentFileName: null,
           lastDocumentParsed: null,
+          targetCountries: "US",
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -52,8 +52,7 @@ export const researchConfigRouter = router({
         targetCategories: z.string().optional(),
         rolesPerDay: z.number().min(1).max(100).optional(),
         enabled: z.number().optional(),
-        remoteOnly: z.boolean().optional(),
-        usHiringOnly: z.boolean().optional(),
+        targetCountries: z.string().optional(), // comma-separated: "US,UK,CA,AU,remote" or "" for all
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -63,7 +62,6 @@ export const researchConfigRouter = router({
       }
 
       try {
-        // Check if config exists for this user
         const existing = await db
           .select()
           .from(researchConfig)
@@ -71,7 +69,6 @@ export const researchConfigRouter = router({
           .limit(1);
 
         if (existing.length === 0) {
-          // Create new config with whatever the user/resume provided — no hardcoded defaults
           await db.insert(researchConfig).values({
             userId: ctx.user.id,
             targetRoles: input.targetRoles || "",
@@ -79,16 +76,15 @@ export const researchConfigRouter = router({
             targetCompanies: "",
             rolesPerDay: input.rolesPerDay || 10,
             enabled: input.enabled !== undefined ? input.enabled : 1,
+            targetCountries: input.targetCountries ?? "US",
           });
         } else {
-          // Update existing config
           const updateData: Record<string, any> = {};
           if (input.targetRoles !== undefined) updateData.targetRoles = input.targetRoles;
           if (input.targetCategories !== undefined) updateData.targetCategories = input.targetCategories;
           if (input.rolesPerDay !== undefined) updateData.rolesPerDay = input.rolesPerDay;
           if (input.enabled !== undefined) updateData.enabled = input.enabled;
-          if (input.remoteOnly !== undefined) updateData.remoteOnly = input.remoteOnly;
-          if (input.usHiringOnly !== undefined) updateData.usHiringOnly = input.usHiringOnly;
+          if (input.targetCountries !== undefined) updateData.targetCountries = input.targetCountries;
 
           await db
             .update(researchConfig)

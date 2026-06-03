@@ -151,6 +151,10 @@ export const researchConfig = mysqlTable("researchConfig", {
   documentFileName: varchar("documentFileName", { length: 255 }),
   lastDocumentParsed: json("lastDocumentParsed"),
 
+  // Comma-separated country codes to filter job locations: "US", "UK", "CA", "AU", "remote"
+  // Empty = no filter (all locations)
+  targetCountries: varchar("targetCountries", { length: 255 }),
+
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

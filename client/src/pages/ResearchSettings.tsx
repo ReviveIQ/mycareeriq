@@ -15,13 +15,29 @@ interface ResearchSettingsProps {
 
 export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {}) {
   const [targetRoles, setTargetRoles] = useState("");
-  const [remoteOnly, setRemoteOnly] = useState(false);
-  const [usHiringOnly, setUsHiringOnly] = useState(true);
+  const [targetCountries, setTargetCountries] = useState<string[]>(["US"]);
   const [targetCategories, setTargetCategories] = useState<string[]>([]);
-  const [rolesPerDay, setRolesPerDay] = useState(30);
+  const [rolesPerDay, setRolesPerDay] = useState(10);
   const [enabled, setEnabled] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+
+  const COUNTRY_OPTIONS = [
+    { code: "US", label: "🇺🇸 United States" },
+    { code: "UK", label: "🇬🇧 United Kingdom" },
+    { code: "CA", label: "🇨🇦 Canada" },
+    { code: "AU", label: "🇦🇺 Australia" },
+    { code: "DE", label: "🇩🇪 Germany" },
+    { code: "FR", label: "🇫🇷 France" },
+    { code: "NL", label: "🇳🇱 Netherlands" },
+    { code: "REMOTE", label: "🌐 Remote / Anywhere" },
+  ];
+
+  const toggleCountry = (code: string) => {
+    setTargetCountries(prev =>
+      prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code]
+    );
+  };
 
   // Fetch current configuration
   const { data: config, isLoading } = trpc.researchConfig.get.useQuery();
@@ -32,8 +48,10 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
   useEffect(() => {
     if (config) {
       setTargetRoles(config.targetRoles);
-      setRemoteOnly(config.remoteOnly || false);
-      setUsHiringOnly(config.usHiringOnly !== false);
+      const countries = (config as any).targetCountries
+        ? (config as any).targetCountries.split(",").map((c: string) => c.trim()).filter(Boolean)
+        : ["US"];
+      setTargetCountries(countries);
       setTargetCategories(
         config.targetCategories
           ? config.targetCategories.split(",").map((c: string) => c.trim()).filter(Boolean)
@@ -49,8 +67,7 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
     try {
       await updateConfig.mutateAsync({
         targetRoles,
-        remoteOnly,
-        usHiringOnly,
+        targetCountries: targetCountries.join(","),
         targetCategories: targetCategories.join(", "),
         rolesPerDay,
         enabled: enabled ? 1 : 0,
@@ -67,6 +84,10 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
   const handleReset = () => {
     if (config) {
       setTargetRoles(config.targetRoles);
+      const countries = (config as any).targetCountries
+        ? (config as any).targetCountries.split(",").map((c: string) => c.trim()).filter(Boolean)
+        : ["US"];
+      setTargetCountries(countries);
       setTargetCategories(
         config.targetCategories
           ? config.targetCategories.split(",").map((c: string) => c.trim()).filter(Boolean)
@@ -197,52 +218,38 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
           </div>
         </div>
 
-        {/* Remote Only Toggle */}
+        {/* Country / Location Filter */}
         <div>
-          <label className="block text-sm font-semibold text-slate-900 mb-3">
-            Remote Roles
+          <label className="block text-sm font-semibold text-slate-900 mb-1">
+            Job Locations
           </label>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setRemoteOnly(!remoteOnly)}
-              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                remoteOnly ? "bg-indigo-600" : "bg-slate-300"
-              }`}
-            >
-              <span
-                className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                  remoteOnly ? "translate-x-7" : "translate-x-1"
-                }`}
-              />
-            </button>
-            <span className={`text-sm font-medium ${remoteOnly ? "text-emerald-600" : "text-slate-600"}`}>
-              {remoteOnly ? "Remote roles only" : "All roles (remote + in-office)"}
-            </span>
+          <p className="text-xs text-slate-500 mb-3">
+            Only show roles in these countries. Select multiple. Leave all unselected for worldwide.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {COUNTRY_OPTIONS.map(({ code, label }) => {
+              const selected = targetCountries.includes(code);
+              return (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => toggleCountry(code)}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                    selected
+                      ? "bg-indigo-600 border-indigo-600 text-white"
+                      : "bg-white border-slate-200 text-slate-600 hover:border-indigo-400"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
-        </div>
-
-        {/* US Only Toggle */}
-        <div>
-          <label className="block text-sm font-semibold text-slate-900 mb-3">
-            US Hiring Only
-          </label>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setUsHiringOnly(!usHiringOnly)}
-              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                usHiringOnly ? "bg-indigo-600" : "bg-slate-300"
-              }`}
-            >
-              <span
-                className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                  usHiringOnly ? "translate-x-7" : "translate-x-1"
-                }`}
-              />
-            </button>
-            <span className={`text-sm font-medium ${usHiringOnly ? "text-emerald-600" : "text-slate-600"}`}>
-              {usHiringOnly ? "US positions only" : "All locations"}
-            </span>
-          </div>
+          {targetCountries.length === 0 && (
+            <p className="text-xs text-amber-600 mt-2">
+              No countries selected — pipeline will include roles from all locations.
+            </p>
+          )}
         </div>
 
         {/* Enable/Disable Toggle */}

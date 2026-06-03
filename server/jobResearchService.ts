@@ -128,6 +128,7 @@ interface RawJob {
   salary: string;
   remote: boolean;
   jobId: string;      // ATS-native job ID (e.g. "8044511")
+  location: string;   // raw location string — used for country filtering
 }
 
 async function fetchAllJobsFromCompany(
@@ -140,16 +141,15 @@ async function fetchAllJobsFromCompany(
     if (company.ats === "greenhouse") {
       const jobs = await fetchGreenhouseJobs(company.slug, keyword);
       return jobs.map(j => {
-        // Extract real job ID from the absolute URL
-        // e.g. https://boards.greenhouse.io/salesloft/jobs/8044511 → "8044511"
         const idMatch = j.url.match(/\/jobs\/(\d+)/);
         return {
           title: j.title,
           description: j.description,
-          url: j.url,           // this is already j.absolute_url — real URL with real ID
+          url: j.url,
           salary: j.salary,
           remote: j.remote,
           jobId: idMatch?.[1] || String(j.url.split("/").pop() || ""),
+          location: j.location || "",
         };
       });
     }
@@ -157,7 +157,6 @@ async function fetchAllJobsFromCompany(
     if (company.ats === "lever") {
       const jobs = await fetchLeverJobs(company.slug, keyword);
       return jobs.map(j => {
-        // Lever job URLs: https://jobs.lever.co/gong/uuid-string
         const idMatch = j.url.match(/lever\.co\/[^/]+\/([a-f0-9-]{36})/);
         return {
           title: j.title,
@@ -166,6 +165,7 @@ async function fetchAllJobsFromCompany(
           salary: j.salary,
           remote: j.remote,
           jobId: idMatch?.[1] || "",
+          location: j.location || "",
         };
       });
     }
@@ -179,6 +179,7 @@ async function fetchAllJobsFromCompany(
         salary: j.salary,
         remote: j.remote,
         jobId: j.jobId,
+        location: j.location || "",
       }));
     }
   } catch (err) {
@@ -344,6 +345,49 @@ async function enrichContact(companyName: string, domain: string, jobTitle?: str
   return { contactName: "", contactEmail: "", contactLinkedIn: "", contactTitle: "" };
 }
 
+// ── Location filter ───────────────────────────────────────────────────────────
+// Maps country codes to location string patterns we'd see from ATS APIs
+const COUNTRY_PATTERNS: Record<string, string[]> = {
+  US: ["united states", "usa", ", ca", ", ny", ", tx", ", fl", ", wa", ", il", ", ga",
+       ", ma", ", co", ", az", ", nc", ", oh", ", pa", ", nj", ", mi", ", mn", ", or",
+       "san francisco", "new york", "los angeles", "chicago", "austin", "seattle",
+       "boston", "denver", "atlanta", "miami", "dallas", "houston", "portland",
+       "remote, us", "remote - us", "us remote", "u.s.", "u.s.a"],
+  UK: ["united kingdom", "london", "manchester", "birmingham", "edinburgh", "bristol",
+       "leeds", "glasgow", ", uk", " uk ", "england", "scotland", "wales",
+       "remote, uk", "uk remote"],
+  CA: ["canada", "toronto", "vancouver", "montreal", "calgary", "ottawa",
+       ", on", ", bc", ", ab", ", qc", "remote, canada", "canada remote"],
+  AU: ["australia", "sydney", "melbourne", "brisbane", "perth", "adelaide",
+       ", nsw", ", vic", ", qld", ", wa", "remote, australia"],
+  DE: ["germany", "berlin", "munich", "hamburg", "frankfurt", "cologne", "münchen"],
+  FR: ["france", "paris", "lyon", "marseille"],
+  NL: ["netherlands", "amsterdam", "rotterdam", "the hague"],
+  REMOTE: ["remote", "anywhere", "worldwide", "global", "work from anywhere"],
+};
+
+function matchesCountryFilter(location: string, countryList: string[]): boolean {
+  // No filter = accept everything
+  if (countryList.length === 0) return true;
+
+  const loc = location.toLowerCase().trim();
+
+  // Empty location — be permissive, don't discard
+  if (!loc) return true;
+
+  for (const country of countryList) {
+    const patterns = COUNTRY_PATTERNS[country] || [];
+
+    // Remote is always included if "REMOTE" in list or if any other country + remote
+    if (country === "REMOTE" && COUNTRY_PATTERNS.REMOTE.some(p => loc.includes(p))) return true;
+
+    // Check country-specific patterns
+    if (patterns.some(p => loc.includes(p))) return true;
+  }
+
+  return false;
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 export async function researchNewJobs(count?: number, userId: number = 1): Promise<GeneratedJob[]> {
   const db = await getDb();
@@ -354,6 +398,7 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
 
   const targetRoles = config?.targetRoles?.toString() || "";
   const targetCategories = config?.targetCategories?.toString() || "";
+  const targetCountries = ((config as any)?.targetCountries || "US").toString().trim();
 
   if (!targetRoles.trim()) {
     console.log("[JobResearch] No target roles configured — upload a resume in Settings.");
@@ -361,7 +406,10 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
   }
 
   const requestedCount = Math.min(count || config?.rolesPerDay || 10, 30);
-  console.log(`[JobResearch] Starting research — ${requestedCount} jobs for: ${targetRoles}`);
+  const countryList = targetCountries
+    ? targetCountries.split(",").map((c: string) => c.trim().toUpperCase()).filter(Boolean)
+    : [];
+  console.log(`[JobResearch] Starting research — ${requestedCount} jobs for: ${targetRoles} | Countries: ${countryList.length ? countryList.join(", ") : "All"}`);
 
   // Load candidate profile from parsed resume for fit scoring
   const parsedResume = (config as any)?.lastDocumentParsed || null;
@@ -394,6 +442,12 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
       console.log(`[JobResearch] ${company.name} (${company.ats}): ${raw.length} jobs fetched`);
     }
     for (const job of raw) {
+      // Apply country filter — skip jobs not in the user's selected countries
+      const jobLocation = (job as any).location || "";
+      if (!matchesCountryFilter(jobLocation, countryList)) {
+        console.log(`[JobResearch] Skipping ${company.name} "${job.title}" — location "${jobLocation}" outside [${countryList.join(",")}]`);
+        continue;
+      }
       allRawJobs.push({
         ...job,
         companyName: company.name,
