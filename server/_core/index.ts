@@ -273,6 +273,36 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+  // ── Account deletion ────────────────────────────────────────────────────────
+  app.delete("/api/account", async (req: any, res: any) => {
+    try {
+      const authHeader = req.headers.authorization || "";
+      const token = authHeader.replace("Bearer ", "").trim();
+      if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+      const { verifySessionToken } = await import("./auth");
+      const userPayload = await verifySessionToken(token);
+      if (!userPayload) { res.status(401).json({ error: "Invalid session" }); return; }
+      const userId = userPayload.userId;
+
+      const db = await import("../db").then(m => m.getDb());
+      if (!db) { res.status(500).json({ error: "Database unavailable" }); return; }
+
+      const { users, researchConfig, companies } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+
+      await db.delete(companies).where(eq(companies.userId, userId));
+      await db.delete(researchConfig).where(eq(researchConfig.userId, userId));
+      await db.delete(users).where(eq(users.id, userId));
+
+      console.log(`[MyCareerIQ] Account deleted for userId ${userId} (${userPayload.email})`);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("[MyCareerIQ] Account deletion failed:", err);
+      res.status(500).json({ error: "Deletion failed — contact bryan@reviveiqi.com" });
+    }
+  });
+
   registerStorageProxy(app);
   registerAuthRoutes(app);
   registerResumeIQRoutes(app);

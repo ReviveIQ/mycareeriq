@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
 import { CategorySelector } from "@/components/CategorySelector";
 import { Button } from "@/components/ui/button";
@@ -458,6 +459,60 @@ export default function ResearchSettings({ onRunNow }: ResearchSettingsProps = {
           </div>
         </div>
       </Card>
+
+      {/* Account — Danger Zone */}
+      <Card className="border-red-100 bg-red-50/30 p-6">
+        <h3 className="font-semibold text-slate-900 mb-1">Danger Zone</h3>
+        <p className="text-xs text-slate-500 mb-4">Permanently delete your account and all pipeline data. This cannot be undone.</p>
+        <DeleteAccountSection />
+      </Card>
     </div>
+  );
+}
+
+function DeleteAccountSection() {
+  const [step, setStep] = React.useState<"idle" | "confirm" | "deleting">("idle");
+  const { logout } = useAuth();
+
+  const handleDelete = async () => {
+    setStep("deleting");
+    try {
+      const token = localStorage.getItem("reviveiq_auth_token");
+      const res = await fetch("/api/account", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        localStorage.removeItem("reviveiq_auth_token");
+        logout();
+        window.location.href = "/";
+      } else {
+        alert("Deletion failed — please email bryan@reviveiqi.com");
+        setStep("idle");
+      }
+    } catch {
+      alert("Deletion failed — please email bryan@reviveiqi.com");
+      setStep("idle");
+    }
+  };
+
+  if (step === "confirm") return (
+    <div className="flex items-center gap-3 flex-wrap">
+      <span className="text-sm text-red-600 font-medium">Are you sure? This cannot be undone.</span>
+      <button onClick={handleDelete} className="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors">
+        Yes, delete my account
+      </button>
+      <button onClick={() => setStep("idle")} className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+        Cancel
+      </button>
+    </div>
+  );
+
+  if (step === "deleting") return <span className="text-sm text-slate-500">Deleting account…</span>;
+
+  return (
+    <button onClick={() => setStep("confirm")} className="px-4 py-2 text-sm font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors">
+      Delete My Account
+    </button>
   );
 }

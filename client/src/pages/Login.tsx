@@ -390,6 +390,8 @@ export default function Login({ onSuccess }: LoginProps) {
         <p style={{ fontSize: "11px", color: "#334155", textAlign: "center", marginTop: "32px", lineHeight: "1.6" }}>
           By continuing you agree to ReviveIQI's{" "}
           <a href="/privacy" style={{ color: "#475569", textDecoration: "underline" }}>Privacy Policy</a>
+          <span style={{ color: "#334155", margin: "0 6px" }}>·</span>
+          <a href="/terms" style={{ color: "#475569", textDecoration: "underline" }}>Terms of Service</a>
         </p>
       </div>
     </div>

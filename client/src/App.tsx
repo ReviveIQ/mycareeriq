@@ -2,6 +2,7 @@ import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
+import TermsOfService from "@/pages/TermsOfService";
 import WorkspaceSettings from "@/pages/WorkspaceSettings";
 import Login from "@/pages/Login";
 import { Route, Switch } from "wouter";
@@ -33,6 +34,7 @@ function Router() {
       <Route path={"/resumeiq"} component={ResumeIQ} />
       <Route path={"/workspace/settings"} component={WorkspaceSettings} />
       <Route path={"/privacy"} component={PrivacyPolicy} />
+      <Route path={"/terms"} component={TermsOfService} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>
