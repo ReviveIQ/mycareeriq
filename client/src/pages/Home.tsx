@@ -383,9 +383,9 @@ export default function Home() {
     <div className="min-h-screen bg-[#fafaf9] font-sans">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div className="max-w-screen-xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <svg viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width:"34px",height:"34px",flexShrink:0}}>
+        <div className="max-w-screen-xl mx-auto px-3 sm:px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <svg viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width:"30px",height:"30px",flexShrink:0}}>
               <defs>
                 <linearGradient id="h-lg1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#60a5fa"/><stop offset="100%" stopColor="#2563eb"/></linearGradient>
                 <linearGradient id="h-lg2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#93c5fd"/><stop offset="100%" stopColor="#3b82f6"/></linearGradient>
@@ -403,11 +403,11 @@ export default function Home() {
               <circle cx="36" cy="36" r="3" fill="#93c5fd"/>
             </svg>
             <div>
-              <h1 className="text-[15px] leading-tight tracking-tight" style={{fontFamily:"'Montserrat',sans-serif",fontWeight:800}}>
+              <h1 className="text-[14px] sm:text-[15px] leading-tight tracking-tight" style={{fontFamily:"'Montserrat',sans-serif",fontWeight:800}}>
                 <span style={{color:"#0f172a"}}>MyCareer</span><span style={{color:"#2563eb"}}>IQ</span>
-                <span style={{color:"#64748b",fontWeight:500,fontSize:"13px"}}> — Job Search Pipeline</span>
+                <span className="hidden sm:inline" style={{color:"#64748b",fontWeight:500,fontSize:"13px"}}> — Job Search Pipeline</span>
               </h1>
-              <p className="text-xs leading-tight" style={{color:"#64748b",fontFamily:"'DM Sans',sans-serif"}}>
+              <p className="hidden sm:block text-xs leading-tight" style={{color:"#64748b",fontFamily:"'DM Sans',sans-serif"}}>
                 by ReviveIQI · AI-Powered · Track & Apply
               </p>
             </div>
@@ -507,7 +507,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="max-w-screen-xl mx-auto px-6 py-6 space-y-6">
+      <main className="max-w-screen-xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
         <h2 className="text-2xl font-bold text-slate-900 mb-4">Pipeline Overview</h2>
         {/* KPI Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -556,34 +556,31 @@ export default function Home() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex gap-1 bg-slate-100 p-1 rounded-lg w-fit">
+        <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-lg w-max sm:w-fit min-w-full sm:min-w-0">
           {(["pipeline", "analytics", "generate", "history", "settings", "pricing"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
+              className={`px-3 sm:px-4 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all flex items-center gap-1 sm:gap-1.5 whitespace-nowrap ${
                 activeTab === tab
                   ? "bg-white text-indigo-700 shadow-sm"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              {tab === "pipeline" && "Pipeline Table"}
-              {tab === "analytics" && "Analytics"}
+              {tab === "pipeline" && <><span className="sm:hidden">📋</span><span className="hidden sm:inline">Pipeline Table</span></>}
+              {tab === "analytics" && <><span className="sm:hidden">📊</span><span className="hidden sm:inline">Analytics</span></>}
               {tab === "generate" && (
-                <>
-                  <FileText className="w-4 h-4" />
-                  Generate
-                </>
+                <><FileText className="w-3.5 h-3.5" /><span className="hidden sm:inline">Generate</span></>
               )}
-              {tab === "history" && "History"}
+              {tab === "history" && <><span className="sm:hidden">📁</span><span className="hidden sm:inline">History</span></>}
               {tab === "settings" && (
-                <>
-                  <Settings className="w-4 h-4" />
-                  Settings
-                </>
+                <><Settings className="w-3.5 h-3.5" /><span className="hidden sm:inline">Settings</span></>
               )}
+              {tab === "pricing" && <><span className="sm:hidden">⭐</span><span className="hidden sm:inline">Pricing</span></>}
             </button>
           ))}
+          </div>
         </div>
 
         {activeTab === "pipeline" && (
@@ -672,9 +669,9 @@ export default function Home() {
             )}
 
             {/* Filters */}
-            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-              <div className="flex flex-wrap gap-3 items-center">
-                <div className="relative flex-1 min-w-[200px]">
+            <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-4 shadow-sm">
+              <div className="flex flex-wrap gap-2 sm:gap-3 items-center">
+                <div className="relative flex-1 min-w-[140px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <Input
                     placeholder="Search company, role, contact..."
@@ -760,18 +757,18 @@ export default function Home() {
                       {[
                         { label: "#", field: null, w: "w-10" },
                         { label: "Company", field: "name" as SortField, w: "w-40" },
-                        { label: "Category", field: "category" as SortField, w: "w-44" },
-                        { label: "Role", field: "role" as SortField, w: "w-56" },
-                        { label: "Stage", field: "stage" as SortField, w: "w-28" },
-                        { label: "Priority", field: "priority" as SortField, w: "w-24" },
-                        { label: "Key Contact", field: null, w: "w-44" },
-                        { label: "Remote", field: null, w: "w-20" },
-                        { label: "Est. Comp.", field: null, w: "w-36" },
-                        { label: "Links", field: null, w: "w-24" },
+                        { label: "Category", field: "category" as SortField, w: "w-44", hide: "hidden sm:table-cell" },
+                        { label: "Role", field: "role" as SortField, w: "w-56", hide: "" },
+                        { label: "Stage", field: "stage" as SortField, w: "w-28", hide: "" },
+                        { label: "Priority", field: "priority" as SortField, w: "w-24", hide: "hidden md:table-cell" },
+                        { label: "Key Contact", field: null, w: "w-44", hide: "hidden lg:table-cell" },
+                        { label: "Remote", field: null, w: "w-20", hide: "hidden lg:table-cell" },
+                        { label: "Est. Comp.", field: null, w: "w-36", hide: "hidden xl:table-cell" },
+                        { label: "Links", field: null, w: "w-24", hide: "hidden md:table-cell" },
                       ].map((col) => (
                         <th
                           key={col.label}
-                          className={`${col.w} px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap ${
+                          className={`${col.w} ${col.hide} px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap ${
                             col.field ? "cursor-pointer hover:text-slate-900 select-none" : ""
                           }`}
                           onClick={() => col.field && handleSort(col.field)}
@@ -797,7 +794,7 @@ export default function Home() {
                             {company.name}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 hidden sm:table-cell">
                           <span
                             className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium ${
                               categoryColors[company.category as CompanyCategory] || "bg-slate-100 text-slate-700"
@@ -818,7 +815,7 @@ export default function Home() {
                             {company.stage}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 hidden md:table-cell">
                           <span
                             className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border ${
                               priorityColors[company.priority]
@@ -827,7 +824,7 @@ export default function Home() {
                             {company.priority}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 hidden lg:table-cell">
                           <div className="text-xs">
                             <p className="font-medium text-slate-800">{company.contactName}</p>
                             <p className="text-slate-500 text-[11px] leading-tight mt-0.5 max-w-[160px] truncate">
@@ -835,7 +832,7 @@ export default function Home() {
                             </p>
                           </div>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 hidden lg:table-cell">
                           {company.remoteOk ? (
                             <span className="inline-flex items-center gap-1 text-emerald-700 text-xs font-medium">
                               <MapPin className="w-3 h-3" /> Remote
@@ -844,10 +841,10 @@ export default function Home() {
                             <span className="text-slate-400 text-xs">Onsite</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">
+                        <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap hidden xl:table-cell">
                           {company.estSalary}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 hidden md:table-cell">
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                             <a
                               href={company.jobLink}
