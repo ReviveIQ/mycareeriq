@@ -115,6 +115,10 @@ export default function Home() {
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
   const verifySession = trpc.subscription.verifySession.useMutation();
+  const { data: coverLetterHistory = [] } = trpc.application.list.useQuery();
+  const coverLetterCompanyIds = new Set(
+    (coverLetterHistory as any[]).map((a: any) => String(a.companyId))
+  );
 
   // Handle Stripe redirect back after checkout
   useEffect(() => {
@@ -162,14 +166,34 @@ export default function Home() {
       toast.error("No LinkedIn profile found for this contact");
       return;
     }
-    // Open LinkedIn profile in new tab
     window.open(company.contactLinkedIn, "_blank");
-    // Auto-advance stage to Outreach
     try {
       await markOutreachSent.mutateAsync({ companyId: company.id });
       await utils.pipeline.getCompanies.invalidate();
       toast.success(`Stage updated to Outreach — message sent to ${company.contactName || "contact"} on LinkedIn`);
       setSelectedCompany(null);
+      // Nudge to generate cover letter while role is fresh
+      setTimeout(() => {
+        toast(`Ready to apply to ${(company as any).companyName || company.name}?`, {
+          description: "Generate a tailored cover letter while the role is fresh.",
+          action: {
+            label: "Generate →",
+            onClick: () => {
+              const rawDesc = (company as any).jobDescription || company.role || "";
+              const decoded = rawDesc.replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g," ").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim().slice(0,3000);
+              setGeneratePrefill({
+                companyName: (company as any).companyName || company.name,
+                jobTitle: company.role || (company as any).jobTitle || "",
+                jobDescription: decoded,
+                contactName: company.contactName || "Hiring Manager",
+                companyId: String(company.id),
+              });
+              setActiveTab("generate");
+            }
+          },
+          duration: 8000,
+        });
+      }, 1500);
     } catch (err) {
       console.error("Failed to update stage:", err);
     }
@@ -860,13 +884,38 @@ export default function Home() {
                                 href={company.contactLinkedIn}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                
                                 className="text-blue-600 hover:text-blue-800 transition-colors"
                                 title="Contact on LinkedIn"
                               >
                                 <Linkedin className="w-4 h-4" />
                               </a>
                             )}
+                            <button
+                              title={coverLetterCompanyIds.has(String(company.id)) ? "Cover letter generated ✓" : "Generate cover letter"}
+                              onClick={() => {
+                                const rawDesc = (company as any).jobDescription || company.role || "";
+                                const decoded = rawDesc
+                                  .replace(/&lt;/g,"<").replace(/&gt;/g,">")
+                                  .replace(/&amp;/g,"&").replace(/&quot;/g,'"')
+                                  .replace(/&#39;/g,"'").replace(/&nbsp;/g," ")
+                                  .replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim().slice(0,3000);
+                                setGeneratePrefill({
+                                  companyName: (company as any).companyName || company.name,
+                                  jobTitle: company.role || (company as any).jobTitle || "",
+                                  jobDescription: decoded,
+                                  contactName: company.contactName || "Hiring Manager",
+                                  companyId: String(company.id),
+                                });
+                                setActiveTab("generate");
+                              }}
+                              className={`transition-colors ${
+                                coverLetterCompanyIds.has(String(company.id))
+                                  ? "text-emerald-500 hover:text-emerald-700"
+                                  : "text-slate-300 hover:text-emerald-600"
+                              }`}
+                            >
+                              <FileText className="w-4 h-4" />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1177,6 +1226,36 @@ export default function Home() {
                   </div>
                 </div>
 
+                {/* Primary CTA — Generate Cover Letter */}
+                <button
+                  onClick={() => {
+                    const rawDesc = (selectedCompany as any).jobDescription || selectedCompany.role || "";
+                    const decoded = rawDesc
+                      .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+                      .replace(/&amp;/g, "&").replace(/&quot;/g, '"')
+                      .replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
+                      .replace(/<[^>]*>/g, " ")
+                      .replace(/\s+/g, " ").trim()
+                      .slice(0, 3000);
+                    setGeneratePrefill({
+                      companyName: (selectedCompany as any).companyName || selectedCompany.name,
+                      jobTitle: selectedCompany.role || (selectedCompany as any).jobTitle || "",
+                      jobDescription: decoded,
+                      contactName: selectedCompany.contactName || "Hiring Manager",
+                      companyId: String(selectedCompany.id),
+                    });
+                    setSelectedCompany(null);
+                    setActiveTab("generate");
+                  }}
+                  className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold h-10 px-4 rounded-lg transition-colors shadow-sm"
+                >
+                  <FileText className="w-4 h-4" />
+                  {coverLetterCompanyIds.has(String(selectedCompany.id))
+                    ? "✓ Cover Letter Generated — Edit or Re-download"
+                    : "Generate Cover Letter"}
+                </button>
+
+                {/* Secondary actions */}
                 <div className="flex gap-3 pt-1">
                   {selectedCompany.notes?.includes("GPT Research") ? (
                     <div className="flex-1">
@@ -1186,12 +1265,7 @@ export default function Home() {
                       </Button>
                     </div>
                   ) : (
-                    <a
-                      href={selectedCompany.jobLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1"
-                    >
+                    <a href={selectedCompany.jobLink} target="_blank" rel="noopener noreferrer" className="flex-1">
                       <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm h-9 gap-2">
                         <ExternalLink className="w-4 h-4" />
                         View Job Posting
@@ -1206,35 +1280,6 @@ export default function Home() {
                     Contact on LinkedIn
                   </button>
                 </div>
-
-                {/* Generate Cover Letter */}
-                <button
-                  onClick={() => {
-                    // Decode HTML entities from job description (stored as HTML in DB)
-                    const rawDesc = (selectedCompany as any).jobDescription || selectedCompany.role || "";
-                    const decoded = rawDesc
-                      .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-                      .replace(/&amp;/g, "&").replace(/&quot;/g, '"')
-                      .replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
-                      .replace(/<[^>]*>/g, " ") // strip HTML tags
-                      .replace(/\s+/g, " ").trim()
-                      .slice(0, 3000); // cap at 3000 chars for GPT
-
-                    setGeneratePrefill({
-                      companyName: (selectedCompany as any).companyName || selectedCompany.name,
-                      jobTitle: selectedCompany.role || (selectedCompany as any).jobTitle || "",
-                      jobDescription: decoded,
-                      contactName: selectedCompany.contactName || "Hiring Manager",
-                      companyId: String(selectedCompany.id),
-                    });
-                    setSelectedCompany(null);
-                    setActiveTab("generate");
-                  }}
-                  className="w-full flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-sm font-semibold h-9 px-3 rounded-md transition-colors"
-                >
-                  <FileText className="w-4 h-4" />
-                  Generate Cover Letter
-                </button>
               </div>
             </>
           )}
