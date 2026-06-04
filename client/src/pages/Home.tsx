@@ -556,7 +556,7 @@ export default function Home() {
               icon: <TrendingUp className="w-4 h-4 text-emerald-600" />,
               label: "Remote Roles",
               value: String(remoteCount),
-              sub: `${remoteCount} of 30 are remote-friendly`,
+              sub: `${remoteCount} of ${pipelineCompanies.length} are remote-friendly`,
               bg: "bg-emerald-50",
             },
             {
@@ -1056,7 +1056,7 @@ export default function Home() {
                   <Pie
                     data={[
                       { name: "Remote OK", value: remoteCount, color: "#10b981" },
-                      { name: "Onsite Required", value: 30 - remoteCount, color: "#94a3b8" },
+                      { name: "Onsite Required", value: Math.max(0, pipelineCompanies.length - remoteCount), color: "#94a3b8" },
                     ]}
                     cx="50%"
                     cy="50%"
