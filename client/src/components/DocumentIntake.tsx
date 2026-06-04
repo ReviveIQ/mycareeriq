@@ -45,8 +45,6 @@ export interface DocumentIntakeProps {
    */
   showApplyToPipeline?: boolean;
 
-  /** Optional workspace context (passed through to the backend). */
-  workspaceId?: number;
 
   /** Optional callback invoked after a successful parse. */
   onParsed?: (extracted: Record<string, unknown>) => void;
@@ -81,7 +79,6 @@ export function DocumentIntake({
   title = "Upload Resume",
   description = "Drag & drop your resume to auto-configure your pipeline.",
   showApplyToPipeline = true,
-  workspaceId,
   onParsed,
 }: DocumentIntakeProps) {
   const [isDragging, setIsDragging] = useState(false);

@@ -58,7 +58,6 @@ import GenerateApplication from "./GenerateApplication";
 import ApplicationHistory from "./ApplicationHistory";
 import ResearchSettings from "./ResearchSettings";
 import PricingPage from "./PricingPage";
-import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 
@@ -446,19 +445,6 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {/* Hide WorkspaceSwitcher + Team on mobile */}
-            <div className="hidden sm:flex items-center gap-2">
-              <WorkspaceSwitcher />
-              <Button
-                onClick={() => navigate("/workspace/settings")}
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs border-slate-200 text-slate-700 hover:bg-slate-50 gap-1.5"
-              >
-                <Settings className="w-3.5 h-3.5" />
-                Team
-              </Button>
-            </div>
 
             {/* Run Now — always visible */}
             <div className="flex flex-col items-center gap-0.5">

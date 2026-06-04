@@ -9,9 +9,6 @@ import { researchConfigRouter } from "./researchConfigRouter";
 import { emailLookupRouter } from "./emailLookupRouter";
 import { monitoringRouter } from "./monitoringRouter";
 import { pipelineRouter } from "./pipelineRouter";
-import { workspaceRouter } from "./workspaceRouter";
-import { workspaceMemberRouter } from "./workspaceMemberRouter";
-import { workspaceMigrationRouter } from "./workspaceMigrationRouter";
 import { documentIntakeRouter } from "./documentIntakeRouter";
 import { subscriptionRouter } from "./subscriptionRouter";
 
@@ -25,9 +22,6 @@ export const appRouter = router({
   emailLookup: emailLookupRouter,
   monitoring: monitoringRouter,
   pipeline: pipelineRouter,
-  workspace: workspaceRouter,
-  workspaceMember: workspaceMemberRouter,
-  workspaceMigration: workspaceMigrationRouter,
   documentIntake: documentIntakeRouter,
   subscription: subscriptionRouter,
   auth: router({

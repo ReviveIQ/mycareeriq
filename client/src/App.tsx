@@ -3,12 +3,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
-import WorkspaceSettings from "@/pages/WorkspaceSettings";
 import Login from "@/pages/Login";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { WorkspaceProvider } from "./contexts/WorkspaceContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Home from "./pages/Home";
 import ResumeIQ from "./pages/ResumeIQ";
@@ -32,7 +30,6 @@ function Router() {
     <Switch>
       <Route path={"/"} component={Home} />
       <Route path={"/resumeiq"} component={ResumeIQ} />
-      <Route path={"/workspace/settings"} component={WorkspaceSettings} />
       <Route path={"/privacy"} component={PrivacyPolicy} />
       <Route path={"/terms"} component={TermsOfService} />
       <Route path={"/404"} component={NotFound} />
@@ -46,12 +43,10 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
         <AuthProvider>
-          <WorkspaceProvider>
             <TooltipProvider>
               <Router />
               <Toaster />
             </TooltipProvider>
-          </WorkspaceProvider>
         </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>
