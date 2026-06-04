@@ -338,6 +338,26 @@ async function startServer() {
   registerAuthRoutes(app);
   registerResumeIQRoutes(app);
 
+  // ── Admin: reset run counter (for Pro users or testing) ──────────────────
+  app.post("/api/admin/reset-runs", async (req: any, res: any) => {
+    try {
+      const authHeader = req.headers.authorization || "";
+      const token = authHeader.replace("Bearer ", "").trim();
+      if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+      const { verifySessionToken } = await import("./auth");
+      const user = await verifySessionToken(token);
+      if (!user) { res.status(401).json({ error: "Invalid session" }); return; }
+      const db = await import("../db").then(m => m.getDb());
+      if (!db) { res.status(500).json({ error: "DB unavailable" }); return; }
+      const { sql } = await import("drizzle-orm");
+      await db.execute(sql`UPDATE researchConfig SET runsThisMonth = 0 WHERE userId = ${user.userId}`);
+      console.log(`[Admin] Run counter reset for userId ${user.userId}`);
+      res.json({ success: true, message: "Run counter reset to 0" });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ── Cross-app SSO handoff ─────────────────────────────────────────────────
   // Generates a short-lived signed token so a logged-in MyCareerIQ user can
   // be automatically signed into ResumeIQ without re-authenticating.
