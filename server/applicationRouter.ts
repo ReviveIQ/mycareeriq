@@ -25,7 +25,6 @@ export const applicationRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       try {
-        // Generate both documents
         const { coverLetter, tailoredResume } = await generateApplicationDocuments(
           input.companyName,
           input.jobTitle,
@@ -34,12 +33,48 @@ export const applicationRouter = router({
           ctx.user.id
         );
 
-        // Save to database as draft
         const db = await getDb();
-        if (!db) {
-          throw new Error("Database not available");
+        if (!db) throw new Error("Database not available");
+
+        // Auto-add to pipeline if not already there
+        // This way generating a cover letter from anywhere adds the job to the pipeline
+        const { companies } = await import("../drizzle/schema");
+        const { eq: eqOp, and } = await import("drizzle-orm");
+
+        const existing = await db.select({ id: companies.id })
+          .from(companies)
+          .where(and(
+            eqOp(companies.userId, ctx.user.id),
+            eqOp(companies.companyId, input.companyId)
+          ))
+          .limit(1);
+
+        let addedToPipeline = false;
+        if (existing.length === 0) {
+          // Not in pipeline yet — add it at Research stage
+          await db.insert(companies).values({
+            userId: ctx.user.id,
+            companyId: input.companyId,
+            companyName: input.companyName,
+            category: "Direct Apply",
+            jobTitle: input.jobTitle,
+            jobDescription: input.jobDescription,
+            jobLink: "",
+            contactName: input.contactName,
+            contactEmail: input.contactEmail || "",
+            linkedinUrl: "",
+            remote: false,
+            salary: "",
+            companySize: "",
+            priority: "Medium",
+            stage: "Research",
+            notes: "Added via cover letter generation",
+          });
+          addedToPipeline = true;
+          console.log(`[ApplicationRouter] Auto-added ${input.companyName} to pipeline for userId ${ctx.user.id}`);
         }
 
+        // Save cover letter to applications table
         await db.insert(applications).values({
           userId: ctx.user.id,
           companyId: input.companyId,
@@ -54,11 +89,10 @@ export const applicationRouter = router({
           companyProfile: input.companyName,
         });
 
-        // Get the inserted ID (most recent) - order by descending to get newest first
         const inserted = await db
           .select()
           .from(applications)
-          .where(eq(applications.userId, ctx.user.id))
+          .where(eqOp(applications.userId, ctx.user.id))
           .orderBy(desc(applications.createdAt))
           .limit(1);
 
@@ -67,6 +101,7 @@ export const applicationRouter = router({
           applicationId: inserted[0]?.id || 0,
           coverLetter,
           tailoredResume,
+          addedToPipeline,
         };
       } catch (error) {
         console.error("[ApplicationRouter] Generate error:", error);

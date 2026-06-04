@@ -28,6 +28,7 @@ export default function GenerateApplication({ prefill }: GenerateApplicationProp
   const [activeView, setActiveView] = useState<"generate" | "history">("generate");
 
   const generateMutation = trpc.application.generate.useMutation();
+  const utils = trpc.useUtils();
   const { data: history = [], refetch: refetchHistory } = trpc.application.list.useQuery();
   const { data: pipelineCompanies = [] } = trpc.pipeline.getCompanies.useQuery();
 
@@ -50,7 +51,12 @@ export default function GenerateApplication({ prefill }: GenerateApplicationProp
       setApplicationId(result.applicationId);
       setStep("generated");
       refetchHistory();
-      toast.success("Cover letter generated");
+      utils.pipeline.getCompanies.invalidate();
+      if (result.addedToPipeline) {
+        toast.success(`Cover letter generated — ${companyName} added to your pipeline`);
+      } else {
+        toast.success("Cover letter generated");
+      }
     } catch (err: any) {
       toast.error(err.message || "Failed to generate — please try again");
     } finally {
