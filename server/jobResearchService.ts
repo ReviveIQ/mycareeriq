@@ -521,10 +521,11 @@ function parseCountryFilter(raw: string): Record<string, string[]> {
  */
 function isUSLocation(loc: string): boolean {
   if (!loc.trim()) return true; // blank = pass
+  const locLower = loc.toLowerCase();
 
   // Check for known non-US indicators
   for (const indicator of NON_US_INDICATORS) {
-    if (loc.includes(indicator)) return false;
+    if (locLower.includes(indicator)) return false;
   }
 
   // If we got here, no non-US indicator found → treat as US
