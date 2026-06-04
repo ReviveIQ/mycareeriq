@@ -349,130 +349,148 @@ async function enrichContact(companyName: string, domain: string, jobTitle?: str
 }
 
 // ── Location filter ───────────────────────────────────────────────────────────
-// targetCountries format: "US:FL,CA,TX|UK|REMOTE"
-// - Pipe-separated country blocks
-// - Each block: "COUNTRYCODE" or "COUNTRYCODE:ST1,ST2,ST3"
-// - State codes match ", FL" / "(FL)" / "Florida" patterns in location strings
-// - Remote is always additive — included if REMOTE in list
+// INVERTED LOGIC: Block known non-US locations. Pass everything ambiguous.
+// Companies use inconsistent formats — there is no standard.
+// Instead of matching US patterns (endless), we identify clearly non-US and block those.
 
-const US_STATE_NAMES: Record<string, string> = {
-  AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",
-  CO: "Colorado", CT: "Connecticut", DE: "Delaware", FL: "Florida", GA: "Georgia",
-  HI: "Hawaii", ID: "Idaho", IL: "Illinois", IN: "Indiana", IA: "Iowa",
-  KS: "Kansas", KY: "Kentucky", LA: "Louisiana", ME: "Maine", MD: "Maryland",
-  MA: "Massachusetts", MI: "Michigan", MN: "Minnesota", MS: "Mississippi",
-  MO: "Missouri", MT: "Montana", NE: "Nebraska", NV: "Nevada", NH: "New Hampshire",
-  NJ: "New Jersey", NM: "New Mexico", NY: "New York", NC: "North Carolina",
-  ND: "North Dakota", OH: "Ohio", OK: "Oklahoma", OR: "Oregon", PA: "Pennsylvania",
-  RI: "Rhode Island", SC: "South Carolina", SD: "South Dakota", TN: "Tennessee",
-  TX: "Texas", UT: "Utah", VT: "Vermont", VA: "Virginia", WA: "Washington",
-  WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming", DC: "District of Columbia",
+// Known non-US country/city/region indicators
+const NON_US_INDICATORS = [
+  // Countries
+  "united kingdom","england","scotland","wales","britain",
+  "canada","australia","germany","france","netherlands","ireland",
+  "spain","italy","sweden","switzerland","india","singapore","japan",
+  "china","brazil","mexico","poland","czech republic","denmark",
+  "norway","finland","portugal","austria","belgium","israel",
+  "uae","south korea","taiwan","new zealand",
+  // Cities
+  "toronto","vancouver","montreal","calgary","sydney","melbourne",
+  "brisbane","perth","berlin","munich","hamburg","frankfurt","paris",
+  "lyon","amsterdam","rotterdam","dublin","madrid","barcelona",
+  "rome","milan","stockholm","zurich","bangalore","bengaluru",
+  "hyderabad","pune","mumbai","delhi","tokyo","osaka","beijing",
+  "shanghai","são paulo","sao paulo","mexico city","warsaw","prague",
+  "copenhagen","oslo","helsinki","lisbon","vienna","brussels",
+  "tel aviv","dubai","seoul","taipei","auckland","london","manchester",
+  "birmingham","edinburgh","bristol","leeds","glasgow",
+  // Regions
+  "emea","apac","latam","latin america","anz","dach",
+];
+
+// US state codes for state-level filtering
+const US_STATE_CODES = new Set([
+  "al","ak","az","ar","ca","co","ct","de","fl","ga","hi","id","il","in","ia",
+  "ks","ky","la","me","md","ma","mi","mn","ms","mo","mt","ne","nv","nh","nj",
+  "nm","ny","nc","nd","oh","ok","or","pa","ri","sc","sd","tn","tx","ut","vt",
+  "va","wa","wv","wi","wy","dc",
+]);
+
+const US_STATE_FULL_NAMES: Record<string, string> = {
+  fl: "florida", ca: "california", tx: "texas", ny: "new york", ga: "georgia",
+  nc: "north carolina", va: "virginia", pa: "pennsylvania", oh: "ohio",
+  il: "illinois", wa: "washington", co: "colorado", az: "arizona",
+  ma: "massachusetts", tn: "tennessee", md: "maryland", mn: "minnesota",
+  wi: "wisconsin", mo: "missouri", or: "oregon", nv: "nevada",
+  sc: "south carolina", al: "alabama", la: "louisiana", ky: "kentucky",
+  ok: "oklahoma", ct: "connecticut", ut: "utah", ia: "iowa",
+  ms: "mississippi", ar: "arkansas", ks: "kansas", nj: "new jersey",
+  ne: "nebraska", nm: "new mexico", id: "idaho", hi: "hawaii",
+  nh: "new hampshire", me: "maine", ri: "rhode island", mt: "montana",
+  de: "delaware", sd: "south dakota", nd: "north dakota", ak: "alaska",
+  vt: "vermont", wy: "wyoming", dc: "district of columbia",
 };
 
-const COUNTRY_KEYWORDS: Record<string, string[]> = {
-  US: ["united states", "usa", "u.s.", "u.s.a", "us remote", "remote, us", "remote - us", "remote - united states"],
-  UK: ["united kingdom", "london", "manchester", "birmingham", "edinburgh", "bristol", "leeds", ", uk", "uk remote", "england", "scotland", "wales"],
-  CA: ["canada", "toronto", "vancouver", "montreal", "calgary", "ottawa", "remote, canada"],
-  AU: ["australia", "sydney", "melbourne", "brisbane", "perth", "remote, australia"],
-  DE: ["germany", "berlin", "munich", "hamburg", "frankfurt"],
-  FR: ["france", "paris", "lyon", "marseille"],
-  NL: ["netherlands", "amsterdam", "rotterdam"],
-  REMOTE: ["remote", "anywhere", "worldwide", "global", "work from anywhere"],
-};
-
-/**
- * Parse the targetCountries string into a structured filter object.
- * Format examples:
- *   "US"              → { US: [], UK: [] } — all US locations
- *   "US:FL,CA,TX"     → { US: ["FL","CA","TX"] } — US, specific states
- *   "US:FL,CA|REMOTE" → { US: ["FL","CA"], REMOTE: [] }
- *   "UK|US:NY,CA"     → { UK: [], US: ["NY","CA"] }
- */
 function parseCountryFilter(raw: string): Record<string, string[]> {
   if (!raw?.trim()) return {};
   const result: Record<string, string[]> = {};
-  const blocks = raw.split("|").map(b => b.trim()).filter(Boolean);
+  const blocks = raw.split("|").map((b: string) => b.trim()).filter(Boolean);
   for (const block of blocks) {
     const [country, statesRaw] = block.split(":");
     const code = country.trim().toUpperCase();
-    const states = statesRaw
-      ? statesRaw.split(",").map(s => s.trim().toUpperCase()).filter(Boolean)
+    result[code] = statesRaw
+      ? statesRaw.split(",").map((s: string) => s.trim().toLowerCase()).filter(Boolean)
       : [];
-    result[code] = states;
   }
   return result;
 }
 
+/**
+ * Determine if a single location string represents a US location.
+ * INVERTED: assume US unless a clear non-US indicator is present.
+ */
+function isUSLocation(loc: string): boolean {
+  if (!loc.trim()) return true; // blank = pass
+
+  // Check for known non-US indicators
+  for (const indicator of NON_US_INDICATORS) {
+    if (loc.includes(indicator)) return false;
+  }
+
+  // If we got here, no non-US indicator found → treat as US
+  return true;
+}
+
+/**
+ * Check state-level filter within a US location.
+ * Remote/flexible roles always pass regardless of state filter.
+ */
+function matchesUSState(loc: string, states: string[]): boolean {
+  if (states.length === 0) return true;
+
+  // Remote roles are accessible from any state
+  if (
+    loc.includes("remote") || loc.includes("anywhere") ||
+    loc.includes("north america") || loc.includes("united states") ||
+    loc.includes("usa") || loc.includes("u.s.")
+  ) return true;
+
+  for (const state of states) { // state is already lowercase
+    // ", fl" pattern
+    if (loc.includes(`, ${state}`)) return true;
+    // "(fl)" pattern
+    if (loc.includes(`(${state}`)) return true;
+    // Full state name
+    const fullName = US_STATE_FULL_NAMES[state];
+    if (fullName && loc.includes(fullName)) return true;
+  }
+  return false;
+}
+
 function matchesCountryFilter(location: string, targetCountries: string): boolean {
   const filter = parseCountryFilter(targetCountries);
-  if (Object.keys(filter).length === 0) return true; // no filter = accept all
+  if (Object.keys(filter).length === 0) return true;
+
+  // Split semicolon/pipe-separated multi-location — if ANY part passes, whole location passes
+  const parts = location.split(/[;|]/).map((p: string) => p.trim()).filter(Boolean);
+  if (parts.length > 1) {
+    return parts.some(part => matchesCountryFilter(part, targetCountries));
+  }
 
   const loc = location.toLowerCase().trim();
-  if (!loc) return true; // empty location = permissive
-
-  // Handle semicolon or pipe-separated multi-location strings
-  // e.g. "San Francisco, CA; USA, Remote" or "Chicago, IL | New York, NY"
-  const locationParts = loc.split(/[;|]/).map(p => p.trim()).filter(Boolean);
-  // If any part matches, the whole location passes
-  if (locationParts.length > 1) {
-    return locationParts.some(part => matchesCountryFilter(part, targetCountries));
-  }
-
-  // Always allow remote if REMOTE is in filter
-  if (filter["REMOTE"] !== undefined) {
-    const remoteKeywords = COUNTRY_KEYWORDS["REMOTE"] || [];
-    if (remoteKeywords.some(k => loc.includes(k))) return true;
-  }
+  if (!loc) return true;
 
   for (const [country, states] of Object.entries(filter)) {
-    if (country === "REMOTE") continue;
 
-    // Check if location matches country
-    const countryKeywords = COUNTRY_KEYWORDS[country] || [];
-
-    // For US: state code is the primary signal — ", FL" or "(FL)" or "Florida"
-    if (country === "US") {
-      const isUSRemote =
-        loc === "remote" ||
-        loc.includes("remote - us") ||
-        loc.includes("us - remote") ||               // "US - Remote" (Asana)
-        loc.includes("remote - united states") ||
-        loc.includes("united states - remote") ||
-        loc.includes("remote u.s.") ||
-        loc.includes("remote us") ||
-        loc.includes("us remote") ||
-        loc.includes("usa, remote") ||
-        loc.includes("remote, usa") ||
-        loc.includes("remote, us") ||
-        loc.includes("north america") ||
-        loc.includes("usa remote") ||
-        (loc.includes("remote") && (loc.includes("united states") || loc.includes("u.s.") || loc.includes("usa")));
-
-      // Remote US roles are accessible from any state — always pass when US is selected
-      if (isUSRemote) return true;
-
-      const isUS = countryKeywords.some(k => loc.includes(k)) ||
-        /,\s*[a-z]{2}(\s|$|\()/.test(loc);
-
-      if (!isUS) continue;
-
-      // If no state filter, any US location passes
-      if (states.length === 0) return true;
-
-      // Check state codes: ", FL" or "(FL)" or full name "Florida"
-      for (const state of states) {
-        const stateName = (US_STATE_NAMES[state] || "").toLowerCase();
-        if (loc.includes(`, ${state.toLowerCase()}`)) return true;
-        if (loc.includes(`(${state.toLowerCase()}`)) return true;
-        if (stateName && loc.includes(stateName)) return true;
-        if (loc.includes(`remote, ${state.toLowerCase()}`) ||
-            loc.includes(`${state.toLowerCase()} remote`)) return true;
-      }
+    if (country === "REMOTE") {
+      if (loc.includes("remote") || loc.includes("anywhere") || loc.includes("worldwide")) return true;
       continue;
     }
 
-    // Non-US countries — keyword match
-    if (countryKeywords.some(k => loc.includes(k))) return true;
+    if (country === "US") {
+      if (isUSLocation(loc) && matchesUSState(loc, states)) return true;
+      continue;
+    }
+
+    // Non-US countries
+    const countryKeywords: Record<string, string[]> = {
+      UK: ["united kingdom","england","scotland","wales","london","manchester","birmingham",", uk"],
+      CA: ["canada","toronto","vancouver","montreal","calgary"],
+      AU: ["australia","sydney","melbourne","brisbane","perth"],
+      DE: ["germany","berlin","munich","hamburg","frankfurt"],
+      FR: ["france","paris","lyon"],
+      NL: ["netherlands","amsterdam"],
+    };
+    const keywords = countryKeywords[country] || [];
+    if (keywords.some((k: string) => loc.includes(k))) return true;
   }
 
   return false;
