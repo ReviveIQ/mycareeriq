@@ -155,7 +155,8 @@ export default function Home() {
   const { data: pipelineData = [], isLoading } = trpc.pipeline.getCompanies.useQuery();
   const { data: companyCount = 0 } = trpc.pipeline.getCompanyCount.useQuery();
   const { data: highPriorityCount = 0 } = trpc.pipeline.getHighPriority.useQuery();
-  const { data: remoteCount = 0 } = trpc.pipeline.getRemoteCount.useQuery();
+  // Compute remoteCount from pipelineData — single source of truth, always in sync
+  const remoteCount = pipelineData.filter((c: any) => c.remoteOk || c.remote).length;
   const runResearch = trpc.monitoring.runNow.useMutation();
   const markOutreachSent = trpc.pipeline.markOutreachSent.useMutation();
   const markApplied = trpc.pipeline.markApplied.useMutation();
