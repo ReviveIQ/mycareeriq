@@ -41,10 +41,10 @@ export const VERIFIED_GREENHOUSE: VerifiedCompany[] = [
   // Sales Enablement
   { name: "Seismic", domain: "seismic.com", ats: "greenhouse", slug: "seismicsoftware", category: "Sales Enablement" },
   { name: "Highspot", domain: "highspot.com", ats: "ashby", slug: "highspot", category: "Sales Enablement" },
-  { name: "Mindtickle", domain: "mindtickle.com", ats: "greenhouse", slug: "mindtickle", category: "Sales Enablement" },
+  { name: "Mindtickle", domain: "mindtickle.com", ats: "ashby", slug: "mindtickle", category: "Sales Enablement" },
   // Showpad — all roles Chicago/Boston/London/Pune, zero FL yield
   // { name: "Showpad", category: "Sales Enablement" },
-  { name: "Allego", domain: "allego.com", ats: "greenhouse", slug: "allego", category: "Sales Enablement" },
+  { name: "Allego", domain: "allego.com", ats: "ashby", slug: "allego", category: "Sales Enablement" },
   { name: "WorkRamp", domain: "workramp.com", ats: "greenhouse", slug: "workramp2", category: "Sales Enablement" },
   { name: "Spekit", domain: "spekit.com", ats: "ashby", slug: "spekit", category: "Sales Enablement" },
 
@@ -81,7 +81,7 @@ export const VERIFIED_GREENHOUSE: VerifiedCompany[] = [
   // { name: "Remote", domain: "remote.com", ats: "greenhouse", slug: "remotecom", category: "HR Technology" },
 
   // Legal & Compliance
-  { name: "Ironclad", domain: "ironcladapp.com", ats: "greenhouse", slug: "ironclad", category: "Legal Tech" },
+  { name: "Ironclad", domain: "ironcladapp.com", ats: "ashby", slug: "ironclad", category: "Legal Tech" },
 
   // Procurement & Finance
   { name: "Vendr", domain: "vendr.com", ats: "greenhouse", slug: "vendr", category: "B2B SaaS" },
@@ -159,7 +159,6 @@ export const VERIFIED_ASHBY: VerifiedCompany[] = [
   { name: "Chorus.ai", domain: "chorus.ai", ats: "ashby", slug: "chorus", category: "Revenue Intelligence" },
   { name: "Salesloft", domain: "salesloft.com", ats: "greenhouse", slug: "salesloft", category: "Sales Engagement" },
   { name: "Mixmax", domain: "mixmax.com", ats: "greenhouse", slug: "mixmax", category: "Sales Engagement" },
-  { name: "Lusha", domain: "lusha.com", ats: "ashby", slug: "lusha", category: "Sales Intelligence" },
   { name: "Cognism", domain: "cognism.com", ats: "greenhouse", slug: "cognism", category: "Sales Intelligence" },
 ];
 

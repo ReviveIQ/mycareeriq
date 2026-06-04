@@ -433,17 +433,19 @@ function matchesCountryFilter(location: string, targetCountries: string): boolea
     // For US: state code is the primary signal — ", FL" or "(FL)" or "Florida"
     if (country === "US") {
       const isUSRemote =
-        loc === "remote" ||                          // bare "Remote" — assume US
+        loc === "remote" ||
         loc.includes("remote - us") ||
+        loc.includes("us - remote") ||               // "US - Remote" (Asana)
         loc.includes("remote - united states") ||
+        loc.includes("united states - remote") ||
         loc.includes("remote u.s.") ||
         loc.includes("remote us") ||
         loc.includes("us remote") ||
-        loc.includes("usa, remote") ||               // "USA, Remote"
-        loc.includes("remote, usa") ||               // "Remote, USA"
+        loc.includes("usa, remote") ||
+        loc.includes("remote, usa") ||
         loc.includes("remote, us") ||
-        loc.includes("north america") ||             // North America includes US
-        loc.includes("usa remote") ||                // "USA Remote"
+        loc.includes("north america") ||
+        loc.includes("usa remote") ||
         (loc.includes("remote") && (loc.includes("united states") || loc.includes("u.s.") || loc.includes("usa")));
 
       // Remote US roles are accessible from any state — always pass when US is selected

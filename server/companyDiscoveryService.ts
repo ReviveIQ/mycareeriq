@@ -147,7 +147,7 @@ async function discoverCompaniesFromProfile(
       messages: [
         {
           role: "system",
-          content: "You are a career advisor identifying target companies for a job candidate. Return only valid JSON. No markdown.",
+          content: "You are a career advisor. You MUST return ONLY a valid JSON array. No markdown code blocks, no backticks, no explanation text before or after. Start your response with [ and end with ].",
         },
         {
           role: "user",
@@ -207,8 +207,9 @@ Return ONLY the JSON array.`,
     const parsed = JSON.parse(text);
     console.log(`[CompanyDiscovery] GPT suggested ${parsed.length} companies based on resume profile`);
     return Array.isArray(parsed) ? parsed : [];
-  } catch {
+  } catch (err) {
     console.warn("[CompanyDiscovery] Failed to parse GPT company suggestions");
+    console.warn(`[CompanyDiscovery] GPT raw response (first 500): ${text.slice(0, 500)}`);
     return [];
   }
 }
