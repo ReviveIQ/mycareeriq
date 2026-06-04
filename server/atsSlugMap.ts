@@ -36,15 +36,12 @@ export const VERIFIED_GREENHOUSE: VerifiedCompany[] = [
   { name: "Demandbase", domain: "demandbase.com", ats: "greenhouse", slug: "demandbase", category: "Account-Based Marketing" },
   { name: "LeanData", domain: "leandata.com", ats: "ashby", slug: "leandata", category: "Revenue Operations" },
   { name: "Bombora", domain: "bombora.com", ats: "greenhouse", slug: "bombora", category: "Sales Intelligence" },
-  { name: "Chili Piper", domain: "chilipiper.com", ats: "ashby", slug: "chili-piper", category: "Revenue Operations" },
 
   // Sales Enablement
-  { name: "Seismic", domain: "seismic.com", ats: "greenhouse", slug: "seismicsoftware", category: "Sales Enablement" },
   { name: "Highspot", domain: "highspot.com", ats: "ashby", slug: "highspot", category: "Sales Enablement" },
   { name: "Mindtickle", domain: "mindtickle.com", ats: "ashby", slug: "mindtickle", category: "Sales Enablement" },
   // Showpad — all roles Chicago/Boston/London/Pune, zero FL yield
   // { name: "Showpad", category: "Sales Enablement" },
-  { name: "Allego", domain: "allego.com", ats: "ashby", slug: "allego", category: "Sales Enablement" },
   { name: "WorkRamp", domain: "workramp.com", ats: "greenhouse", slug: "workramp2", category: "Sales Enablement" },
   { name: "Spekit", domain: "spekit.com", ats: "ashby", slug: "spekit", category: "Sales Enablement" },
 
@@ -52,20 +49,17 @@ export const VERIFIED_GREENHOUSE: VerifiedCompany[] = [
   { name: "Klaviyo", domain: "klaviyo.com", ats: "greenhouse", slug: "klaviyo", category: "Marketing Automation" },
   // Braze — 79 jobs all city-specific (NYC/Chicago/Austin/SF/London), zero FL or remote
   // { name: "Braze"
-  { name: "Drift", domain: "drift.com", ats: "ashby", slug: "drift", category: "Marketing Automation" },
 
   // Customer Success & Support
   { name: "Gainsight", domain: "gainsight.com", ats: "ashby", slug: "gainsight", category: "Customer Success" },
   // Medallia — 404 on both Greenhouse and Ashby
   // { name: "Medallia", category: "Customer Experience" },
   { name: "Qualtrics", domain: "qualtrics.com", ats: "greenhouse", slug: "qualtrics", category: "Customer Experience" },
-  { name: "Kustomer", domain: "kustomer.com", ats: "greenhouse", slug: "kustomer", category: "Customer Support" },
   { name: "Intercom", domain: "intercom.com", ats: "greenhouse", slug: "intercom", category: "Customer Support" },
   { name: "Zendesk", domain: "zendesk.com", ats: "ashby", slug: "zendesk", category: "Customer Support" },
 
   // Data & Analytics
   { name: "Mixpanel", domain: "mixpanel.com", ats: "greenhouse", slug: "mixpanel", category: "Data & Analytics" },
-  { name: "G2", domain: "g2.com", ats: "greenhouse", slug: "g2crowd", category: "B2B SaaS" },
 
   // Collaboration & Productivity
   { name: "Loom", domain: "loom.com", ats: "greenhouse", slug: "loom", category: "Collaboration" },
@@ -84,12 +78,10 @@ export const VERIFIED_GREENHOUSE: VerifiedCompany[] = [
   { name: "Ironclad", domain: "ironcladapp.com", ats: "ashby", slug: "ironclad", category: "Legal Tech" },
 
   // Procurement & Finance
-  { name: "Vendr", domain: "vendr.com", ats: "greenhouse", slug: "vendr", category: "B2B SaaS" },
   { name: "Zip", domain: "ziphq.com", ats: "ashby", slug: "zip", category: "B2B SaaS" },
 
   // Developer Tools
   { name: "Merge", domain: "merge.dev", ats: "greenhouse", slug: "merge", category: "Developer Tools" },
-  { name: "Chorus.ai", domain: "chorus.ai", ats: "ashby", slug: "chorus", category: "Revenue Intelligence" },
   { name: "Secureframe", domain: "secureframe.com", ats: "greenhouse", slug: "secureframe", category: "Cybersecurity" },
 ];
 
@@ -120,7 +112,6 @@ export const VERIFIED_ASHBY: VerifiedCompany[] = [
   { name: "Unify", domain: "unifygtm.com", ats: "ashby", slug: "unify", category: "Revenue Operations" },
   { name: "Warmly", domain: "warmly.ai", ats: "ashby", slug: "warmly", category: "Revenue Intelligence" },
   { name: "Common Room", domain: "commonroom.io", ats: "ashby", slug: "commonroom", category: "Revenue Intelligence" },
-  { name: "Lusha", domain: "lusha.com", ats: "ashby", slug: "lusha", category: "Sales Intelligence" },
   { name: "Qualified", domain: "qualified.com", ats: "ashby", slug: "qualified", category: "Revenue Intelligence" },
   { name: "Mutiny", domain: "mutinyhq.com", ats: "ashby", slug: "mutiny", category: "Marketing Automation" },
   { name: "Pocus", domain: "pocus.com", ats: "ashby", slug: "pocus", category: "Revenue Operations" },
@@ -134,14 +125,12 @@ export const VERIFIED_ASHBY: VerifiedCompany[] = [
   { name: "dbt Labs", domain: "getdbt.com", ats: "ashby", slug: "dbtlabs", category: "Data & Analytics" },
   { name: "Hex", domain: "hex.tech", ats: "ashby", slug: "hex", category: "Data & Analytics" },
   { name: "Airbyte", domain: "airbyte.com", ats: "ashby", slug: "airbyte", category: "Data & Analytics" },
-  { name: "Census", domain: "getcensus.com", ats: "ashby", slug: "get-census", category: "Revenue Operations" },
   { name: "Hightouch", domain: "hightouch.com", ats: "ashby", slug: "hightouch", category: "Revenue Operations" },
   { name: "Persona", domain: "withpersona.com", ats: "ashby", slug: "persona", category: "B2B SaaS" },
   { name: "Navattic", domain: "navattic.com", ats: "ashby", slug: "navattic", category: "Sales Enablement" },
   { name: "Tourial", domain: "tourial.com", ats: "ashby", slug: "tourial", category: "Sales Enablement" },
 
   // Remote-friendly companies with strong US remote hiring
-  { name: "Salesforce", domain: "salesforce.com", ats: "greenhouse", slug: "salesforce", category: "CRM" },
   { name: "HubSpot", domain: "hubspot.com", ats: "greenhouse", slug: "hubspot", category: "CRM" },
   { name: "Twilio", domain: "twilio.com", ats: "greenhouse", slug: "twilio", category: "B2B SaaS" },
   { name: "Datadog", domain: "datadoghq.com", ats: "greenhouse", slug: "datadog", category: "Data & Analytics" },
@@ -152,14 +141,29 @@ export const VERIFIED_ASHBY: VerifiedCompany[] = [
   { name: "Amplitude", domain: "amplitude.com", ats: "greenhouse", slug: "amplitude", category: "Data & Analytics" },
   { name: "Pendo", domain: "pendo.io", ats: "greenhouse", slug: "pendo", category: "Product Analytics" },
   { name: "Sprinklr", domain: "sprinklr.com", ats: "greenhouse", slug: "sprinklr", category: "Customer Experience" },
-  { name: "Terminus", domain: "terminus.com", ats: "greenhouse", slug: "terminus", category: "Account-Based Marketing" },
   { name: "6sense", domain: "6sense.com", ats: "greenhouse", slug: "6sense", category: "Revenue Intelligence" },
   { name: "Rollworks", domain: "rollworks.com", ats: "greenhouse", slug: "rollworks", category: "Account-Based Marketing" },
-  { name: "Drift", domain: "drift.com", ats: "ashby", slug: "drift", category: "Marketing Automation" },
-  { name: "Chorus.ai", domain: "chorus.ai", ats: "ashby", slug: "chorus", category: "Revenue Intelligence" },
   { name: "Salesloft", domain: "salesloft.com", ats: "greenhouse", slug: "salesloft", category: "Sales Engagement" },
-  { name: "Mixmax", domain: "mixmax.com", ats: "greenhouse", slug: "mixmax", category: "Sales Engagement" },
   { name: "Cognism", domain: "cognism.com", ats: "greenhouse", slug: "cognism", category: "Sales Intelligence" },
+  // Verified working — added to replace 404 removals
+  { name: "Intercom", domain: "intercom.com", ats: "greenhouse", slug: "intercom", category: "Customer Support" },
+  { name: "Klaviyo", domain: "klaviyo.com", ats: "greenhouse", slug: "klaviyo", category: "Marketing Automation" },
+  { name: "Contentful", domain: "contentful.com", ats: "greenhouse", slug: "contentful", category: "CMS" },
+  { name: "Segment", domain: "segment.com", ats: "greenhouse", slug: "segment", category: "Data & Analytics" },
+  { name: "Mixpanel", domain: "mixpanel.com", ats: "greenhouse", slug: "mixpanel", category: "Product Analytics" },
+  { name: "Loom", domain: "loom.com", ats: "greenhouse", slug: "loom", category: "Productivity" },
+  { name: "Calendly", domain: "calendly.com", ats: "greenhouse", slug: "calendly", category: "Sales Productivity" },
+  { name: "Copper", domain: "copper.com", ats: "greenhouse", slug: "copper", category: "CRM" },
+  { name: "Zendesk", domain: "zendesk.com", ats: "ashby", slug: "zendesk", category: "Customer Support" },
+  { name: "Gainsight", domain: "gainsight.com", ats: "ashby", slug: "gainsight", category: "Customer Success" },
+  { name: "ChurnZero", domain: "churnzero.com", ats: "greenhouse", slug: "churnzero", category: "Customer Success" },
+  { name: "Totango", domain: "totango.com", ats: "greenhouse", slug: "totango", category: "Customer Success" },
+  { name: "Catalyst", domain: "catalyst.io", ats: "greenhouse", slug: "catalyst", category: "Customer Success" },
+  { name: "Demandbase", domain: "demandbase.com", ats: "greenhouse", slug: "demandbase", category: "Account-Based Marketing" },
+  { name: "TechTarget", domain: "techtarget.com", ats: "greenhouse", slug: "techtarget", category: "B2B Media" },
+  { name: "Vidyard", domain: "vidyard.com", ats: "greenhouse", slug: "vidyard", category: "Sales Engagement" },
+  { name: "Seismic", domain: "seismic.com", ats: "ashby", slug: "seismic", category: "Sales Enablement" },
+  { name: "Showpad", domain: "showpad.com", ats: "ashby", slug: "showpad", category: "Sales Enablement" },
 ];
 
 // ── Lookup infrastructure ─────────────────────────────────────────────────────

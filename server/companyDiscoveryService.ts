@@ -205,7 +205,14 @@ Return ONLY the JSON array. Start with [ end with ].`,
     .replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
 
   try {
-    const parsed = JSON.parse(text);
+    // Extract JSON array — find first [ and last ] to handle any preamble/postamble
+    const firstBracket = text.indexOf("[");
+    const lastBracket = text.lastIndexOf("]");
+    if (firstBracket === -1 || lastBracket === -1) {
+      throw new Error("No JSON array found in response");
+    }
+    const jsonStr = text.slice(firstBracket, lastBracket + 1);
+    const parsed = JSON.parse(jsonStr);
     console.log(`[CompanyDiscovery] GPT suggested ${parsed.length} companies based on resume profile`);
     return Array.isArray(parsed) ? parsed : [];
   } catch (err) {

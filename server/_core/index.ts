@@ -290,12 +290,6 @@ async function startServer() {
               .set(result.updates as any)
               .where(eq(users.id, result.userId));
             console.log(`[Stripe] Updated user ${result.userId}: plan=${result.updates.plan}, status=${result.updates.planStatus}`);
-
-            const { researchConfig } = await import("../../drizzle/schema");
-            const newLimit = result.updates.plan === "pro" ? 9999 : 3;
-            await db.update(researchConfig)
-              .set({ monthlyRunLimit: newLimit } as any)
-              .where(eq(researchConfig.userId, result.userId));
           }
         }
 
