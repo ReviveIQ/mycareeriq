@@ -73,9 +73,24 @@ export const monitoringRouter = router({
     const userRows = await db.execute(
       sql`SELECT plan, planStatus, planExpiresAt FROM users WHERE id = ${userId} LIMIT 1`
     ) as any;
-    const userRow = Array.isArray(userRows) ? userRows[0] : (userRows?.rows?.[0] ?? null);
+
+    // TiDB via mysql2 returns [rows[], fields[]] — rows are in result[0]
+    let userRow: any = null;
+    if (Array.isArray(userRows) && Array.isArray(userRows[0])) {
+      userRow = userRows[0][0] ?? null; // mysql2 format: [rows[], fields[]]
+    } else if (Array.isArray(userRows)) {
+      userRow = userRows[0] ?? null;
+    } else {
+      userRow = userRows?.rows?.[0] ?? null;
+    }
+
     const { isPro } = await import("./stripeService");
-    const userIsPro = isPro({ plan: userRow?.plan, planStatus: userRow?.planStatus, planExpiresAt: userRow?.planExpiresAt ? new Date(userRow.planExpiresAt) : null });
+    const userIsPro = isPro({
+      plan: userRow?.plan,
+      planStatus: userRow?.planStatus,
+      planExpiresAt: userRow?.planExpiresAt ? new Date(userRow.planExpiresAt) : null
+    });
+    console.log(`[MonitoringRouter] User ${userId} plan=${userRow?.plan} status=${userRow?.planStatus} isPro=${userIsPro}`);
 
     const lastRunAt = row?.lastRunAt ? new Date(row.lastRunAt) : null;
     const runsThisMonth = Number(row?.runsThisMonth ?? 0);
@@ -171,12 +186,40 @@ export const monitoringRouter = router({
     const rows = await db.execute(
       sql`SELECT lastRunAt, runsThisMonth, monthlyRunsResetAt, monthlyRunLimit FROM researchConfig WHERE userId = ${ctx.user.id} LIMIT 1`
     ) as any;
-    const row = Array.isArray(rows) ? rows[0] : (rows?.rows?.[0] ?? null);
+
+    // TiDB mysql2 format: [rows[], fields[]]
+    let row: any = null;
+    if (Array.isArray(rows) && Array.isArray(rows[0])) {
+      row = rows[0][0] ?? null;
+    } else if (Array.isArray(rows)) {
+      row = rows[0] ?? null;
+    } else {
+      row = rows?.rows?.[0] ?? null;
+    }
+
+    // Check user plan for actual limit
+    const userRows2 = await db.execute(
+      sql`SELECT plan, planStatus, planExpiresAt FROM users WHERE id = ${ctx.user.id} LIMIT 1`
+    ) as any;
+    let userRow2: any = null;
+    if (Array.isArray(userRows2) && Array.isArray(userRows2[0])) {
+      userRow2 = userRows2[0][0] ?? null;
+    } else if (Array.isArray(userRows2)) {
+      userRow2 = userRows2[0] ?? null;
+    } else {
+      userRow2 = userRows2?.rows?.[0] ?? null;
+    }
+    const { isPro } = await import("./stripeService");
+    const userIsPro2 = isPro({
+      plan: userRow2?.plan,
+      planStatus: userRow2?.planStatus,
+      planExpiresAt: userRow2?.planExpiresAt ? new Date(userRow2.planExpiresAt) : null,
+    });
 
     const now = new Date();
     const lastRunAt = row?.lastRunAt ? new Date(row.lastRunAt) : null;
     const runsThisMonth = Number(row?.runsThisMonth ?? 0);
-    const monthlyLimit = Number(row?.monthlyRunLimit ?? 60);
+    const monthlyLimit = userIsPro2 ? 9999 : 3;
 
     let minutesUntilNextRun = 0;
     let canRunNow = true;
