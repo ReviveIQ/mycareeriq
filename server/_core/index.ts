@@ -270,6 +270,43 @@ async function startServer() {
     next();
   });
 
+  // ── Stripe webhook — MUST be before express.json() ──────────────────────
+  // Stripe signature verification requires raw Buffer body.
+  // express.json() would parse it into a JS object first, breaking verification.
+  app.post("/api/stripe/webhook",
+    express.raw({ type: "application/json" }),
+    async (req: any, res: any) => {
+      try {
+        const { handleWebhookEvent } = await import("../stripeService");
+        const sig = req.headers["stripe-signature"] || "";
+        const result = await handleWebhookEvent(req.body, sig);
+
+        if (result?.userId && result?.updates) {
+          const db = await import("../db").then(m => m.getDb());
+          if (db) {
+            const { users } = await import("../../drizzle/schema");
+            const { eq } = await import("drizzle-orm");
+            await db.update(users)
+              .set(result.updates as any)
+              .where(eq(users.id, result.userId));
+            console.log(`[Stripe] Updated user ${result.userId}: plan=${result.updates.plan}, status=${result.updates.planStatus}`);
+
+            const { researchConfig } = await import("../../drizzle/schema");
+            const newLimit = result.updates.plan === "pro" ? 9999 : 3;
+            await db.update(researchConfig)
+              .set({ monthlyRunLimit: newLimit } as any)
+              .where(eq(researchConfig.userId, result.userId));
+          }
+        }
+
+        res.json({ received: true });
+      } catch (err: any) {
+        console.error("[Stripe] Webhook error:", err.message);
+        res.status(400).json({ error: err.message });
+      }
+    }
+  );
+
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
@@ -340,42 +377,7 @@ async function startServer() {
   app.post("/api/scheduled/sendDigest", sendDigestEmailHandler);
   app.post("/api/scheduled/jobResearch", jobResearchHandler);
 
-  // ── Stripe webhook ────────────────────────────────────────────────────────
-  // Must use raw body — express.json() must NOT parse this route
-  app.post("/api/stripe/webhook",
-    express.raw({ type: "application/json" }),
-    async (req: any, res: any) => {
-      try {
-        const { handleWebhookEvent } = await import("../stripeService");
-        const sig = req.headers["stripe-signature"] || "";
-        const result = await handleWebhookEvent(req.body, sig);
 
-        if (result?.userId && result?.updates) {
-          const db = await import("../db").then(m => m.getDb());
-          if (db) {
-            const { users } = await import("../../drizzle/schema");
-            const { eq } = await import("drizzle-orm");
-            await db.update(users)
-              .set(result.updates as any)
-              .where(eq(users.id, result.userId));
-            console.log(`[Stripe] Updated user ${result.userId}: plan=${result.updates.plan}, status=${result.updates.planStatus}`);
-
-            // Update run limit based on plan
-            const { researchConfig } = await import("../../drizzle/schema");
-            const newLimit = result.updates.plan === "pro" ? 9999 : 3;
-            await db.update(researchConfig)
-              .set({ monthlyRunLimit: newLimit } as any)
-              .where(eq(researchConfig.userId, result.userId));
-          }
-        }
-
-        res.json({ received: true });
-      } catch (err: any) {
-        console.error("[Stripe] Webhook error:", err.message);
-        res.status(400).json({ error: err.message });
-      }
-    }
-  );
 
   // Serve S3 storage files via signed URL redirect
   app.get("/api/storage/:key(*)", async (req: any, res: any) => {
