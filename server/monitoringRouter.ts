@@ -94,8 +94,8 @@ export const monitoringRouter = router({
     const monthlyLimit = userIsPro ? 9999 : 3;
     const resetAt = row?.monthlyRunsResetAt ? new Date(row.monthlyRunsResetAt) : null;
 
-    // Check 20-minute cooldown
-    if (lastRunAt) {
+    // Check 20-minute cooldown — free users only, Pro can run anytime
+    if (!userIsPro && lastRunAt) {
       const minutesSince = (now.getTime() - lastRunAt.getTime()) / (1000 * 60);
       if (minutesSince < 20) {
         const minutesLeft = Math.ceil(20 - minutesSince);
@@ -218,7 +218,9 @@ export const monitoringRouter = router({
     let minutesUntilNextRun = 0;
     let canRunNow = true;
 
-    if (lastRunAt) {
+    // 20-minute cooldown only applies to free users
+    // Pro users can run anytime (they paid for unlimited)
+    if (!userIsPro2 && lastRunAt) {
       const minsSince = (now.getTime() - lastRunAt.getTime()) / (1000 * 60);
       if (minsSince < 20) {
         minutesUntilNextRun = Math.ceil(20 - minsSince);
