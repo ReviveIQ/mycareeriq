@@ -626,14 +626,18 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
   const parsedResume = (config as any)?.lastDocumentParsed || null;
   const candidateProfile = await extractCandidateProfile(parsedResume);
 
-  // Track which companies are already in pipeline (skip entirely if already there)
-  const existingRows = await db.select({ companyName: companies.companyName })
+  // Track which specific job postings are already in pipeline (by companyId = company+jobId)
+  // This is JOB-level deduplication — NOT company-level.
+  // A company can be in the pipeline AND still have new job postings worth fetching.
+  const existingJobRows = await db.select({ companyId: companies.companyId })
     .from(companies)
     .where(eq(companies.userId, userId));
-  const existingCompanies = new Set(existingRows.map(r => r.companyName.toLowerCase()));
-  console.log(`[JobResearch] ${existingCompanies.size} companies already in pipeline — will skip`);
+  const existingJobIds = new Set(existingJobRows.map(r => r.companyId));
+  console.log(`[JobResearch] ${existingJobIds.size} job postings already in pipeline — will skip duplicates`);
 
-  // ── Phase 1: Discover companies matched to THIS candidate's resume ──────────
+  // ── Phase 1: Build company pool ───────────────────────────────────────────────
+  // Always research all companies — job-level dedup handles duplicates at insert time.
+  // Rotate the static pool so each run sees different companies.
   const poolSize = Math.min(requestedCount * 3, 30);
 
   // Parse candidate profile for company discovery
@@ -642,22 +646,13 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
     if (candidateProfile) profileForDiscovery = JSON.parse(candidateProfile);
   } catch { /* use empty profile */ }
 
-  // Get static fallback companies
+  // Get static fallback companies — shuffled so each run sees a different subset
   const staticFallback = getVerifiedCompaniesForDiscovery(poolSize);
 
-  // Check how many static companies are NOT yet in pipeline
-  const staticNotInPipeline = staticFallback.filter(
-    co => !existingCompanies.has(co.name.toLowerCase())
-  );
-
+  // Always run GPT discovery to find companies not in the static map
+  console.log(`[JobResearch] Running resume-driven company discovery`);
   let allCompanies;
-  if (staticNotInPipeline.length >= Math.floor(poolSize * 0.5)) {
-    // Enough static companies available — skip GPT discovery to save time
-    console.log(`[JobResearch] Using static company pool (${staticNotInPipeline.length} new companies available)`);
-    allCompanies = staticFallback;
-  } else {
-    // Most static companies already in pipeline — use GPT to discover fresh ones
-    console.log(`[JobResearch] Static pool exhausted (${staticNotInPipeline.length} new) — running resume-driven discovery`);
+  try {
     allCompanies = await discoverCompaniesForCandidate(
       profileForDiscovery,
       targetRoles,
@@ -665,13 +660,13 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
       poolSize,
       staticFallback
     );
+  } catch (err: any) {
+    console.warn(`[JobResearch] Discovery failed (${err.message}) — using static pool`);
+    allCompanies = staticFallback;
   }
 
-  // Skip companies already in pipeline
-  const toFetch = allCompanies.filter(
-    co => !existingCompanies.has(co.name.toLowerCase())
-  );
-  console.log(`[JobResearch] Fetching from ${toFetch.length} resume-matched companies (${allCompanies.length - toFetch.length} skipped, already in pipeline)`);
+  const toFetch = allCompanies;
+  console.log(`[JobResearch] Fetching from ${toFetch.length} companies`);
 
   // Collect all raw jobs tagged with their source company
   const allRawJobs: RawJobWithCompany[] = [];
@@ -877,8 +872,19 @@ export async function addJobsToPipeline(jobs: GeneratedJob[], userId: number = 1
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  // Load existing job IDs to prevent duplicates at insert time
+  const existingRows = await db.select({ companyId: companies.companyId })
+    .from(companies)
+    .where(eq(companies.userId, userId));
+  const existingIds = new Set(existingRows.map(r => r.companyId));
+
   let addedCount = 0;
   for (const job of jobs) {
+    // Skip if this exact job posting is already in the pipeline
+    if (existingIds.has(job.companyId)) {
+      console.log(`[JobResearch] Skipping duplicate job: ${job.companyName} (${job.companyId})`);
+      continue;
+    }
     try {
       await db.insert(companies).values({
         userId,
@@ -898,12 +904,13 @@ export async function addJobsToPipeline(jobs: GeneratedJob[], userId: number = 1
         stage: "Research",
         notes: `Source: ${job.source}${job.fitScore ? ` | Fit: ${job.fitScore}/10` : ""}`,
       });
+      existingIds.add(job.companyId); // track newly added IDs within this run
       addedCount++;
     } catch (err: any) {
       console.error(`[JobResearch] INSERT FAILED for ${job.companyName}:`, err?.message || String(err));
     }
   }
 
-  console.log(`[JobResearch] Added ${addedCount} jobs to pipeline`);
+  console.log(`[JobResearch] Added ${addedCount} new job postings to pipeline`);
   return addedCount;
 }
