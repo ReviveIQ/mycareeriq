@@ -163,6 +163,8 @@ export const pipelineRouter = router({
   markOutreachSent: protectedProcedure
     .input(z.object({ companyId: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
       const { sql } = await import("drizzle-orm");
       await db.execute(
         sql`UPDATE companies SET stage = 'Outreach', updatedAt = NOW() WHERE id = ${input.companyId} AND userId = ${ctx.user.id}`
@@ -174,6 +176,8 @@ export const pipelineRouter = router({
   markApplied: protectedProcedure
     .input(z.object({ companyId: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
       const { sql } = await import("drizzle-orm");
       await db.execute(
         sql`UPDATE companies SET stage = 'Applied', updatedAt = NOW() WHERE id = ${input.companyId} AND userId = ${ctx.user.id}`
@@ -183,12 +187,18 @@ export const pipelineRouter = router({
 
   // Get LinkedIn profile for current user
   getLinkedInProfile: protectedProcedure.query(async ({ ctx }) => {
-    const { sql } = await import("drizzle-orm");
-    const result = await db.execute(
-      sql`SELECT linkedinAccessToken FROM users WHERE id = ${ctx.user.id} LIMIT 1`
-    ) as any;
-    const rows = Array.isArray(result) && Array.isArray(result[0]) ? result[0] : result;
-    const token = rows?.[0]?.linkedinAccessToken || rows?.[0]?.linkedinaccesstoken;
-    return { connected: !!token };
+    try {
+      const db = await getDb();
+      if (!db) return { connected: false };
+      const { sql } = await import("drizzle-orm");
+      const result = await db.execute(
+        sql`SELECT linkedinAccessToken FROM users WHERE id = ${ctx.user.id} LIMIT 1`
+      ) as any;
+      const rows = Array.isArray(result) && Array.isArray(result[0]) ? result[0] : result;
+      const token = rows?.[0]?.linkedinAccessToken || rows?.[0]?.linkedinaccesstoken;
+      return { connected: !!token };
+    } catch {
+      return { connected: false };
+    }
   }),
 });
