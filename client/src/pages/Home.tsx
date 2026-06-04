@@ -155,8 +155,10 @@ export default function Home() {
   const { data: pipelineData = [], isLoading } = trpc.pipeline.getCompanies.useQuery();
   const { data: companyCount = 0 } = trpc.pipeline.getCompanyCount.useQuery();
   const { data: highPriorityCount = 0 } = trpc.pipeline.getHighPriority.useQuery();
-  // Compute remoteCount from pipelineData — single source of truth, always in sync
-  const remoteCount = pipelineData.filter((c: any) => c.remoteOk || c.remote).length;
+  // Active jobs (excludes dismissed) — used for all KPI counts
+  const activeData = pipelineData.filter((c: any) => c.stage !== "Dismissed");
+  // Compute remoteCount from activeData — single source of truth, always in sync
+  const remoteCount = activeData.filter((c: any) => c.remoteOk || c.remote).length;
   const runResearch = trpc.monitoring.runNow.useMutation();
   const markOutreachSent = trpc.pipeline.markOutreachSent.useMutation();
   const markApplied = trpc.pipeline.markApplied.useMutation();
@@ -542,14 +544,14 @@ export default function Home() {
             {
               icon: <Building2 className="w-4 h-4 text-indigo-600" />,
               label: "Total Prospects",
-              value: String(pipelineData.length),
+              value: String(activeData.length),
               sub: "Companies in pipeline",
               bg: "bg-indigo-50",
             },
             {
               icon: <Target className="w-4 h-4 text-rose-600" />,
               label: "High Priority",
-              value: String(pipelineData.filter((c) => c.priority === "High").length),
+              value: String(activeData.filter((c: any) => c.priority === "High").length),
               sub: "Immediate outreach targets",
               bg: "bg-rose-50",
             },
@@ -557,13 +559,13 @@ export default function Home() {
               icon: <TrendingUp className="w-4 h-4 text-emerald-600" />,
               label: "Remote Roles",
               value: String(remoteCount),
-              sub: `${remoteCount} of ${pipelineData.length} are remote-friendly`,
+              sub: `${remoteCount} of ${activeData.length} are remote-friendly`,
               bg: "bg-emerald-50",
             },
             {
               icon: <Users className="w-4 h-4 text-amber-600" />,
               label: "Key Contacts",
-              value: String(pipelineData.filter((c: any) => c.contactName && c.contactName.trim()).length),
+              value: String(activeData.filter((c: any) => c.contactName && (c.contactName as string).trim()).length),
               sub: "Contacts identified",
               bg: "bg-amber-50",
             },
