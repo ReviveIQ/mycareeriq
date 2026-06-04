@@ -45,7 +45,7 @@ export default function TermsOfService() {
           <section style={{ marginBottom: "36px" }}>
             <h2 style={h2}>4. Subscription Plans and Billing</h2>
             <ul style={ul}>
-              <li><strong style={{ color: "#0f172a" }}>Free plan:</strong> 3 job research runs per month, pipeline limited to 10 jobs. Free forever — no credit card required.</li>
+              <li><strong style={{ color: "#0f172a" }}>Free plan:</strong> 7 job research runs per month, pipeline limited to 10 jobs. Free forever — no credit card required.</li>
               <li><strong style={{ color: "#0f172a" }}>Pro Monthly:</strong> $49.99/month. Unlimited research runs and pipeline jobs.</li>
               <li><strong style={{ color: "#0f172a" }}>Pro Annual:</strong> $299/year. Unlimited research runs and pipeline jobs. Billed once annually.</li>
               <li><strong style={{ color: "#0f172a" }}>No auto-renewal:</strong> Subscriptions do not automatically renew. You will be notified before your subscription expires and must actively choose to renew.</li>

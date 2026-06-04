@@ -471,10 +471,14 @@ export default function Home() {
                   <><Play className="w-3.5 h-3.5" />Run Now</>
                 )}
               </Button>
-              {rateLimitStatus && (
-                <span className="text-[10px] text-slate-500 leading-none">
+              {rateLimitStatus && rateLimitStatus.monthlyLimit !== 9999 && (
+                <span className="text-[10px] leading-none font-medium" style={{
+                  color: rateLimitStatus.canRunNow
+                    ? (rateLimitStatus.runsThisMonth >= 5 ? "#f97316" : "#64748b")
+                    : "#ef4444"
+                }}>
                   {rateLimitStatus.canRunNow
-                    ? `${rateLimitStatus.runsThisMonth}/${rateLimitStatus.monthlyLimit === 9999 ? "∞" : rateLimitStatus.monthlyLimit} used`
+                    ? `${rateLimitStatus.runsThisMonth}/${rateLimitStatus.monthlyLimit} used`
                     : (rateLimitStatus.hoursUntilNextRun ?? 0) > 0
                       ? `${rateLimitStatus.hoursUntilNextRun}h cooldown`
                       : `Limit reached`}

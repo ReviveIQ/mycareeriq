@@ -52,7 +52,7 @@ export default function PricingPage({ onClose, trigger }: PricingPageProps) {
   ];
 
   const FREE_FEATURES = [
-    "3 research runs per month",
+    "7 research runs per month",
     "Up to 10 jobs in pipeline",
     "Resume scoring",
     "Dismiss & stage management",
@@ -78,8 +78,8 @@ export default function PricingPage({ onClose, trigger }: PricingPageProps) {
         </h1>
         <p style={{ color: "#64748b", fontSize: "15px", margin: 0 }}>
           {trigger === "run_limit"
-            ? "Free plan includes 3 research runs/month. Upgrade for unlimited runs and a full pipeline."
-            : "From 3 free runs to unlimited research, real ATS listings, and fit-scored roles."}
+            ? "Free plan includes 7 research runs/month. Upgrade for unlimited runs and a full pipeline."
+            : "From 7 free runs to unlimited research, real ATS listings, and fit-scored roles."}
         </p>
       </div>
 
