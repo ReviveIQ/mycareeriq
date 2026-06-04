@@ -136,14 +136,16 @@ export default function Home() {
         verifySession.mutateAsync({ sessionId }).then(() => {
           utils.subscription.getStatus.invalidate();
           toast.success(`🎉 Welcome to ${label}! Unlimited research runs activated.`, { duration: 6000 });
+          setActiveTab("pipeline");
         }).catch(() => {
-          // Webhook may have already handled it
           utils.subscription.getStatus.invalidate();
           toast.success(`🎉 Welcome to ${label}! Unlimited research runs activated.`, { duration: 6000 });
+          setActiveTab("pipeline");
         });
       } else {
         utils.subscription.getStatus.invalidate();
         toast.success(`🎉 Welcome to ${label}! Unlimited research runs activated.`, { duration: 6000 });
+        setActiveTab("pipeline");
       }
     } else if (payment === "canceled") {
       window.history.replaceState({}, "", window.location.pathname);
@@ -595,7 +597,7 @@ export default function Home() {
         {/* Tab Navigation */}
         <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
           <div className="flex gap-1 bg-slate-100 p-1 rounded-lg w-max sm:w-fit min-w-full sm:min-w-0">
-          {(["pipeline", "analytics", "generate", "history", "settings", "pricing"] as const).map((tab) => (
+          {(["pipeline", "analytics", "generate", "history", "settings", "pricing"] as const).filter(tab => tab !== "pricing" || rateLimitStatus?.monthlyLimit !== 100).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
