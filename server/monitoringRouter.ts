@@ -70,27 +70,23 @@ export const monitoringRouter = router({
     const row = Array.isArray(rows) ? rows[0] : (rows?.rows?.[0] ?? null);
 
     // Get user plan to determine actual limit
-    const userRows = await db.execute(
-      sql`SELECT plan, planStatus, planExpiresAt FROM users WHERE id = ${userId} LIMIT 1`
-    ) as any;
+    // Get user plan using Drizzle select (more reliable than raw sql for TiDB)
+    const { users } = await import("../drizzle/schema");
+    const { eq: eqOp } = await import("drizzle-orm");
+    const userPlanRows = await db.select({
+      plan: users.plan,
+      planStatus: users.planStatus,
+      planExpiresAt: users.planExpiresAt,
+    }).from(users).where(eqOp(users.id, userId)).limit(1);
 
-    // TiDB via mysql2 returns [rows[], fields[]] — rows are in result[0]
-    let userRow: any = null;
-    if (Array.isArray(userRows) && Array.isArray(userRows[0])) {
-      userRow = userRows[0][0] ?? null; // mysql2 format: [rows[], fields[]]
-    } else if (Array.isArray(userRows)) {
-      userRow = userRows[0] ?? null;
-    } else {
-      userRow = userRows?.rows?.[0] ?? null;
-    }
-
+    const userPlan = userPlanRows[0];
     const { isPro } = await import("./stripeService");
     const userIsPro = isPro({
-      plan: userRow?.plan,
-      planStatus: userRow?.planStatus,
-      planExpiresAt: userRow?.planExpiresAt ? new Date(userRow.planExpiresAt) : null
+      plan: userPlan?.plan,
+      planStatus: userPlan?.planStatus,
+      planExpiresAt: userPlan?.planExpiresAt ? new Date(userPlan.planExpiresAt) : null
     });
-    console.log(`[MonitoringRouter] User ${userId} plan=${userRow?.plan} status=${userRow?.planStatus} isPro=${userIsPro}`);
+    console.log(`[MonitoringRouter] User ${userId} plan=${userPlan?.plan} status=${userPlan?.planStatus} isPro=${userIsPro}`);
 
     const lastRunAt = row?.lastRunAt ? new Date(row.lastRunAt) : null;
     const runsThisMonth = Number(row?.runsThisMonth ?? 0);
@@ -197,23 +193,21 @@ export const monitoringRouter = router({
       row = rows?.rows?.[0] ?? null;
     }
 
-    // Check user plan for actual limit
-    const userRows2 = await db.execute(
-      sql`SELECT plan, planStatus, planExpiresAt FROM users WHERE id = ${ctx.user.id} LIMIT 1`
-    ) as any;
-    let userRow2: any = null;
-    if (Array.isArray(userRows2) && Array.isArray(userRows2[0])) {
-      userRow2 = userRows2[0][0] ?? null;
-    } else if (Array.isArray(userRows2)) {
-      userRow2 = userRows2[0] ?? null;
-    } else {
-      userRow2 = userRows2?.rows?.[0] ?? null;
-    }
+    // Check user plan using Drizzle select
+    const { users: usersTable } = await import("../drizzle/schema");
+    const { eq: eq2 } = await import("drizzle-orm");
+    const planRows = await db.select({
+      plan: usersTable.plan,
+      planStatus: usersTable.planStatus,
+      planExpiresAt: usersTable.planExpiresAt,
+    }).from(usersTable).where(eq2(usersTable.id, ctx.user.id)).limit(1);
+    const planRow = planRows[0];
+
     const { isPro } = await import("./stripeService");
     const userIsPro2 = isPro({
-      plan: userRow2?.plan,
-      planStatus: userRow2?.planStatus,
-      planExpiresAt: userRow2?.planExpiresAt ? new Date(userRow2.planExpiresAt) : null,
+      plan: planRow?.plan,
+      planStatus: planRow?.planStatus,
+      planExpiresAt: planRow?.planExpiresAt ? new Date(planRow.planExpiresAt) : null,
     });
 
     const now = new Date();

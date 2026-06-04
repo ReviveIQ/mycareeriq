@@ -300,10 +300,11 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.tool_choice = normalizedToolChoice;
   }
 
-  payload.max_tokens = 32768
-  payload.thinking = {
-    "budget_tokens": 128
+  // Use caller-specified max_tokens or sensible default — do NOT hardcode 32768
+  if (!payload.max_tokens) {
+    payload.max_tokens = 4096;
   }
+  // Remove 'thinking' — Anthropic-only param, breaks OpenAI calls
 
   const normalizedResponseFormat = normalizeResponseFormat({
     responseFormat,
