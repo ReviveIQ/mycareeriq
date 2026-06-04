@@ -167,7 +167,7 @@ export default function ResumeIQ() {
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"16px",marginTop:"32px"}}>
               {[
                 {icon:"✦",title:"ATS Optimized",desc:"Structured for applicant tracking systems"},
-                {icon:"◈",title:"Bullet Enhancement",desc:"AI rewrites each bullet for maximum impact"},
+                {icon:"◈",title:"Bullet Enhancement",desc:"AI transforms each bullet for maximum impact"},
                 {icon:"▣",title:"Visual Design",desc:"Professional branded template output"},
               ].map(item => (
                 <div key={item.title} style={{background:"rgba(255,255,255,0.05)",borderRadius:"12px",padding:"16px",textAlign:"center"}}>

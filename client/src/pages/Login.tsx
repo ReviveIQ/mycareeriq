@@ -36,7 +36,7 @@ const steps = [
     product: "ResumeIQ",
     productUrl: "https://resumeiq.reviveiqi.com",
     headline: "Transform your resume",
-    body: "Upload your resume and ResumeIQ rewrites every bullet with measurable impact — ATS-optimized, ready to get callbacks.",
+    body: "Upload your resume and ResumeIQ transforms every bullet with measurable impact — ATS-optimized, ready to get callbacks.",
     accent: "#60a5fa",
   },
   {
