@@ -634,9 +634,6 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
   console.log(`[JobResearch] ${existingCompanies.size} companies already in pipeline — will skip`);
 
   // ── Phase 1: Discover companies matched to THIS candidate's resume ──────────
-  // Use resume-driven discovery: GPT suggests companies based on their background,
-  // each suggestion is validated against live ATS APIs before use.
-  // Falls back to static verified map if discovery yields too few results.
   const poolSize = Math.min(requestedCount * 3, 30);
 
   // Parse candidate profile for company discovery
@@ -645,17 +642,30 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
     if (candidateProfile) profileForDiscovery = JSON.parse(candidateProfile);
   } catch { /* use empty profile */ }
 
-  // Get static fallback companies for supplementing
+  // Get static fallback companies
   const staticFallback = getVerifiedCompaniesForDiscovery(poolSize);
 
-  // Discover companies based on resume — resume-specific pool
-  const allCompanies = await discoverCompaniesForCandidate(
-    profileForDiscovery,
-    targetRoles,
-    targetCategories,
-    poolSize,
-    staticFallback
+  // Check how many static companies are NOT yet in pipeline
+  const staticNotInPipeline = staticFallback.filter(
+    co => !existingCompanies.has(co.name.toLowerCase())
   );
+
+  let allCompanies;
+  if (staticNotInPipeline.length >= Math.floor(poolSize * 0.5)) {
+    // Enough static companies available — skip GPT discovery to save time
+    console.log(`[JobResearch] Using static company pool (${staticNotInPipeline.length} new companies available)`);
+    allCompanies = staticFallback;
+  } else {
+    // Most static companies already in pipeline — use GPT to discover fresh ones
+    console.log(`[JobResearch] Static pool exhausted (${staticNotInPipeline.length} new) — running resume-driven discovery`);
+    allCompanies = await discoverCompaniesForCandidate(
+      profileForDiscovery,
+      targetRoles,
+      targetCategories,
+      poolSize,
+      staticFallback
+    );
+  }
 
   // Skip companies already in pipeline
   const toFetch = allCompanies.filter(

@@ -33,7 +33,7 @@ async function validateGreenhouseSlug(slug: string): Promise<boolean> {
   try {
     const res = await fetch(
       `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(slug)}/jobs`,
-      { signal: AbortSignal.timeout(8000) }
+      { signal: AbortSignal.timeout(12000) }
     );
     return res.ok;
   } catch {
@@ -48,7 +48,7 @@ async function validateAshbySlug(slug: string): Promise<boolean> {
   try {
     const res = await fetch(
       `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(slug)}`,
-      { signal: AbortSignal.timeout(8000) }
+      { signal: AbortSignal.timeout(12000) }
     );
     return res.ok;
   } catch {
@@ -192,7 +192,7 @@ Return ONLY the JSON array. Start with [ end with ].`,
       max_tokens: 2000,
       temperature: 0.7,
     }),
-    signal: AbortSignal.timeout(20000),
+    signal: AbortSignal.timeout(45000),
   });
 
   if (!res.ok) {
