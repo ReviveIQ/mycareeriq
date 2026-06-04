@@ -363,7 +363,7 @@ export default function Home() {
         return;
       }
 
-      const isPro = (result.monthlyLimit || 10) >= 9999;
+      const isPro = (result.monthlyLimit || 10) >= 100;
       const runsLeft = (result.monthlyLimit || 10) - (result.runsThisMonth || 0);
       toast.success(isPro
         ? "Job research started — checking companies for new roles"
@@ -475,7 +475,7 @@ export default function Home() {
                   <><Play className="w-3.5 h-3.5" />Run Now</>
                 )}
               </Button>
-              {rateLimitStatus && rateLimitStatus.monthlyLimit !== 9999 && (
+              {rateLimitStatus && rateLimitStatus.monthlyLimit !== 100 && (
                 <span className="text-[10px] leading-none font-medium" style={{
                   color: rateLimitStatus.canRunNow
                     ? (rateLimitStatus.runsThisMonth >= 5 ? "#f97316" : "#64748b")

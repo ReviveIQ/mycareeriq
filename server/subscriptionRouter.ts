@@ -121,7 +121,7 @@ export const subscriptionRouter = router({
         // Update run limit
         const { researchConfig } = await import("../drizzle/schema");
         await db.update(researchConfig)
-          .set({ monthlyRunLimit: 9999 } as any)
+          .set({ monthlyRunLimit: 100 } as any)
           .where(eq(researchConfig.userId, ctx.user.id));
 
         console.log(`[Stripe] Session verified — userId ${ctx.user.id} upgraded to Pro`);
