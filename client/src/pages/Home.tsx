@@ -109,6 +109,9 @@ export default function Home() {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [activeTab, setActiveTab] = useState<"pipeline" | "analytics" | "generate" | "history" | "settings" | "pricing">("pipeline");
   const [isRunning, setIsRunning] = useState(false);
+  const [generatePrefill, setGeneratePrefill] = useState<{
+    companyName: string; jobTitle: string; jobDescription: string; contactName?: string; companyId: string;
+  } | null>(null);
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
   const verifySession = trpc.subscription.verifySession.useMutation();
@@ -1078,7 +1081,7 @@ export default function Home() {
         )}
 
         {activeTab === "generate" && (
-          <GenerateApplication />
+          <GenerateApplication prefill={generatePrefill || undefined} />
         )}
 
         {activeTab === "history" && (
@@ -1206,6 +1209,25 @@ export default function Home() {
                     Contact on LinkedIn
                   </button>
                 </div>
+
+                {/* Generate Cover Letter */}
+                <button
+                  onClick={() => {
+                    setGeneratePrefill({
+                      companyName: (selectedCompany as any).companyName || selectedCompany.name,
+                      jobTitle: selectedCompany.role || (selectedCompany as any).jobTitle || "",
+                      jobDescription: (selectedCompany as any).jobDescription || selectedCompany.role || "",
+                      contactName: selectedCompany.contactName || "Hiring Manager",
+                      companyId: String(selectedCompany.id),
+                    });
+                    setSelectedCompany(null);
+                    setActiveTab("generate");
+                  }}
+                  className="w-full flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-sm font-semibold h-9 px-3 rounded-md transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  Generate Cover Letter
+                </button>
               </div>
             </>
           )}

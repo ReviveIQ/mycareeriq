@@ -334,6 +334,47 @@ async function startServer() {
     }
   });
 
+  // ── Cover letter download ──────────────────────────────────────────────────
+  app.get("/api/applications/:id/download", async (req: any, res: any) => {
+    try {
+      const authHeader = req.headers.authorization || "";
+      const token = authHeader.replace("Bearer ", "").trim();
+      if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+      const { verifySessionToken } = await import("./auth");
+      const user = await verifySessionToken(token);
+      if (!user) { res.status(401).json({ error: "Invalid session" }); return; }
+
+      const applicationId = parseInt(req.params.id);
+      const db = await import("../db").then(m => m.getDb());
+      if (!db) { res.status(500).json({ error: "DB unavailable" }); return; }
+
+      const { applications } = await import("../../drizzle/schema");
+      const { eq, and } = await import("drizzle-orm");
+      const rows = await db.select()
+        .from(applications)
+        .where(and(eq(applications.id, applicationId), eq(applications.userId, user.userId)))
+        .limit(1);
+
+      const app_ = rows[0];
+      if (!app_) { res.status(404).json({ error: "Application not found" }); return; }
+
+      // Generate PDF
+      const { generateCoverLetterPDF } = await import("../pdfGenerator");
+      const pdfBuffer = await generateCoverLetterPDF(
+        app_.coverLetter,
+        app_.contactName || "Hiring Manager",
+        app_.companyName
+      );
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="cover-letter-${app_.companyName.toLowerCase().replace(/\s+/g, "-")}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (err: any) {
+      console.error("[Download] Cover letter download failed:", err.message);
+      res.status(500).json({ error: "Download failed" });
+    }
+  });
+
   registerStorageProxy(app);
   registerAuthRoutes(app);
   registerResumeIQRoutes(app);
