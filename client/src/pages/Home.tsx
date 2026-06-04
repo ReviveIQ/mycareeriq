@@ -542,7 +542,7 @@ export default function Home() {
             {
               icon: <Building2 className="w-4 h-4 text-indigo-600" />,
               label: "Total Prospects",
-              value: String(companyCount),
+              value: String(pipelineData.length),
               sub: "Companies in pipeline",
               bg: "bg-indigo-50",
             },
@@ -563,8 +563,8 @@ export default function Home() {
             {
               icon: <Users className="w-4 h-4 text-amber-600" />,
               label: "Key Contacts",
-              value: String(companyCount),
-              sub: "VPs & Directors identified",
+              value: String(pipelineData.filter((c: any) => c.contactName && c.contactName.trim()).length),
+              sub: "Contacts identified",
               bg: "bg-amber-50",
             },
           ].map((kpi) => (
