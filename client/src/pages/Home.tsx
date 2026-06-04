@@ -290,7 +290,7 @@ export default function Home() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return data;
-  }, [search, stageFilter, categoryFilter, priorityFilter, sortField, sortDir]);
+  }, [pipelineData, search, stageFilter, categoryFilter, priorityFilter, sortField, sortDir]);
 
   const stageChartData = useMemo(() => {
     return stageOrder.map((s) => ({
@@ -436,17 +436,22 @@ export default function Home() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <WorkspaceSwitcher />
-            <Button
-              onClick={() => navigate("/workspace/settings")}
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs border-slate-200 text-slate-700 hover:bg-slate-50 gap-1.5"
-            >
-              <Settings className="w-3.5 h-3.5" />
-              Team
-            </Button>
+          <div className="flex items-center gap-2">
+            {/* Hide WorkspaceSwitcher + Team on mobile */}
+            <div className="hidden sm:flex items-center gap-2">
+              <WorkspaceSwitcher />
+              <Button
+                onClick={() => navigate("/workspace/settings")}
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs border-slate-200 text-slate-700 hover:bg-slate-50 gap-1.5"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                Team
+              </Button>
+            </div>
+
+            {/* Run Now — always visible */}
             <div className="flex flex-col items-center gap-0.5">
               <Button
                 onClick={handleRunNow}
@@ -458,15 +463,9 @@ export default function Home() {
                   : undefined}
               >
                 {isRunning ? (
-                  <>
-                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Running...
-                  </>
+                  <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Running...</>
                 ) : (
-                  <>
-                    <Play className="w-3.5 h-3.5" />
-                    Run Now
-                  </>
+                  <><Play className="w-3.5 h-3.5" />Run Now</>
                 )}
               </Button>
               {rateLimitStatus && (
@@ -480,16 +479,16 @@ export default function Home() {
               )}
             </div>
 
-            {/* Plan badge */}
+            {/* Plan badge — always visible */}
             <SubscriptionBadge onUpgrade={() => setActiveTab("pricing")} />
 
-            {/* User menu with logout */}
+            {/* User menu — always visible, name hidden on mobile */}
             <div className="relative">
               <button
                 onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors text-sm font-medium text-slate-700 border border-slate-200"
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-slate-100 transition-colors text-sm font-medium text-slate-700 border border-slate-200"
               >
-                <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-xs">
+                <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-xs flex-shrink-0">
                   {(user?.name || user?.email || "U").charAt(0).toUpperCase()}
                 </div>
                 <span className="hidden sm:block max-w-[100px] truncate text-xs">{user?.name || user?.email}</span>
@@ -516,17 +515,20 @@ export default function Home() {
               )}
             </div>
 
-            <Button
-              onClick={() => exportToCSV(filtered)}
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs border-slate-200 text-slate-700 hover:bg-slate-50 gap-1.5"
-            >
-              <FileDown className="w-3.5 h-3.5" />
-              Export CSV
-            </Button>
-            <span className="text-xs text-slate-500 hidden sm:block">Updated May 2026</span>
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            {/* Export + status — desktop only */}
+            <div className="hidden sm:flex items-center gap-2">
+              <Button
+                onClick={() => exportToCSV(filtered)}
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs border-slate-200 text-slate-700 hover:bg-slate-50 gap-1.5"
+              >
+                <FileDown className="w-3.5 h-3.5" />
+                Export CSV
+              </Button>
+              <span className="text-xs text-slate-500">Updated May 2026</span>
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            </div>
           </div>
         </div>
       </header>
