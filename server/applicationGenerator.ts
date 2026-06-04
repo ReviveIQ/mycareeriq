@@ -111,7 +111,7 @@ Return ONLY the JSON object. No markdown. No explanation.`,
     ],
   });
 
-  const text = (response.choices?.[0]?.message?.content || "")
+  const text = String(response.choices?.[0]?.message?.content || "")
     .trim()
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/```\s*$/i, "");
@@ -160,39 +160,58 @@ ${brief.transitionStatement}`
         .join("; ")
     : "";
 
+  const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+
   const response = await invokeLLM({
     messages: [
       {
         role: "system",
-        content: `You are an expert cover letter writer. Write in first person. Never fabricate metrics or experience not in the brief. 4 paragraphs plus a close. Plain text with paragraph breaks only. No headers, no bullet points. Mode: ${modeDesc}`,
+        content: `You are an expert cover letter writer. You write narrative-driven, resume-informed cover letters that reflect the candidate's actual career story — not generic templates.
+
+RULES:
+- Write in first person
+- Never fabricate metrics, titles, or experience not in the brief
+- Never sound defensive about career transitions — keep them factual and brief
+- 4 paragraphs + closing — no headers, no bullet points, plain text only
+- 250-350 words for the letter body
+- Mode: ${modeDesc}
+
+FIVE-STEP FRAMEWORK:
+Step 1 (Para 1): Establish professional identity — who they are + why interested in this role
+Step 2 (Para 2): Career story — progression, tenure, transition if applicable (factual, never defensive)
+Step 3 (Para 3): Evidence — specific accomplishments with metrics, concrete qualifications
+Step 4 (Para 4): Connect to employer needs — why this specific company + call to action
+Close: Confident, forward-looking`,
       },
       {
         role: "user",
-        content: `Write a cover letter for:
-Role: ${jobTitle} at ${companyName}
-Salutation: ${salutation}
+        content: `Write a cover letter using this exact format:
 
-Career Narrative:
-- Identity: ${brief.professionalIdentity}
-- Theme: ${brief.careerTheme}${transitionParagraph}
-- Top accomplishments: ${accomplishmentsText}
-- Value proposition: ${brief.valueProposition}
-- Relevant skills: ${brief.relevantSkills.join(", ")}
-- Why this role: ${brief.closingHook}
-- How they match employer needs: ${brief.employerNeedsMatch}
+${today}
 
-Structure:
-Paragraph 1: Who I am + why I am interested in ${companyName}
-Paragraph 2: Career story${brief.transitionEvent !== "none" ? " + transition context (factual, never defensive)" : ""}
-Paragraph 3: Relevant accomplishments and qualifications
-Paragraph 4: Connection to ${companyName}'s specific needs + closing call to action
+${hiringManager && hiringManager !== "Hiring Manager" ? hiringManager : "Hiring Manager"}
+${companyName}
 
-Start directly with the salutation. End with "Sincerely," followed by a blank line for the candidate name. 250-350 words.`,
+${salutation}
+
+[Para 1: Who I am professionally + why I am interested in ${companyName} and this ${jobTitle} role]
+
+[Para 2: Career story — ${brief.professionalIdentity}. Theme: ${brief.careerTheme}.${transitionParagraph ? ` ${brief.transitionStatement}` : ""}]
+
+[Para 3: Evidence — use these accomplishments: ${accomplishmentsText || brief.valueProposition}. Relevant skills: ${brief.relevantSkills.slice(0, 5).join(", ")}]
+
+[Para 4: Why ${companyName} specifically — ${brief.closingHook}. ${brief.employerNeedsMatch}. Call to action.]
+
+Sincerely,
+
+[Candidate Name]
+
+Write the full letter now. Start with the date. Replace all bracketed instructions with actual prose. 250-350 words for the body paragraphs.`,
       },
     ],
   });
 
-  return (response.choices?.[0]?.message?.content || "").trim();
+  return String(response.choices?.[0]?.message?.content || "").trim();
 }
 
 // ── Stage 3: Score the Cover Letter ──────────────────────────────────────────
@@ -230,7 +249,7 @@ Return ONLY the JSON. No markdown.`,
     ],
   });
 
-  const text = (response.choices?.[0]?.message?.content || "")
+  const text = String(response.choices?.[0]?.message?.content || "")
     .trim()
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/```\s*$/i, "");
@@ -388,7 +407,7 @@ Format as plain text. Emphasize experience and skills most relevant to this spec
     ],
   });
 
-  return (response.choices?.[0]?.message?.content || "").trim();
+  return String(response.choices?.[0]?.message?.content || "").trim();
 }
 
 // ── Generate both documents ───────────────────────────────────────────────────

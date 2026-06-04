@@ -1213,10 +1213,20 @@ export default function Home() {
                 {/* Generate Cover Letter */}
                 <button
                   onClick={() => {
+                    // Decode HTML entities from job description (stored as HTML in DB)
+                    const rawDesc = (selectedCompany as any).jobDescription || selectedCompany.role || "";
+                    const decoded = rawDesc
+                      .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+                      .replace(/&amp;/g, "&").replace(/&quot;/g, '"')
+                      .replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
+                      .replace(/<[^>]*>/g, " ") // strip HTML tags
+                      .replace(/\s+/g, " ").trim()
+                      .slice(0, 3000); // cap at 3000 chars for GPT
+
                     setGeneratePrefill({
                       companyName: (selectedCompany as any).companyName || selectedCompany.name,
                       jobTitle: selectedCompany.role || (selectedCompany as any).jobTitle || "",
-                      jobDescription: (selectedCompany as any).jobDescription || selectedCompany.role || "",
+                      jobDescription: decoded,
                       contactName: selectedCompany.contactName || "Hiring Manager",
                       companyId: String(selectedCompany.id),
                     });
