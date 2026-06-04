@@ -758,6 +758,7 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
   );
 
   // ── Phase 4: Build final GeneratedJob list ───────────────────────────────────
+  const { resolveSalary } = await import("./salaryService");
   const results: GeneratedJob[] = [];
 
   for (const job of selected) {
@@ -786,7 +787,13 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
       contactLinkedIn: contact.contactLinkedIn,
       jobDescription: job.description,
       jobLink: job.url,
-      salary: job.salary || "Competitive",
+      salary: await resolveSalary(
+        job.salary || "",
+        job.description || "",
+        job.title,
+        job.companyName,
+        standardizeCategory(job.category)
+      ),
       remote: job.remote || false,
       priority: getPriority(job.title),
       source: sourceLabel,
@@ -858,7 +865,7 @@ Return JSON array: companyName, jobTitle, category, jobDescription (2 sentences)
       contactName: "", contactEmail: "", linkedinUrl: "", contactLinkedIn: "",
       jobDescription: j.jobDescription || "",
       jobLink: j.jobLink || "",
-      salary: j.salary || "Competitive",
+      salary: j.salary || "",
       remote: j.remote === true,
       priority: ["High", "Medium", "Low"].includes(j.priority) ? j.priority : getPriority(j.jobTitle || ""),
       source: "GPT Research",

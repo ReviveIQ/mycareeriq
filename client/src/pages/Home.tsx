@@ -869,7 +869,7 @@ export default function Home() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap hidden xl:table-cell">
-                          {company.estSalary}
+                          {company.estSalary || <span className="text-slate-300">—</span>}
                         </td>
                         <td className="px-4 py-3 hidden md:table-cell">
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
