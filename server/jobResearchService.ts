@@ -355,26 +355,128 @@ async function enrichContact(companyName: string, domain: string, jobTitle?: str
 
 // Known non-US country/city/region indicators
 const NON_US_INDICATORS = [
+  // ── Europe ──────────────────────────────────────────────────────────────────
   // Countries
-  "united kingdom","england","scotland","wales","britain",
-  "canada","australia","germany","france","netherlands","ireland",
-  "spain","italy","sweden","switzerland","india","singapore","japan",
-  "china","brazil","mexico","poland","czech republic","denmark",
-  "norway","finland","portugal","austria","belgium","israel",
-  "uae","south korea","taiwan","new zealand",
+  "united kingdom","england","scotland","wales","northern ireland","britain","great britain",
+  "germany","france","netherlands","ireland","spain","italy","sweden","switzerland",
+  "belgium","austria","portugal","denmark","norway","finland","poland","czech republic",
+  "czechia","slovakia","hungary","romania","bulgaria","croatia","serbia","slovenia",
+  "greece","turkey","ukraine","russia","luxembourg","malta","cyprus","estonia",
+  "latvia","lithuania","iceland","liechtenstein","andorra","monaco","san marino",
+  // UK cities
+  "london","manchester","birmingham","edinburgh","glasgow","bristol","leeds",
+  "liverpool","sheffield","newcastle","nottingham","cardiff","belfast","oxford","cambridge",
+  // German cities
+  "berlin","munich","münchen","hamburg","frankfurt","cologne","köln","düsseldorf",
+  "stuttgart","dortmund","essen","bremen","hanover","hannover","nuremberg","nürnberg",
+  // French cities
+  "paris","lyon","marseille","toulouse","nice","bordeaux","lille","strasbourg","nantes",
+  // Other European cities
+  "amsterdam","rotterdam","the hague","utrecht","eindhoven",    // Netherlands
+  "dublin","cork","galway",                                      // Ireland
+  "madrid","barcelona","seville","sevilla","valencia","bilbao",  // Spain
+  "rome","milan","naples","napoli","turin","torino","florence","firenze", // Italy
+  "stockholm","gothenburg","malmö","göteborg",                   // Sweden
+  "zurich","zürich","geneva","bern","basel",                     // Switzerland
+  "vienna","wien","graz","salzburg","linz",                      // Austria
+  "brussels","bruxelles","antwerp","ghent","bruges",             // Belgium
+  "lisbon","porto","lisboa",                                     // Portugal
+  "copenhagen","aarhus","odense",                                // Denmark
+  "oslo","bergen","stavanger",                                   // Norway
+  "helsinki","tampere","espoo","oulu",                           // Finland
+  "warsaw","kraków","wrocław","gdansk","poznan","krakow","gdańsk", // Poland
+  "prague","brno","ostrava",                                     // Czech Republic
+  "budapest","debrecen",                                         // Hungary
+  "bucharest","cluj","timisoara",                                // Romania
+  "sofia","plovdiv",                                             // Bulgaria
+  "zagreb","split",                                              // Croatia
+  "athens","thessaloniki",                                       // Greece
+  "istanbul","ankara","izmir",                                   // Turkey
+  "kyiv","kiev","kharkiv",                                       // Ukraine
+  "moscow","saint petersburg","st. petersburg","novosibirsk",    // Russia
+  "luxembourg city",
+  "reykjavik",                                                   // Iceland
+  "tallinn","riga","vilnius",                                    // Baltics
+
+  // ── Asia Pacific ────────────────────────────────────────────────────────────
+  // Countries
+  "japan","china","india","singapore","australia","new zealand","south korea","korea",
+  "hong kong","taiwan","indonesia","malaysia","philippines","thailand","vietnam",
+  "bangladesh","pakistan","sri lanka","nepal","myanmar","cambodia","laos",
+  // Japanese cities
+  "tokyo","osaka","kyoto","nagoya","sapporo","fukuoka","kobe","yokohama","hiroshima",
+  // Chinese cities
+  "beijing","shanghai","shenzhen","guangzhou","chengdu","hangzhou","wuhan","tianjin",
+  "chongqing","nanjing","xi'an","xian","suzhou","qingdao","dongguan","shenyang",
+  // Indian cities
+  "bangalore","bengaluru","hyderabad","pune","mumbai","delhi","new delhi","chennai",
+  "kolkata","ahmedabad","jaipur","surat","lucknow","kanpur","nagpur","indore",
+  "noida","gurgaon","gurugram","chandigarh","coimbatore","kochi","vizag",
+  // Australian cities
+  "sydney","melbourne","brisbane","perth","adelaide","canberra","gold coast","newcastle",
+  // Other APAC cities
+  "singapore",
+  "seoul","busan","incheon",                                    // South Korea
+  "taipei","kaohsiung","taichung",                              // Taiwan
+  "hong kong",
+  "kuala lumpur","penang","johor bahru","petaling jaya",        // Malaysia
+  "jakarta","surabaya","bandung","medan",                       // Indonesia
+  "manila","quezon city","cebu",                                // Philippines
+  "bangkok","chiang mai",                                       // Thailand
+  "ho chi minh","hanoi","haiphong","da nang",                   // Vietnam
+  "auckland","wellington","christchurch",                       // New Zealand
+
+  // ── Middle East & Africa ────────────────────────────────────────────────────
+  // Countries
+  "israel","uae","united arab emirates","saudi arabia","qatar","kuwait","bahrain",
+  "jordan","lebanon","egypt","nigeria","kenya","south africa","ghana","ethiopia",
+  "tanzania","morocco","algeria","tunisia","senegal","cameroon","uganda","zimbabwe",
   // Cities
-  "toronto","vancouver","montreal","calgary","sydney","melbourne",
-  "brisbane","perth","berlin","munich","hamburg","frankfurt","paris",
-  "lyon","amsterdam","rotterdam","dublin","madrid","barcelona",
-  "rome","milan","stockholm","zurich","bangalore","bengaluru",
-  "hyderabad","pune","mumbai","delhi","tokyo","osaka","beijing",
-  "shanghai","são paulo","sao paulo","mexico city","warsaw","prague",
-  "copenhagen","oslo","helsinki","lisbon","vienna","brussels",
-  "tel aviv","dubai","seoul","taipei","auckland","london","manchester",
-  "birmingham","edinburgh","bristol","leeds","glasgow",
-  // Regions
-  "emea","apac","latam","latin america","anz","dach",
+  "tel aviv","jerusalem","haifa","raanana","herzliya","petah tikva","beer sheva",
+  "dubai","abu dhabi","sharjah",                                // UAE
+  "riyadh","jeddah","dammam",                                   // Saudi Arabia
+  "doha",                                                       // Qatar
+  "cairo","alexandria",                                         // Egypt
+  "lagos","abuja","ibadan","kano",                              // Nigeria
+  "nairobi","mombasa",                                          // Kenya
+  "johannesburg","cape town","durban","pretoria",               // South Africa
+  "accra","kumasi",                                             // Ghana
+  "casablanca","rabat","marrakech",                             // Morocco
+  "amman","beirut",
+
+  // ── Americas (non-US) ───────────────────────────────────────────────────────
+  // Countries
+  "canada","brazil","mexico","argentina","colombia","chile","peru","venezuela",
+  "ecuador","bolivia","uruguay","paraguay","panama","costa rica","guatemala",
+  "honduras","el salvador","nicaragua","cuba","dominican republic","haiti",
+  "trinidad","jamaica","bahamas",
+  // Canadian cities
+  "toronto","vancouver","montreal","calgary","ottawa","edmonton","winnipeg",
+  "québec","quebec city","hamilton","kitchener","london ontario","halifax",
+  "saskatoon","regina","victoria bc",
+  // Brazilian cities
+  "são paulo","sao paulo","rio de janeiro","brasilia","fortaleza","salvador",
+  "belo horizonte","manaus","curitiba","recife","porto alegre","belém",
+  // Mexican cities
+  "mexico city","guadalajara","monterrey","cancun","tijuana","puebla","merida",
+  // Other LatAm cities
+  "buenos aires","bogota","bogotá","santiago","lima","caracas","quito",
+  "montevideo","asuncion","panama city","san josé","costa rica",
+
+  // ── Regions / Multi-country ─────────────────────────────────────────────────
+  "emea","apac","latam","latin america","anz","dach","cee","mena","sea",
+  "southeast asia","sub-saharan africa","middle east","nordic","nordics",
+  "europe","asia","africa","oceania",
+  "eu ","european union","eurozone",
+  "worldwide","global","international", // these often mean non-US-specific
+
+  // ── Country codes that appear in job locations ───────────────────────────────
+  ", uk"," uk,",", gb",", de",", fr",", nl",", ie",", es",", it",", se",
+  ", ch",", be",", at",", pt",", dk",", no",", fi",", pl",", cz",", hu",
+  ", au",", nz",", sg",", jp",", cn",", in",", kr",", hk",", tw",
+  ", ca",", mx",", br",", ar",", co",", cl",", il",", ae",", za",
 ];
+
 
 // US state codes for state-level filtering
 const US_STATE_CODES = new Set([

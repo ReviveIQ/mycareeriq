@@ -151,7 +151,7 @@ async function discoverCompaniesFromProfile(
         },
         {
           role: "user",
-          content: `Based on this candidate's profile, suggest ${count} B2B SaaS companies that would be strong matches for their background and actively hire for their target roles.
+          content: `Based on this candidate's profile, suggest ${count} companies that would be strong matches for their background and actively hire for their target roles.
 
 Candidate Profile:
 ${profileSummary}
@@ -160,32 +160,33 @@ Target Roles: ${targetRoles}
 Target Categories: ${targetCategories}
 
 Rules:
-- Match companies to the candidate's SPECIFIC background and industry expertise
-- If they've sold security software, suggest security companies
-- If they've sold HR tech, suggest HR tech companies  
-- If they're enterprise-level, suggest enterprise-stage companies
-- Include companies competitors to their past employers (they understand the space)
-- Mix company sizes: some scale-ups (200-500 employees), some growth (500-2000), some enterprise (2000+)
-- ONLY suggest companies that use Greenhouse or Ashby ATS (most B2B SaaS companies do)
-- Include US companies known for remote or distributed sales teams
+- Match companies to the candidate's SPECIFIC background — not just B2B SaaS
+- If they've sold into healthcare, suggest healthcare tech AND traditional healthcare orgs
+- If they've sold enterprise software, suggest companies across ALL industries that buy enterprise software
+- If they're in revenue/sales leadership, suggest companies in FinTech, Healthcare, Logistics, Real Estate, Manufacturing, Media, Retail — anywhere senior sales talent is needed
+- Include direct competitors to their past employers
+- Include companies in adjacent industries where their skills transfer
+- Include companies of similar size to where they've worked (don't just suggest Fortune 500)
+- Mix company types: SaaS, services, consulting, enterprise software, platforms
+- ONLY suggest companies that use Greenhouse or Ashby ATS
+- Prioritize companies known for US remote or distributed sales teams
 - Vary the list — don't suggest the same companies every time
 
 For each company provide:
 - The most likely Greenhouse/Ashby board slug (usually lowercase company name or domain stem)
-- Example: HubSpot → "hubspot", Gong → "gong", Rippling → "rippling"
 
 Return JSON array:
 [
   {
-    "name": "Gong",
-    "domain": "gong.io",
-    "category": "Revenue Intelligence",
-    "suggestedSlug": "gong",
-    "reasoning": "Candidate sold RevIntel tools, direct competitor ecosystem"
+    "name": "Veeva Systems",
+    "domain": "veeva.com",
+    "category": "Life Sciences SaaS",
+    "suggestedSlug": "veeva",
+    "reasoning": "Candidate has healthcare/pharma sales background"
   }
 ]
 
-Return ONLY the JSON array.`,
+Return ONLY the JSON array. Start with [ end with ].`,
         },
       ],
       max_tokens: 2000,
