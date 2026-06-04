@@ -111,17 +111,33 @@ export default function Home() {
   const [isRunning, setIsRunning] = useState(false);
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
+  const verifySession = trpc.subscription.verifySession.useMutation();
 
   // Handle Stripe redirect back after checkout
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const payment = params.get("payment");
     const plan = params.get("plan");
+    const sessionId = params.get("session_id");
+
     if (payment === "success") {
       window.history.replaceState({}, "", window.location.pathname);
       const label = plan?.includes("annual") ? "Pro Annual" : "Pro Monthly";
-      toast.success(`🎉 Welcome to ${label}! Unlimited research runs activated.`, { duration: 6000 });
-      utils.subscription.getStatus.invalidate();
+
+      // Verify session directly with Stripe as fallback for webhook delay
+      if (sessionId) {
+        verifySession.mutateAsync({ sessionId }).then(() => {
+          utils.subscription.getStatus.invalidate();
+          toast.success(`🎉 Welcome to ${label}! Unlimited research runs activated.`, { duration: 6000 });
+        }).catch(() => {
+          // Webhook may have already handled it
+          utils.subscription.getStatus.invalidate();
+          toast.success(`🎉 Welcome to ${label}! Unlimited research runs activated.`, { duration: 6000 });
+        });
+      } else {
+        utils.subscription.getStatus.invalidate();
+        toast.success(`🎉 Welcome to ${label}! Unlimited research runs activated.`, { duration: 6000 });
+      }
     } else if (payment === "canceled") {
       window.history.replaceState({}, "", window.location.pathname);
       toast.info("Checkout canceled — your plan wasn't changed.");
