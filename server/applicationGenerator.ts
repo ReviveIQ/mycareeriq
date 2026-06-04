@@ -140,12 +140,17 @@ async function generateCoverLetterFromBrief(
   mode: CoverLetterMode,
   jobTitle: string,
   companyName: string,
-  hiringManager: string
+  hiringManager: string,
+  candidateName: string = ""
 ): Promise<string> {
   const modeDesc = MODE_DESCRIPTIONS[mode];
   const salutation = hiringManager && hiringManager !== "Hiring Manager"
     ? `Dear ${hiringManager},`
     : "Dear Hiring Manager,";
+
+  const signoff = candidateName
+    ? `Sincerely,\n\n${candidateName}`
+    : "Sincerely,\n\n[Your Name]";
 
   const transitionParagraph = brief.transitionEvent && brief.transitionEvent !== "none" && brief.transitionStatement
     ? `
@@ -202,9 +207,7 @@ ${salutation}
 
 [Para 4: Why ${companyName} specifically — ${brief.closingHook}. ${brief.employerNeedsMatch}. Call to action.]
 
-Sincerely,
-
-[Candidate Name]
+${signoff}
 
 Write the full letter now. Start with the date. Replace all bracketed instructions with actual prose. 250-350 words for the body paragraphs.`,
       },
@@ -289,10 +292,19 @@ export async function generateCoverLetter(
 ): Promise<string> {
   // Get user's resume from researchConfig if userId provided
   let resumeText = "";
+  let candidateName = "";
+
   if (userId) {
     try {
       const db = await getDb();
       if (db) {
+        // Get name from users table first — most reliable source
+        const { users } = await import("../drizzle/schema");
+        const { eq: eqOp } = await import("drizzle-orm");
+        const userRows = await db.select({ name: users.name, email: users.email })
+          .from(users).where(eqOp(users.id, userId)).limit(1);
+        candidateName = userRows[0]?.name || "";
+
         const configs = await db.select().from(researchConfig).where(eq(researchConfig.userId, userId));
         const config = configs[0];
         if (config?.lastDocumentParsed) {
@@ -300,12 +312,12 @@ export async function generateCoverLetter(
             ? JSON.parse(config.lastDocumentParsed)
             : config.lastDocumentParsed;
 
-          // Use raw resume text if available (best for cover letter generation)
           if (parsed?.rawText) {
             resumeText = parsed.rawText;
           } else if (parsed?.extracted) {
-            // Fall back to structured extracted data
             const e = parsed.extracted;
+            // Use resume name if user account name not set
+            if (!candidateName && e.candidateName) candidateName = e.candidateName;
             resumeText = [
               e.candidateName ? `Name: ${e.candidateName}` : "",
               e.currentTitle ? `Current Title: ${e.currentTitle}` : "",
@@ -322,7 +334,6 @@ export async function generateCoverLetter(
     }
   }
 
-  // Fallback if no resume uploaded
   if (!resumeText) {
     console.warn("[CoverLetter] No resume found for userId", userId, "— using generic fallback");
     resumeText = `Experienced professional applying for ${jobTitle} role. Please upload a resume in Settings for a personalized cover letter.`;
@@ -335,7 +346,7 @@ export async function generateCoverLetter(
   const mode = requestedMode || autoSelectMode(jobTitle, brief.transitionEvent);
 
   // Stage 2 — Generate cover letter
-  let coverLetter = await generateCoverLetterFromBrief(brief, mode, jobTitle, companyName, contactName);
+  let coverLetter = await generateCoverLetterFromBrief(brief, mode, jobTitle, companyName, contactName, candidateName);
 
   // Stage 3 — Score (retry once if below threshold)
   let scores = await scoreCoverLetter(coverLetter, jobDescription, companyName);
