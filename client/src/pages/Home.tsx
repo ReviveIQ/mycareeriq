@@ -878,8 +878,14 @@ export default function Home() {
                             <span className="text-slate-400 text-xs">Onsite</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap hidden xl:table-cell">
-                          {company.estSalary || <span className="text-slate-300">—</span>}
+                        <td className="px-4 py-3 text-xs whitespace-nowrap hidden xl:table-cell">
+                          {company.estSalary ? (
+                            <span className={company.estSalary.startsWith("Est.") ? "text-slate-400 italic" : "text-slate-700 font-medium"}>
+                              {company.estSalary}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 hidden md:table-cell">
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>

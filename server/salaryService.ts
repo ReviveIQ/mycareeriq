@@ -146,7 +146,7 @@ export async function estimateSalaryWithGPT(
         messages: [
           {
             role: "system",
-            content: `You are a compensation analyst. Return ONLY a salary range in this exact format: "$XXXk - $XXXk OTE" or "$XXXk - $XXXk base". No other text. Use US market rates. For sales roles include OTE (on-target earnings). For non-sales roles use base salary.`,
+            content: `You are a compensation analyst. Return ONLY a salary range like: $130K - $160K base or $180K - $240K OTE. No quotes, no extra words, no punctuation. Use US market rates. Sales roles use OTE. Non-sales roles use base.`,
           },
           {
             role: "user",
@@ -167,10 +167,12 @@ Estimate the compensation range for this role.`,
     const data = await res.json() as any;
     const estimate = (data.choices?.[0]?.message?.content || "").trim();
 
+    // Strip any quotes GPT may have added, clean up formatting
+    const clean = estimate.replace(/^["']|["']$/g, "").trim();
     // Validate it looks like a real range
-    if (/\$\d+k?\s*[-–]\s*\$\d+k?/i.test(estimate)) {
-      ESTIMATE_CACHE.set(cacheKey, estimate);
-      return estimate;
+    if (/\$\d+k?\s*[-–]\s*\$\d+k?/i.test(clean)) {
+      ESTIMATE_CACHE.set(cacheKey, clean);
+      return clean;
     }
     return "";
   } catch {
@@ -196,7 +198,7 @@ export async function resolveSalary(
 
   // 3. GPT estimate
   const estimated = await estimateSalaryWithGPT(jobTitle, companyName, category, jobDescription);
-  if (estimated) return `~${estimated} est.`;
+  if (estimated) return `Est. ${estimated}`;
 
   return "";
 }
