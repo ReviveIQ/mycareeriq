@@ -363,8 +363,12 @@ export default function Home() {
         return;
       }
 
+      const isPro = (result.monthlyLimit || 10) >= 9999;
       const runsLeft = (result.monthlyLimit || 10) - (result.runsThisMonth || 0);
-      toast.success(`Job research started — ${runsLeft} run${runsLeft === 1 ? "" : "s"} remaining this month`);
+      toast.success(isPro
+        ? "Job research started — checking companies for new roles"
+        : `Job research started — ${runsLeft} run${runsLeft === 1 ? "" : "s"} remaining this month`
+      );
       refetchRateLimit();
 
       // Poll every 5 seconds for 60 seconds — track previous count to detect when jobs land
