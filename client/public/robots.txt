@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://mycareeriq.reviveiqi.com/sitemap.xml
