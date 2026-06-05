@@ -2,7 +2,7 @@
 // DM Sans (headers) + Inter (body), off-white background, deep indigo accent
 // CRM-like interface with status badges, filter chips, and sortable columns
 
-export type PipelineStage = "Research" | "Outreach" | "Applied" | "Interviewing" | "Offer" | "Rejected" | "Dismissed";
+export type PipelineStage = "Research" | "Cover Letter" | "Outreach" | "Applied" | "Interviewing" | "Offer" | "Rejected" | "Dismissed";
 
 export type CompanyCategory = string;
 
@@ -28,6 +28,7 @@ export const pipelineData: Company[] = [];
 
 export const stageColors: Record<PipelineStage, string> = {
   Research: "bg-slate-100 text-slate-700 border-slate-200",
+  "Cover Letter": "bg-indigo-50 text-indigo-700 border-indigo-200",
   Outreach: "bg-amber-50 text-amber-700 border-amber-200",
   Applied: "bg-blue-50 text-blue-700 border-blue-200",
   Interviewing: "bg-violet-50 text-violet-700 border-violet-200",
@@ -99,6 +100,7 @@ export const categoryColors = new Proxy(_categoryColorMap, {
 
 export const stageOrder: PipelineStage[] = [
   "Research",
+  "Cover Letter",
   "Outreach",
   "Applied",
   "Interviewing",

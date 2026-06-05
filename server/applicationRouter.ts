@@ -67,7 +67,7 @@ export const applicationRouter = router({
             salary: "",
             companySize: "",
             priority: "Medium",
-            stage: "Research",
+            stage: "Cover Letter",
             notes: "Added via cover letter generation",
           });
           addedToPipeline = true;
