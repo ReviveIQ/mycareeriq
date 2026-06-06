@@ -6,6 +6,7 @@ import { SignJWT, jwtVerify } from "jose";
 import { ENV } from "./env";
 import type { User } from "../../drizzle/schema";
 import * as crypto from "crypto";
+import { notifyNewUser } from "./notification";
 
 function getJwtSecret(): Uint8Array {
   const secret = ENV.cookieSecret || "fallback-secret-change-in-production";
@@ -89,8 +90,9 @@ export function registerAuthRoutes(app: Express) {
       const token = await createSessionToken(user.id, user.email!, user.name!);
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      // Also return token in response for localStorage fallback
       res.json({ success: true, token, user: { id: user.id, email: user.email, name: user.name } });
+      // Owner notification (non-blocking)
+      notifyNewUser(email, name).catch(() => {});
     } catch (error) {
       console.error("[Auth] Register failed", error);
       res.status(500).json({ error: "Registration failed" });

@@ -1,6 +1,5 @@
 /**
- * Notification service — sends daily job research summaries via email
- * Uses nodemailer (Gmail SMTP) — same as emailService.ts
+ * Notification service — sends alerts via Gmail SMTP
  * Falls back to console.log if email not configured
  */
 import nodemailer from "nodemailer";
@@ -25,7 +24,6 @@ export async function notifyOwner(payload: NotificationPayload): Promise<boolean
   const ownerEmail = process.env.OWNER_EMAIL || process.env.GMAIL_USER || process.env.GMAIL_APP_EMAIL;
 
   if (!transporter || !ownerEmail) {
-    // Dev fallback — just log it
     console.log(`[Notification] ${title}\n${content}`);
     return true;
   }
@@ -44,4 +42,20 @@ export async function notifyOwner(payload: NotificationPayload): Promise<boolean
     console.warn("[Notification] Email failed:", err);
     return false;
   }
+}
+
+export async function notifyNewUser(email: string, name: string): Promise<void> {
+  const time = new Date().toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "medium", timeStyle: "short" });
+  await notifyOwner({
+    title: `🆕 New MyCareerIQ signup — ${email}`,
+    content: `New free account created\n\nName: ${name || "—"}\nEmail: ${email}\nTime: ${time} ET\nPlan: Free`,
+  });
+}
+
+export async function notifyPurchase(email: string, plan: string, amount: string): Promise<void> {
+  const time = new Date().toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "medium", timeStyle: "short" });
+  await notifyOwner({
+    title: `💰 MyCareerIQ purchase — ${amount} — ${email}`,
+    content: `New purchase 🎉\n\nEmail: ${email}\nPlan: ${plan}\nAmount: ${amount}\nTime: ${time} ET`,
+  });
 }

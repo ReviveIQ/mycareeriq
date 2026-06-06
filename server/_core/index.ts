@@ -290,6 +290,19 @@ async function startServer() {
               .set(result.updates as any)
               .where(eq(users.id, result.userId));
             console.log(`[Stripe] Updated user ${result.userId}: plan=${result.updates.plan}, status=${result.updates.planStatus}`);
+
+            // Owner purchase notification
+            try {
+              const userRows = await db.select({ email: users.email, name: users.name })
+                .from(users).where(eq(users.id, result.userId)).limit(1);
+              const u = userRows[0];
+              if (u) {
+                const { notifyPurchase } = await import("./notification");
+                const plan = result.updates.plan === "pro" ? "MyCareerIQ Pro Monthly" : "MyCareerIQ Pro Annual";
+                const amount = result.updates.plan === "pro" ? "$49.99/month" : "$299/year";
+                notifyPurchase(u.email || "", plan, amount).catch(() => {});
+              }
+            } catch { /* non-fatal */ }
           }
         }
 
