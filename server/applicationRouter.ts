@@ -56,7 +56,7 @@ export const applicationRouter = router({
             userId: ctx.user.id,
             companyId: input.companyId,
             companyName: input.companyName,
-            category: "Direct Apply",
+            category: "Cover Letter",
             jobTitle: input.jobTitle,
             jobDescription: input.jobDescription,
             jobLink: "",
