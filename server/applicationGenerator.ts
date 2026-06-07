@@ -358,7 +358,7 @@ export async function generateCoverLetter(
 
   console.log(`[CoverLetter] Generated for ${companyName} — Mode: ${mode} — Scores: A${scores.authenticity}/R${scores.relevance}/R${scores.readability}`);
 
-  return coverLetter;
+  return { coverLetter, scores, mode, brief };
 }
 
 // ── Generate tailored resume (unchanged) ─────────────────────────────────────
@@ -428,10 +428,16 @@ export async function generateApplicationDocuments(
   jobDescription: string,
   contactName: string,
   userId?: number
-): Promise<{ coverLetter: string; tailoredResume: string }> {
-  const [coverLetter, tailoredResume] = await Promise.all([
+): Promise<{ coverLetter: string; tailoredResume: string; scores?: any; mode?: string; brief?: any }> {
+  const [letterResult, tailoredResume] = await Promise.all([
     generateCoverLetter(companyName, jobTitle, jobDescription, contactName, userId),
     generateTailoredResume(jobTitle, jobDescription, companyName, userId),
   ]);
-  return { coverLetter, tailoredResume };
+  return {
+    coverLetter: letterResult.coverLetter,
+    tailoredResume,
+    scores: letterResult.scores,
+    mode: letterResult.mode,
+    brief: letterResult.brief,
+  };
 }

@@ -46,10 +46,23 @@ export const pipelineRouter = router({
         console.log("[PipelineRouter] First row:", JSON.stringify(sample).slice(0, 200));
       }
 
+      // Also fetch companyIds that have cover letters
+      const appResult = await db.execute(
+        sql`SELECT DISTINCT companyId FROM applications WHERE userId = ${userId}`
+      ) as any;
+      let appRows: any[] = [];
+      if (Array.isArray(appResult) && Array.isArray(appResult[0])) {
+        appRows = appResult[0];
+      } else if (Array.isArray(appResult)) {
+        appRows = appResult;
+      }
+      const companyIdsWithCoverLetters = new Set(appRows.map((r: any) => r.companyId || r.companyid));
+
       // Transform to pipeline format
       // TiDB raw SQL returns lowercase field names — handle both cases
       const companies = jobs.map((job: any) => {
         const get = (camel: string, lower: string) => job[camel] ?? job[lower] ?? job[camel.toLowerCase()] ?? "";
+        const companyId = get("companyId", "companyid") || get("company_id", "company_id");
         return {
           id: job.id,
           name: get("companyName", "companyname") || get("company_name", "company_name"),
@@ -65,6 +78,8 @@ export const pipelineRouter = router({
           remoteOk: Boolean(job.remote),
           estSalary: get("salary", "salary"),
           companySize: get("companySize", "companysize") || get("company_size", "company_size"),
+          companyId,
+          hasCoverLetter: companyId ? companyIdsWithCoverLetters.has(companyId) : false,
         };
       });
 

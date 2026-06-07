@@ -25,13 +25,14 @@ export const applicationRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       try {
-        const { coverLetter, tailoredResume } = await generateApplicationDocuments(
+        const result = await generateApplicationDocuments(
           input.companyName,
           input.jobTitle,
           input.jobDescription,
           input.contactName,
           ctx.user.id
         );
+        const { coverLetter, tailoredResume } = result;
 
         const db = await getDb();
         if (!db) throw new Error("Database not available");
@@ -102,6 +103,8 @@ export const applicationRouter = router({
           coverLetter,
           tailoredResume,
           addedToPipeline,
+          scores: result.scores,
+          mode: result.mode,
         };
       } catch (error) {
         console.error("[ApplicationRouter] Generate error:", error);

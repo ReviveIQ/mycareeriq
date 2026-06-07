@@ -115,9 +115,10 @@ export default function Home() {
   const utils = trpc.useUtils();
   const verifySession = trpc.subscription.verifySession.useMutation();
   const { data: coverLetterHistory = [] } = trpc.application.list.useQuery();
-  const coverLetterCompanyIds = new Set(
-    (coverLetterHistory as any[]).map((a: any) => String(a.companyId))
-  );
+  const coverLetterCompanyIds = new Set([
+    ...(coverLetterHistory as any[]).map((a: any) => String(a.companyId)),
+    ...pipelineData.filter((c: any) => c.hasCoverLetter).map((c: any) => String(c.companyId)),
+  ]);
 
   // Handle Stripe redirect back after checkout
   useEffect(() => {

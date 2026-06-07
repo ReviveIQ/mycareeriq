@@ -26,6 +26,9 @@ export default function GenerateApplication({ prefill }: GenerateApplicationProp
   const [copied, setCopied] = useState(false);
   const [step, setStep] = useState<"form" | "generated">("form");
   const [activeView, setActiveView] = useState<"generate" | "history">("generate");
+  const [scores, setScores] = useState<{ authenticity: number; relevance: number; readability: number } | null>(null);
+  const [mode, setMode] = useState<string>("");
+  const [isImproving, setIsImproving] = useState(false);
 
   const generateMutation = trpc.application.generate.useMutation();
   const utils = trpc.useUtils();
@@ -49,6 +52,8 @@ export default function GenerateApplication({ prefill }: GenerateApplicationProp
       });
       setCoverLetter(result.coverLetter);
       setApplicationId(result.applicationId);
+      setScores(result.scores || null);
+      setMode(result.mode || "");
       setStep("generated");
       refetchHistory();
       utils.pipeline.getCompanies.invalidate();
@@ -111,7 +116,31 @@ export default function GenerateApplication({ prefill }: GenerateApplicationProp
     if (!prefill) {
       setCompanyName(""); setJobTitle(""); setJobDescription(""); setContactName("Hiring Manager");
     }
-    setCoverLetter(""); setApplicationId(null); setStep("form");
+    setCoverLetter(""); setApplicationId(null); setStep("form"); setScores(null); setMode("");
+  };
+
+  const handleImprove = async () => {
+    if (!companyName || !jobTitle) return;
+    setIsImproving(true);
+    try {
+      const result = await generateMutation.mutateAsync({
+        companyName,
+        jobTitle,
+        jobDescription: jobDescription || jobTitle,
+        contactName: contactName || "Hiring Manager",
+        contactEmail: "",
+        companyId: prefill?.companyId || `${companyName.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`,
+      });
+      setCoverLetter(result.coverLetter);
+      setScores(result.scores || null);
+      setMode(result.mode || "");
+      refetchHistory();
+      toast.success("Cover letter regenerated");
+    } catch {
+      toast.error("Regeneration failed — please try again");
+    } finally {
+      setIsImproving(false);
+    }
   };
 
   const formatDate = (d: any) => {
@@ -341,8 +370,9 @@ export default function GenerateApplication({ prefill }: GenerateApplicationProp
       {/* ── GENERATED VIEW ───────────────────────────────────────────────── */}
       {activeView === "generate" && step === "generated" && (
         <div className="space-y-4">
+          {/* Header with scores */}
           <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                 <h2 className="text-base font-bold text-slate-900">Cover Letter Ready</h2>
@@ -353,13 +383,48 @@ export default function GenerateApplication({ prefill }: GenerateApplicationProp
                 <span>{jobTitle}</span>
               </div>
             </div>
-            <p className="text-xs text-slate-500 ml-7">Saved to your history · Review and edit below</p>
+
+            {/* Mode chip + Score badges */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {mode && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-full border border-indigo-100">
+                  ✦ {mode.replace(/_/g, " ")}
+                </span>
+              )}
+              {scores && (
+                <>
+                  {[
+                    { label: "Authentic", value: scores.authenticity },
+                    { label: "Relevant", value: scores.relevance },
+                    { label: "Readable", value: scores.readability },
+                  ].map(s => (
+                    <span key={s.label} className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full border ${
+                      s.value >= 8 ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                      : s.value >= 6 ? "bg-amber-50 text-amber-700 border-amber-100"
+                      : "bg-red-50 text-red-700 border-red-100"
+                    }`}>
+                      {s.label} {s.value}/10
+                    </span>
+                  ))}
+                </>
+              )}
+            </div>
           </div>
 
+          {/* Editable letter */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50">
               <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Cover Letter</span>
-              <span className="text-xs text-slate-400">{coverLetter.split(/\s+/).filter(Boolean).length} words</span>
+              <div className="flex items-center gap-3">
+                <span className={`text-xs font-medium ${
+                  coverLetter.split(/\s+/).filter(Boolean).length < 250 ? "text-amber-500"
+                  : coverLetter.split(/\s+/).filter(Boolean).length > 350 ? "text-amber-500"
+                  : "text-emerald-600"
+                }`}>
+                  {coverLetter.split(/\s+/).filter(Boolean).length} words
+                  <span className="text-slate-400 font-normal ml-1">(target 250–350)</span>
+                </span>
+              </div>
             </div>
             <textarea value={coverLetter} onChange={e => setCoverLetter(e.target.value)}
               className="w-full px-6 py-5 text-sm text-slate-700 leading-relaxed resize-none focus:outline-none"
@@ -367,6 +432,7 @@ export default function GenerateApplication({ prefill }: GenerateApplicationProp
             />
           </div>
 
+          {/* Actions */}
           <div className="flex gap-3">
             <Button onClick={() => handleDownload("current", companyName)}
               disabled={isDownloading === "current"}
@@ -377,8 +443,12 @@ export default function GenerateApplication({ prefill }: GenerateApplicationProp
             <Button onClick={() => handleCopy()} variant="outline" className="flex-1 h-11 gap-2 border-slate-200">
               {copied ? <><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Copied!</> : <><Copy className="w-4 h-4" /> Copy Text</>}
             </Button>
+            <Button onClick={handleImprove} variant="outline" disabled={isImproving}
+              className="h-11 gap-2 border-slate-200 px-4 text-indigo-600 hover:text-indigo-700 hover:border-indigo-200" title="Regenerate">
+              {isImproving ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            </Button>
             <Button onClick={handleReset} variant="outline" className="h-11 gap-2 border-slate-200 px-4" title="Start over">
-              <RefreshCw className="w-4 h-4" />
+              <Sparkles className="w-4 h-4" />
             </Button>
           </div>
 
