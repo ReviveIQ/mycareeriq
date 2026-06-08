@@ -492,3 +492,40 @@ async function startServer() {
 }
 
 startServer().catch(console.error);
+
+// ── Process-level error alerting ─────────────────────────────────────────────
+async function sendCrashAlert(type: string, err: any) {
+  const user = process.env.GMAIL_USER || process.env.GMAIL_APP_EMAIL;
+  const pass = process.env.GMAIL_APP_PASSWORD;
+  const owner = process.env.OWNER_EMAIL || user;
+  if (!user || !pass || !owner) return;
+  const msg = err instanceof Error ? err.message : String(err);
+  const stack = err instanceof Error ? (err.stack || "").slice(0, 800) : "";
+  const time = new Date().toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "medium", timeStyle: "short" });
+  try {
+    const nodemailer = await import("nodemailer");
+    const transporter = nodemailer.default.createTransport({ service: "gmail", auth: { user, pass } });
+    await transporter.sendMail({
+      from: `"MyCareerIQ Alerts" <${user}>`,
+      to: owner,
+      subject: `🚨 MyCareerIQ ${type} — ${msg.slice(0, 60)}`,
+      text: `MyCareerIQ ${type}\n\nTime: ${time} ET\nError: ${msg}\n\n${stack}\n\nCheck Railway logs: MyCareerIQ/production`,
+    });
+  } catch { /* never throw in crash handler */ }
+}
+
+process.on("uncaughtException", async (err) => {
+  console.error("[MyCareerIQ] uncaughtException:", err);
+  await sendCrashAlert("uncaughtException", err);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", async (reason) => {
+  console.error("[MyCareerIQ] unhandledRejection:", reason);
+  await sendCrashAlert("unhandledRejection", reason);
+});
+
+process.on("SIGTERM", () => {
+  console.log("[MyCareerIQ] SIGTERM received — shutting down gracefully");
+  process.exit(0);
+});
