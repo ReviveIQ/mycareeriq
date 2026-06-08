@@ -15,6 +15,7 @@ export interface LeverJob {
   remote: boolean;
   team: string;
   location: string;
+  postedAt?: string; // ISO date string from createdAt
 }
 
 /**
@@ -132,6 +133,7 @@ export async function fetchLeverJobs(
       remote: isRemote,
       team: j.categories?.team || "",
       location: j.categories?.location || "",
+      postedAt: j.createdAt ? new Date(j.createdAt).toISOString() : undefined,
     };
   });
 }

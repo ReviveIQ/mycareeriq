@@ -120,7 +120,10 @@ export const companies = mysqlTable("companies", {
   
   // Custom notes
   notes: text("notes"),
-  
+
+  // Job post date (for freshness filtering)
+  jobPostedAt: timestamp("jobPostedAt"),
+
   // Timestamps
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

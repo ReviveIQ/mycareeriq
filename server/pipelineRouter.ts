@@ -22,7 +22,7 @@ export const pipelineRouter = router({
       // db.execute returns [RowDataPacket[], FieldPacket[]] in mysql2
       // RowDataPacket objects have named fields — but result[0] is the rows array
       const rawResult = await db.execute(
-        sql`SELECT * FROM companies WHERE userId = ${userId} ORDER BY createdAt DESC`
+        sql`SELECT * FROM companies WHERE userId = ${userId} AND (jobPostedAt IS NULL OR jobPostedAt >= DATE_SUB(NOW(), INTERVAL 30 DAY)) ORDER BY createdAt DESC`
       ) as any;
 
       // Parse mysql2 result format: either [rows[], fields[]] or rows[] directly
@@ -80,6 +80,7 @@ export const pipelineRouter = router({
           companySize: get("companySize", "companysize") || get("company_size", "company_size"),
           companyId,
           hasCoverLetter: companyId ? companyIdsWithCoverLetters.has(companyId) : false,
+          jobPostedAt: job.jobPostedAt || job.jobpostedat || null,
         };
       });
 

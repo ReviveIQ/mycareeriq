@@ -25,6 +25,7 @@ export interface GeneratedJob {
   source: string;
   contactLinkedIn: string;
   fitScore?: number;
+  postedAt?: string; // ISO date string — used for freshness filtering
 }
 
 // ── Category taxonomy ─────────────────────────────────────────────────────────
@@ -132,6 +133,7 @@ interface RawJob {
   remote: boolean;
   jobId: string;      // ATS-native job ID (e.g. "8044511")
   location: string;   // raw location string — used for country filtering
+  postedAt?: string;  // ISO date string — used for freshness filtering
 }
 
 async function fetchAllJobsFromCompany(
@@ -153,6 +155,7 @@ async function fetchAllJobsFromCompany(
           remote: j.remote,
           jobId: idMatch?.[1] || String(j.url.split("/").pop() || ""),
           location: j.location || "",
+          postedAt: j.postedAt,
         };
       });
     }
@@ -169,6 +172,7 @@ async function fetchAllJobsFromCompany(
           remote: j.remote,
           jobId: idMatch?.[1] || "",
           location: j.location || "",
+          postedAt: j.postedAt,
         };
       });
     }
@@ -798,6 +802,7 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
       priority: getPriority(job.title),
       source: sourceLabel,
       fitScore: job.fitScore,
+      postedAt: job.postedAt,
     });
   }
 
@@ -911,6 +916,7 @@ export async function addJobsToPipeline(jobs: GeneratedJob[], userId: number = 1
         priority: job.priority,
         stage: "Research",
         notes: `Source: ${job.source}${job.fitScore ? ` | Fit: ${job.fitScore}/10` : ""}`,
+        jobPostedAt: job.postedAt ? new Date(job.postedAt) : undefined,
       });
       existingIds.add(job.companyId); // track newly added IDs within this run
       addedCount++;
