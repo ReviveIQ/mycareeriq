@@ -115,10 +115,6 @@ export default function Home() {
   const utils = trpc.useUtils();
   const verifySession = trpc.subscription.verifySession.useMutation();
   const { data: coverLetterHistory = [] } = trpc.application.list.useQuery();
-  const coverLetterCompanyIds = new Set([
-    ...(coverLetterHistory as any[]).map((a: any) => String(a.companyId)),
-    ...pipelineData.filter((c: any) => c.hasCoverLetter).map((c: any) => String(c.companyId)),
-  ]);
 
   // Handle Stripe redirect back after checkout
   useEffect(() => {
@@ -155,6 +151,10 @@ export default function Home() {
 
   // Fetch pipeline data from tRPC
   const { data: pipelineData = [], isLoading } = trpc.pipeline.getCompanies.useQuery();
+  const coverLetterCompanyIds = new Set([
+    ...(coverLetterHistory as any[]).map((a: any) => String(a.companyId)),
+    ...pipelineData.filter((c: any) => c.hasCoverLetter).map((c: any) => String(c.companyId)),
+  ]);
   const { data: companyCount = 0 } = trpc.pipeline.getCompanyCount.useQuery();
   const { data: highPriorityCount = 0 } = trpc.pipeline.getHighPriority.useQuery();
   // Active jobs (excludes dismissed) — used for all KPI counts
