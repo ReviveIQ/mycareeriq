@@ -446,6 +446,7 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <a href="/faq" className="hidden sm:block text-xs text-slate-400 hover:text-slate-600 transition-colors">FAQ</a>
 
             {/* Run Now — always visible */}
             <div className="flex flex-col items-center gap-0.5">
