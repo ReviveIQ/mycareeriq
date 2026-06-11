@@ -60,6 +60,11 @@ export function serveStatic(app: Express) {
 
   app.use(express.static(distPath));
 
+  // Clean URL routes
+  app.get("/faq", (_req, res) => {
+    res.sendFile(path.resolve(distPath, "faq.html"));
+  });
+
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
