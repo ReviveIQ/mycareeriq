@@ -65,6 +65,14 @@ export function serveStatic(app: Express) {
     res.sendFile(path.resolve(distPath, "faq.html"));
   });
 
+  app.get("/privacy", (_req, res) => {
+    res.sendFile(path.resolve(distPath, "privacy.html"));
+  });
+
+  app.get("/terms", (_req, res) => {
+    res.sendFile(path.resolve(distPath, "terms.html"));
+  });
+
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
