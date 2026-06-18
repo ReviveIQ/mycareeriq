@@ -17,7 +17,8 @@ function getTransporter() {
         user: "bryan.greer1@gmail.com",
         pass: gmailPassword,
       },
-    });
+      family: 4,
+    } as any);
   }
   return transporter;
 }

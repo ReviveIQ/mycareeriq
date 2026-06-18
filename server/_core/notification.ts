@@ -13,7 +13,7 @@ function getTransporter() {
   const user = process.env.GMAIL_USER || process.env.GMAIL_APP_EMAIL;
   const pass = process.env.GMAIL_APP_PASSWORD;
   if (!user || !pass) return null;
-  return nodemailer.createTransport({ service: "gmail", auth: { user, pass } });
+  return nodemailer.createTransport({ service: "gmail", auth: { user, pass }, family: 4 } as any);
 }
 
 export async function notifyOwner(payload: NotificationPayload): Promise<boolean> {

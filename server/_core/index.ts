@@ -504,7 +504,7 @@ async function sendCrashAlert(type: string, err: any) {
   const time = new Date().toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "medium", timeStyle: "short" });
   try {
     const nodemailer = await import("nodemailer");
-    const transporter = nodemailer.default.createTransport({ service: "gmail", auth: { user, pass } });
+    const transporter = nodemailer.default.createTransport({ service: "gmail", auth: { user, pass }, family: 4 } as any);
     await transporter.sendMail({
       from: `"MyCareerIQ Alerts" <${user}>`,
       to: owner,
