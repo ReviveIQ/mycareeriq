@@ -45,6 +45,14 @@ export default function SSO() {
           localStorage.setItem("mciq_resumeiq_key", data.resumeKey);
         }
 
+        // Auto-sync resume to settings in background
+        fetch("/api/auth/resumeiq-resume-sync", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${data.token}` },
+        }).then(r => r.json())
+          .then(d => { if (d.synced) console.log(`[SSO] Resume synced — role: ${d.role}`); })
+          .catch(() => {});
+
         // Full page redirect — forces AuthContext to re-initialize with new token
         window.location.href = "/";
       })

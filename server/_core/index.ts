@@ -419,6 +419,87 @@ async function startServer() {
   // Generates a short-lived signed token so a logged-in MyCareerIQ user can
   // be automatically signed into ResumeIQ without re-authenticating.
   // Token expires in 5 minutes and can only be used once (nonce in payload).
+  // ── ResumeIQ resume auto-sync — populates Settings from ResumeIQ parsed data ──
+  app.post("/api/auth/resumeiq-resume-sync", async (req: any, res: any) => {
+    try {
+      const { verifySessionToken } = await import("./auth");
+      const authHeader = req.headers.authorization || "";
+      const token = authHeader.replace("Bearer ", "").trim();
+      if (!token) { res.status(401).json({ error: "Unauthorized" }); return; }
+      const user = await verifySessionToken(token);
+      if (!user) { res.status(401).json({ error: "Invalid session" }); return; }
+
+      const db = await import("../db").then(m => m.getDb());
+      if (!db) { res.status(500).json({ error: "DB unavailable" }); return; }
+
+      const { users, researchConfig } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+
+      // Get user's resumeIQKey
+      const userRows = await db.select().from(users).where(eq(users.id, user.userId)).limit(1);
+      const dbUser = userRows[0];
+      if (!dbUser?.resumeIQKey) { res.json({ synced: false, reason: "No resumeIQKey on user" }); return; }
+
+      // Query riq_resumes from same DB cluster using raw SQL via Drizzle
+      const { sql } = await import("drizzle-orm");
+      const resumeRows = await db.execute(sql`
+        SELECT parsedData, preScore, postScore FROM riq_resumes 
+        WHERE originalFileUrl = ${dbUser.resumeIQKey}
+        ORDER BY createdAt DESC LIMIT 1
+      `) as any;
+
+      // Also try by userId if key doesn't match directly
+      let parsedData: any = null;
+      if (resumeRows?.rows?.[0]?.parsedData) {
+        parsedData = typeof resumeRows.rows[0].parsedData === "string"
+          ? JSON.parse(resumeRows.rows[0].parsedData)
+          : resumeRows.rows[0].parsedData;
+      }
+
+      // Fallback: find by email in riq_users → riq_resumes
+      if (!parsedData) {
+        const riqRows = await db.execute(sql`
+          SELECT r.parsedData FROM riq_resumes r
+          JOIN riq_users u ON u.id = r.userId
+          WHERE u.email = ${dbUser.email}
+          ORDER BY r.createdAt DESC LIMIT 1
+        `) as any;
+        if (riqRows?.rows?.[0]?.parsedData) {
+          parsedData = typeof riqRows.rows[0].parsedData === "string"
+            ? JSON.parse(riqRows.rows[0].parsedData)
+            : riqRows.rows[0].parsedData;
+        }
+      }
+
+      if (!parsedData) { res.json({ synced: false, reason: "No resume found in ResumeIQ" }); return; }
+
+      // Extract target roles from title and experience
+      const title = parsedData.title || "";
+      const roles = [title].filter(Boolean);
+
+      // Auto-populate researchConfig
+      const existing = await db.select().from(researchConfig).where(eq(researchConfig.userId, user.userId)).limit(1);
+
+      const configData = {
+        documentType: "resume",
+        documentFileName: parsedData.name ? `${parsedData.name}_ResumeIQ.pdf` : "ResumeIQ_Resume.pdf",
+        lastDocumentParsed: { extracted: { targetRoles: roles, targetIndustries: [] }, raw: parsedData },
+        targetRoles: roles.join(","),
+      };
+
+      if (existing.length > 0) {
+        await db.update(researchConfig).set(configData as any).where(eq(researchConfig.userId, user.userId));
+      }
+      // If no researchConfig exists yet, it'll be created when user first visits settings
+
+      console.log(`[SSO] Auto-synced ResumeIQ resume for ${dbUser.email} — role: ${title}`);
+      res.json({ synced: true, role: title, name: parsedData.name });
+    } catch (err: any) {
+      console.error("[SSO] Resume sync error:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ── ResumeIQ → MyCareerIQ SSO receiver ──────────────────────────────────
   app.post("/api/auth/resumeiq-sso", async (req: any, res: any) => {
     try {
