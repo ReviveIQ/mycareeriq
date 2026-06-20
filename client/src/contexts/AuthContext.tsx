@@ -4,6 +4,7 @@ interface AuthUser {
   id: number;
   email: string;
   name: string;
+  plan?: string;
 }
 
 interface AuthContextType {

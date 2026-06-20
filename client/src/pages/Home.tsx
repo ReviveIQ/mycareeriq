@@ -414,11 +414,13 @@ export default function Home() {
 
   const trialDaysRemaining = parseInt(localStorage.getItem("mciq_trial_days") || "-1");
   const trialActive = localStorage.getItem("mciq_trial_active") === "true";
+  const isPaidUser = user?.plan === "pro" || user?.plan === "enterprise";
+  const showTrialBanner = trialActive && trialDaysRemaining >= 0 && !isPaidUser;
 
   return (
     <div className="min-h-screen bg-[#fafaf9] font-sans">
       {/* Trial banner */}
-      {trialActive && trialDaysRemaining >= 0 && (
+      {showTrialBanner && (
         <div style={{ background: "linear-gradient(135deg, #1d4ed8, #2563eb)", padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <span style={{ fontSize: "16px" }}>🎯</span>
