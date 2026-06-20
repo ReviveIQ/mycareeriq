@@ -45,8 +45,8 @@ export default function SSO() {
           localStorage.setItem("mciq_resumeiq_key", data.resumeKey);
         }
 
-        // Redirect to home
-        navigate("/");
+        // Full page redirect — forces AuthContext to re-initialize with new token
+        window.location.href = "/";
       })
       .catch(() => {
         setError("Network error. Please try again.");
