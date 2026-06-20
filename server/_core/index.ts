@@ -420,8 +420,6 @@ async function startServer() {
   // be automatically signed into ResumeIQ without re-authenticating.
   // Token expires in 5 minutes and can only be used once (nonce in payload).
   // ── ResumeIQ → MyCareerIQ SSO receiver ──────────────────────────────────
-  // User arrives from ResumeIQ done screen with a signed token.
-  // Creates or finds their account, starts 7-day trial, pre-loads resume.
   app.post("/api/auth/resumeiq-sso", async (req: any, res: any) => {
     try {
       const { token } = req.body;
@@ -444,25 +442,25 @@ async function startServer() {
       const { email, name, resumeKey, source } = payload;
       if (!email) { res.status(400).json({ error: "No email in token" }); return; }
 
-      const { db } = await import("./db");
+      const db = await getDb();
 
       // Find or create user
-      let [rows] = await db.execute("SELECT * FROM users WHERE email = ? LIMIT 1", [email]) as any;
-      let user = rows[0];
+      const [rows] = await db.execute("SELECT * FROM users WHERE email = ? LIMIT 1", [email]) as any;
+      const existingUsers = Array.isArray(rows[0]) ? rows[0] : rows;
+      let user = existingUsers[0];
 
       if (!user) {
-        // Create new user
-        const openId = crypto.randomBytes(16).toString("hex");
+        const openId = (await import("crypto")).randomBytes(16).toString("hex");
         const [result] = await db.execute(
           `INSERT INTO users (openId, name, email, loginMethod, trialStartedAt, trialSource, resumeIQKey)
            VALUES (?, ?, ?, 'resumeiq_sso', NOW(), ?, ?)`,
           [openId, name || email.split("@")[0], email, source || "resumeiq", resumeKey || null]
         ) as any;
-        const [newRows] = await db.execute("SELECT * FROM users WHERE id = ? LIMIT 1", [result.insertId]) as any;
-        user = newRows[0];
+        const [newRows] = await db.execute("SELECT * FROM users WHERE id = ? LIMIT 1", [(result as any).insertId]) as any;
+        const newUsers = Array.isArray(newRows[0]) ? newRows[0] : newRows;
+        user = newUsers[0];
         console.log(`[SSO] Created MyCareerIQ account for ${email} via ResumeIQ SSO`);
       } else {
-        // Existing user — start trial if not already started, update resume key
         if (!user.trialStartedAt) {
           await db.execute(
             "UPDATE users SET trialStartedAt = NOW(), trialSource = ?, resumeIQKey = COALESCE(?, resumeIQKey) WHERE id = ?",
@@ -474,11 +472,10 @@ async function startServer() {
         console.log(`[SSO] Existing user ${email} logged in via ResumeIQ SSO`);
       }
 
-      // Generate session token
-      const { signSessionToken } = await import("./auth");
-      const sessionToken = await signSessionToken(user);
+      // Generate session token using MyCareerIQ's auth system
+      const { createSessionToken } = await import("./auth");
+      const sessionToken = await createSessionToken(user.id, user.email, user.name || "");
 
-      // Check trial status
       const trialStartedAt = user.trialStartedAt || new Date();
       const trialDaysRemaining = Math.max(0, 7 - Math.floor((Date.now() - new Date(trialStartedAt).getTime()) / (1000 * 60 * 60 * 24)));
 
