@@ -4,7 +4,7 @@
  * Handles subscription checkout, webhook processing, and customer portal.
  *
  * Plans:
- *   Pro Monthly:  $49.99/month  — STRIPE_PRICE_PRO_MONTHLY env var
+ *   Pro Monthly:  $29.99/month  — STRIPE_PRICE_PRO_MONTHLY env var
  *   Pro Annual:   $299.00/year  — STRIPE_PRICE_PRO_ANNUAL env var
  *
  * No auto-renew: subscriptions use cancel_at_period_end = true by default.
@@ -22,7 +22,7 @@ function getStripe(): Stripe {
 export const PLANS = {
   pro_monthly: {
     name: "MyCareerIQ Pro — Monthly",
-    price: 4999, // cents
+    price: 2999, // cents — $29.99/month
     interval: "month" as const,
     description: "Unlimited job research runs, unlimited pipeline, cover letters",
   },

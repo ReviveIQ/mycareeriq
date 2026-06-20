@@ -10,9 +10,15 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Home from "./pages/Home";
 import ResumeIQ from "./pages/ResumeIQ";
+import SSO from "./pages/SSO";
 
 function Router() {
   const { user, isLoading, refetch } = useAuth();
+
+  // SSO route — must be accessible before auth check
+  if (window.location.pathname === "/sso") {
+    return <SSO />;
+  }
 
   if (isLoading) {
     return (

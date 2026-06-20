@@ -125,7 +125,10 @@ async function runMigrations() {
         CONSTRAINT workspaces_slug_unique UNIQUE(slug)
       )`,
 
-      // workspaceMembers table
+      // Trial and SSO columns
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS trialStartedAt timestamp NULL`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS trialSource varchar(64) NULL`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS resumeIQKey varchar(512) NULL`,
       `CREATE TABLE IF NOT EXISTS workspaceMembers (
         id int AUTO_INCREMENT NOT NULL,
         workspaceId int NOT NULL,
@@ -416,6 +419,82 @@ async function startServer() {
   // Generates a short-lived signed token so a logged-in MyCareerIQ user can
   // be automatically signed into ResumeIQ without re-authenticating.
   // Token expires in 5 minutes and can only be used once (nonce in payload).
+  // ── ResumeIQ → MyCareerIQ SSO receiver ──────────────────────────────────
+  // User arrives from ResumeIQ done screen with a signed token.
+  // Creates or finds their account, starts 7-day trial, pre-loads resume.
+  app.post("/api/auth/resumeiq-sso", async (req: any, res: any) => {
+    try {
+      const { token } = req.body;
+      if (!token) { res.status(400).json({ error: "Missing token" }); return; }
+
+      const crypto = await import("crypto");
+      const secret = process.env.CROSS_APP_SECRET || process.env.JWT_SECRET || "cross-app-secret";
+
+      // Verify token
+      let payload: any;
+      try {
+        const decoded = JSON.parse(Buffer.from(token, "base64url").toString("utf-8"));
+        const { payload: payloadStr, sig } = decoded;
+        const expectedSig = crypto.createHmac("sha256", secret).update(payloadStr).digest("hex");
+        if (sig !== expectedSig) { res.status(401).json({ error: "Invalid token" }); return; }
+        payload = JSON.parse(payloadStr);
+        if (Date.now() > payload.expiresAt) { res.status(401).json({ error: "Token expired" }); return; }
+      } catch { res.status(401).json({ error: "Malformed token" }); return; }
+
+      const { email, name, resumeKey, source } = payload;
+      if (!email) { res.status(400).json({ error: "No email in token" }); return; }
+
+      const { db } = await import("./db");
+
+      // Find or create user
+      let [rows] = await db.execute("SELECT * FROM users WHERE email = ? LIMIT 1", [email]) as any;
+      let user = rows[0];
+
+      if (!user) {
+        // Create new user
+        const openId = crypto.randomBytes(16).toString("hex");
+        const [result] = await db.execute(
+          `INSERT INTO users (openId, name, email, loginMethod, trialStartedAt, trialSource, resumeIQKey)
+           VALUES (?, ?, ?, 'resumeiq_sso', NOW(), ?, ?)`,
+          [openId, name || email.split("@")[0], email, source || "resumeiq", resumeKey || null]
+        ) as any;
+        const [newRows] = await db.execute("SELECT * FROM users WHERE id = ? LIMIT 1", [result.insertId]) as any;
+        user = newRows[0];
+        console.log(`[SSO] Created MyCareerIQ account for ${email} via ResumeIQ SSO`);
+      } else {
+        // Existing user — start trial if not already started, update resume key
+        if (!user.trialStartedAt) {
+          await db.execute(
+            "UPDATE users SET trialStartedAt = NOW(), trialSource = ?, resumeIQKey = COALESCE(?, resumeIQKey) WHERE id = ?",
+            [source || "resumeiq", resumeKey || null, user.id]
+          );
+        } else if (resumeKey) {
+          await db.execute("UPDATE users SET resumeIQKey = ? WHERE id = ?", [resumeKey, user.id]);
+        }
+        console.log(`[SSO] Existing user ${email} logged in via ResumeIQ SSO`);
+      }
+
+      // Generate session token
+      const { signSessionToken } = await import("./auth");
+      const sessionToken = await signSessionToken(user);
+
+      // Check trial status
+      const trialStartedAt = user.trialStartedAt || new Date();
+      const trialDaysRemaining = Math.max(0, 7 - Math.floor((Date.now() - new Date(trialStartedAt).getTime()) / (1000 * 60 * 60 * 24)));
+
+      res.json({
+        token: sessionToken,
+        user: { id: user.id, email: user.email, name: user.name },
+        trialDaysRemaining,
+        trialActive: trialDaysRemaining > 0,
+        resumeKey: resumeKey || user.resumeIQKey,
+      });
+    } catch (err: any) {
+      console.error("[SSO] ResumeIQ SSO error:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.post("/api/auth/cross-app-token", async (req: any, res: any) => {
     try {
       const authHeader = req.headers.authorization || "";

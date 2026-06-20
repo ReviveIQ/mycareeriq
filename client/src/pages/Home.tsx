@@ -412,8 +412,31 @@ export default function Home() {
     }
   };
 
+  const trialDaysRemaining = parseInt(localStorage.getItem("mciq_trial_days") || "-1");
+  const trialActive = localStorage.getItem("mciq_trial_active") === "true";
+
   return (
     <div className="min-h-screen bg-[#fafaf9] font-sans">
+      {/* Trial banner */}
+      {trialActive && trialDaysRemaining >= 0 && (
+        <div style={{ background: "linear-gradient(135deg, #1d4ed8, #2563eb)", padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontSize: "16px" }}>🎯</span>
+            <p style={{ color: "white", fontSize: "13px", fontWeight: 600, margin: 0 }}>
+              {trialDaysRemaining === 0
+                ? "Your 7-day free trial ends today."
+                : `${trialDaysRemaining} day${trialDaysRemaining === 1 ? "" : "s"} left in your free trial.`}
+              <span style={{ fontWeight: 400, marginLeft: "8px", opacity: 0.85 }}>Your resume is loaded and your pipeline is ready.</span>
+            </p>
+          </div>
+          <a
+            href="/upgrade"
+            style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: "6px", padding: "6px 14px", color: "white", fontSize: "12px", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}
+          >
+            Upgrade — $29.99/mo →
+          </a>
+        </div>
+      )}
       {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
         <div className="max-w-screen-xl mx-auto px-3 sm:px-6 py-3 flex items-center justify-between">
