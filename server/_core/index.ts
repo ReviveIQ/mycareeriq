@@ -442,41 +442,47 @@ async function startServer() {
       const { email, name, resumeKey, source } = payload;
       if (!email) { res.status(400).json({ error: "No email in token" }); return; }
 
-      const db = await getDb();
+      // Use Drizzle ORM
+      const db = await import("../db").then(m => m.getDb());
+      if (!db) { res.status(500).json({ error: "Database unavailable" }); return; }
+      const { users } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
 
       // Find or create user
-      const [rows] = await db.execute("SELECT * FROM users WHERE email = ? LIMIT 1", [email]) as any;
-      const existingUsers = Array.isArray(rows[0]) ? rows[0] : rows;
+      const existingUsers = await db.select().from(users).where(eq(users.email, email)).limit(1);
       let user = existingUsers[0];
 
       if (!user) {
         const openId = (await import("crypto")).randomBytes(16).toString("hex");
-        const [result] = await db.execute(
-          `INSERT INTO users (openId, name, email, loginMethod, trialStartedAt, trialSource, resumeIQKey)
-           VALUES (?, ?, ?, 'resumeiq_sso', NOW(), ?, ?)`,
-          [openId, name || email.split("@")[0], email, source || "resumeiq", resumeKey || null]
-        ) as any;
-        const [newRows] = await db.execute("SELECT * FROM users WHERE id = ? LIMIT 1", [(result as any).insertId]) as any;
-        const newUsers = Array.isArray(newRows[0]) ? newRows[0] : newRows;
+        await db.insert(users).values({
+          openId,
+          name: name || email.split("@")[0],
+          email,
+          loginMethod: "resumeiq_sso",
+          trialStartedAt: new Date(),
+          trialSource: source || "resumeiq",
+          resumeIQKey: resumeKey || null,
+        } as any);
+        const newUsers = await db.select().from(users).where(eq(users.email, email)).limit(1);
         user = newUsers[0];
         console.log(`[SSO] Created MyCareerIQ account for ${email} via ResumeIQ SSO`);
       } else {
+        const updates: any = {};
         if (!user.trialStartedAt) {
-          await db.execute(
-            "UPDATE users SET trialStartedAt = NOW(), trialSource = ?, resumeIQKey = COALESCE(?, resumeIQKey) WHERE id = ?",
-            [source || "resumeiq", resumeKey || null, user.id]
-          );
-        } else if (resumeKey) {
-          await db.execute("UPDATE users SET resumeIQKey = ? WHERE id = ?", [resumeKey, user.id]);
+          updates.trialStartedAt = new Date();
+          updates.trialSource = source || "resumeiq";
+        }
+        if (resumeKey) updates.resumeIQKey = resumeKey;
+        if (Object.keys(updates).length > 0) {
+          await db.update(users).set(updates).where(eq(users.id, user.id));
         }
         console.log(`[SSO] Existing user ${email} logged in via ResumeIQ SSO`);
       }
 
-      // Generate session token using MyCareerIQ's auth system
       const { createSessionToken } = await import("./auth");
-      const sessionToken = await createSessionToken(user.id, user.email, user.name || "");
+      const sessionToken = await createSessionToken(user.id, user.email || "", user.name || "");
 
-      const trialStartedAt = user.trialStartedAt || new Date();
+      const trialStartedAt = (user as any).trialStartedAt || new Date();
       const trialDaysRemaining = Math.max(0, 7 - Math.floor((Date.now() - new Date(trialStartedAt).getTime()) / (1000 * 60 * 60 * 24)));
 
       res.json({
@@ -484,7 +490,7 @@ async function startServer() {
         user: { id: user.id, email: user.email, name: user.name },
         trialDaysRemaining,
         trialActive: trialDaysRemaining > 0,
-        resumeKey: resumeKey || user.resumeIQKey,
+        resumeKey: resumeKey || (user as any).resumeIQKey,
       });
     } catch (err: any) {
       console.error("[SSO] ResumeIQ SSO error:", err.message);

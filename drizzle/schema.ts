@@ -29,6 +29,10 @@ export const users = mysqlTable("users", {
   planInterval: varchar("planInterval", { length: 20 }), // "month" | "year"
   planStatus: varchar("planStatus", { length: 50 }).default("active"),
   planExpiresAt: timestamp("planExpiresAt"),
+  // ResumeIQ SSO and trial
+  trialStartedAt: timestamp("trialStartedAt"),
+  trialSource: varchar("trialSource", { length: 64 }),
+  resumeIQKey: varchar("resumeIQKey", { length: 512 }),
 });
 
 export type User = typeof users.$inferSelect;
