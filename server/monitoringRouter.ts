@@ -55,6 +55,14 @@ export const monitoringRouter = router({
   runNow: protectedProcedure.mutation(async ({ ctx }) => {
     const userId = ctx.user.id;
 
+    // ── In-memory lock — prevent duplicate concurrent runs ───────────────────
+    const lockKey = `research_running_${userId}`;
+    if ((global as any)[lockKey]) {
+      return { success: false, jobsResearched: 0, jobsAdded: 0, executionTimeMs: 0, message: "Research already running — please wait.", rateLimited: true };
+    }
+    (global as any)[lockKey] = true;
+    setTimeout(() => { delete (global as any)[lockKey]; }, 5 * 60 * 1000); // clear after 5 min
+
     // ── Rate limiting via Drizzle sql template ───────────────────────────────
     const { getDb } = await import("./db");
     const { sql } = await import("drizzle-orm");
@@ -157,6 +165,8 @@ export const monitoringRouter = router({
         console.log(`[MonitoringRouter] Background research complete: ${addedCount} jobs added`);
       } catch (err) {
         console.error("[MonitoringRouter] Background research failed:", err);
+      } finally {
+        delete (global as any)[`research_running_${userId}`];
       }
     })();
 

@@ -160,17 +160,18 @@ Target Roles: ${targetRoles}
 Target Categories: ${targetCategories}
 
 Rules:
-- Match companies to the candidate's SPECIFIC background — not just B2B SaaS
-- If they've sold into healthcare, suggest healthcare tech AND traditional healthcare orgs
-- If they've sold enterprise software, suggest companies across ALL industries that buy enterprise software
-- If they're in revenue/sales leadership, suggest companies in FinTech, Healthcare, Logistics, Real Estate, Manufacturing, Media, Retail — anywhere senior sales talent is needed
+- Match companies to the candidate's SPECIFIC role and background — not just B2B SaaS
+- For administrative/operations roles: suggest healthcare systems, government agencies, large enterprise companies, universities, financial institutions, insurance companies, logistics firms, hospitality chains, and staffing agencies that hire admin talent
+- For sales roles: suggest companies across ALL industries that hire sales talent
+- For technical roles: suggest tech companies and companies with large tech teams
 - Include direct competitors to their past employers
 - Include companies in adjacent industries where their skills transfer
-- Include companies of similar size to where they've worked (don't just suggest Fortune 500)
-- Mix company types: SaaS, services, consulting, enterprise software, platforms
+- Include companies of similar size to where they've worked
+- Mix company types appropriate for the role: don't suggest SaaS companies for an admin assistant
 - ONLY suggest companies that use Greenhouse or Ashby ATS
-- Prioritize companies known for US remote or distributed sales teams
+- Prioritize companies known for US remote or distributed teams
 - Vary the list — don't suggest the same companies every time
+- IMPORTANT: Suggest companies that ACTUALLY HIRE for the candidate's target roles
 
 For each company provide:
 - The most likely Greenhouse/Ashby board slug (usually lowercase company name or domain stem)
@@ -189,7 +190,7 @@ Return JSON array:
 Return ONLY the JSON array. Start with [ end with ].`,
         },
       ],
-      max_tokens: 2000,
+      max_tokens: 4000,
       temperature: 0.7,
     }),
     signal: AbortSignal.timeout(45000),
@@ -208,11 +209,17 @@ Return ONLY the JSON array. Start with [ end with ].`,
     // Extract JSON array — find first [ and last ] to handle any preamble/postamble
     const firstBracket = text.indexOf("[");
     const lastBracket = text.lastIndexOf("]");
-    if (firstBracket === -1 || lastBracket === -1) {
-      throw new Error("No JSON array found in response");
-    }
-    const jsonStr = text.slice(firstBracket, lastBracket + 1);
-    const parsed = JSON.parse(jsonStr);
+    if (firstBracket === -1) throw new Error("No JSON array found in response");
+
+    // If no closing bracket (truncated response), try to recover partial array
+    const jsonStr = lastBracket > firstBracket
+      ? text.slice(firstBracket, lastBracket + 1)
+      : text.slice(firstBracket) + "]"; // close truncated array
+
+    // Remove any trailing incomplete object before closing bracket
+    const cleanJson = jsonStr.replace(/,\s*\{[^}]*$/, "]").replace(/,\s*$/, "]");
+
+    const parsed = JSON.parse(cleanJson);
     console.log(`[CompanyDiscovery] GPT suggested ${parsed.length} companies based on resume profile`);
     return Array.isArray(parsed) ? parsed : [];
   } catch (err) {
