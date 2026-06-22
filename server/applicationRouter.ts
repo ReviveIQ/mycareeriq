@@ -50,30 +50,9 @@ export const applicationRouter = router({
           ))
           .limit(1);
 
-        let addedToPipeline = false;
-        if (existing.length === 0) {
-          // Not in pipeline yet — add it at Research stage
-          await db.insert(companies).values({
-            userId: ctx.user.id,
-            companyId: input.companyId,
-            companyName: input.companyName,
-            category: "Cover Letter",
-            jobTitle: input.jobTitle,
-            jobDescription: input.jobDescription,
-            jobLink: "",
-            contactName: input.contactName,
-            contactEmail: input.contactEmail || "",
-            linkedinUrl: "",
-            remote: false,
-            salary: "",
-            companySize: "",
-            priority: "Medium",
-            stage: "Cover Letter",
-            notes: "Added via cover letter generation",
-          });
-          addedToPipeline = true;
-          console.log(`[ApplicationRouter] Auto-added ${input.companyName} to pipeline for userId ${ctx.user.id}`);
-        }
+        // Cover letters are stored in history only — do NOT auto-add to pipeline
+        // Pipeline entries are created by the job research flow, not cover letter generation
+        const addedToPipeline = false;
 
         // Save cover letter to applications table
         await db.insert(applications).values({
