@@ -52,10 +52,17 @@ export async function findHiringManager(
       signal: AbortSignal.timeout(10000),
     });
 
-    if (!res.ok) { console.warn(`[Apollo] Search failed for ${companyName}: ${res.status}`); return null; }
+    if (!res.ok) {
+      console.warn(`[Apollo] findHiringManager failed for ${companyName}: HTTP ${res.status}`);
+      if (res.status === 429) console.warn("[Apollo] Rate limited — slow down enrichment calls");
+      if (res.status === 401) console.warn("[Apollo] Invalid API key");
+      return null;
+    }
 
     const data = await res.json() as any;
+    if (data?.error) { console.warn(`[Apollo] API error for ${companyName}:`, data.error); return null; }
     const people = data?.people || [];
+    console.log(`[Apollo] findHiringManager ${companyName} (${domain}): ${people.length} results`);
     if (people.length === 0) return null;
 
     const ranked = people.sort((a: any, b: any) => {

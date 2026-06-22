@@ -381,7 +381,7 @@ async function enrichContact(companyName: string, domain: string, jobTitle?: str
 
   // Try recruiter/TA first — they own the requisition
   const jobPoster = await findJobPoster(companyName, domain, jobTitle);
-  if (jobPoster) {
+  if (jobPoster?.name) {
     return {
       contactName: jobPoster.name,
       contactEmail: jobPoster.email,
@@ -390,15 +390,45 @@ async function enrichContact(companyName: string, domain: string, jobTitle?: str
     };
   }
 
-  // Fall back to sales leader if no recruiter found
+  // Fall back to sales/hiring leader
   const leader = await findHiringManager(companyName, domain);
-  if (leader) {
+  if (leader?.name) {
     return {
       contactName: leader.name,
       contactEmail: leader.email,
       contactLinkedIn: leader.linkedinUrl,
       contactTitle: leader.title,
     };
+  }
+
+  // Final fallback: Hunter.io domain search for any contact
+  if (process.env.HUNTER_API_KEY && domain) {
+    try {
+      const hunterRes = await fetch(
+        `https://api.hunter.io/v2/domain-search?domain=${domain}&limit=3&api_key=${process.env.HUNTER_API_KEY}`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+      if (hunterRes.ok) {
+        const hunterData = await hunterRes.json() as any;
+        const emails = hunterData?.data?.emails || [];
+        // Prefer HR, recruiting, or admin titles
+        const preferred = emails.find((e: any) => {
+          const t = (e.position || "").toLowerCase();
+          return t.includes("recruit") || t.includes("talent") || t.includes("hr") ||
+            t.includes("people") || t.includes("admin") || t.includes("office");
+        }) || emails[0];
+        if (preferred) {
+          const name = [preferred.first_name, preferred.last_name].filter(Boolean).join(" ");
+          console.log(`[Hunter] Found contact at ${companyName}: ${name} (${preferred.position})`);
+          return {
+            contactName: name,
+            contactEmail: preferred.value || "",
+            contactLinkedIn: "",
+            contactTitle: preferred.position || "",
+          };
+        }
+      }
+    } catch { /* non-critical */ }
   }
 
   return { contactName: "", contactEmail: "", contactLinkedIn: "", contactTitle: "" };
@@ -797,21 +827,27 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
 
   console.log(`[JobResearch] ${qualifying.length} qualifying jobs → ${selected.length} selected (1 per company, best fit)`);
 
-  // ── Phase 3: Enrich contacts for selected companies ──────────────────────────
-  // Enrich in parallel, capped to avoid rate limits
+  // ── Phase 3: Enrich contacts for top jobs only ───────────────────────────────
+  // Serial enrichment with delay — parallel calls exhaust Apollo rate limits instantly
   const enrichedContacts = new Map<string, { contactName: string; contactEmail: string; contactLinkedIn: string; contactTitle: string }>();
-  await Promise.all(
-    selected.map(async job => {
-      const key = job.companyName.toLowerCase();
-      if (!enrichedContacts.has(key)) {
-        const co = toFetch.find(c => c.name.toLowerCase() === key);
-        if (co) {
-          const contact = await enrichContact(co.name, co.domain, job.title);
-          enrichedContacts.set(key, contact);
+  const topJobs = selected.slice(0, 8); // enrich top 8 only — preserve Apollo credits
+  for (const job of topJobs) {
+    const key = job.companyName.toLowerCase();
+    if (!enrichedContacts.has(key)) {
+      const co = toFetch.find(c => c.name.toLowerCase() === key);
+      if (co?.domain) {
+        const contact = await enrichContact(co.name, co.domain, job.title);
+        enrichedContacts.set(key, contact);
+        if (contact.contactName) {
+          console.log(`[Enrichment] ✓ ${co.name}: ${contact.contactName} (${contact.contactTitle})`);
+        } else {
+          console.log(`[Enrichment] ✗ ${co.name}: no contact found`);
         }
+        // 300ms delay between Apollo calls to avoid rate limiting
+        await new Promise(r => setTimeout(r, 300));
       }
-    })
-  );
+    }
+  }
 
   // ── Phase 4: Build final GeneratedJob list ───────────────────────────────────
   const { resolveSalary } = await import("./salaryService");
