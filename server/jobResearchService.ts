@@ -30,6 +30,7 @@ export interface GeneratedJob {
 
 // ── Category taxonomy ─────────────────────────────────────────────────────────
 const STANDARD_CATEGORIES: Record<string, string> = {
+  // SaaS / Tech
   "crm": "CRM", "customer relationship management": "CRM",
   "sales engagement": "Sales Engagement", "sales enablement": "Sales Enablement",
   "sales intelligence": "Sales Intelligence", "revenue intelligence": "Revenue Intelligence",
@@ -39,10 +40,61 @@ const STANDARD_CATEGORIES: Record<string, string> = {
   "customer success": "Customer Success", "customer experience": "Customer Experience",
   "customer support": "Customer Support", "hr tech": "HR Technology",
   "hr technology": "HR Technology", "data analytics": "Data & Analytics",
-  "cybersecurity": "Cybersecurity", "fintech": "FinTech",
-  "billing": "Billing & Payments", "edtech": "EdTech",
+  "data & analytics": "Data & Analytics", "cybersecurity": "Cybersecurity",
+  "fintech": "FinTech", "billing": "Billing & Payments", "edtech": "EdTech",
   "b2b saas": "B2B SaaS", "enterprise software": "Enterprise Software",
+  "cloud computing": "Cloud Computing", "artificial intelligence": "AI & Machine Learning",
+  "machine learning": "AI & Machine Learning", "ai": "AI & Machine Learning",
+  "developer tools": "Developer Tools", "devtools": "Developer Tools",
+  "project management": "Project Management", "collaboration": "Collaboration Software",
+  // Healthcare
+  "healthcare": "Healthcare", "health care": "Healthcare",
+  "healthcare administration": "Healthcare", "healthcare technology": "Healthcare Technology",
+  "health tech": "Healthcare Technology", "healthtech": "Healthcare Technology",
+  "hospital": "Healthcare", "medical": "Healthcare", "clinical": "Healthcare",
+  "pharmaceutical": "Pharmaceutical", "pharma": "Pharmaceutical",
+  "life sciences": "Life Sciences", "biotech": "Biotech",
+  "medical devices": "Medical Devices", "dental": "Healthcare",
+  "mental health": "Healthcare", "insurance": "Insurance",
+  "health insurance": "Insurance", "medical insurance": "Insurance",
+  // Government & Public Sector
+  "government": "Government", "government administration": "Government",
+  "public sector": "Government", "public administration": "Government",
+  "federal": "Government", "state government": "Government",
+  "municipal": "Government", "city": "Government", "county": "Government",
+  "nonprofit": "Nonprofit", "non-profit": "Nonprofit",
+  "education": "Education", "higher education": "Education",
+  "university": "Education", "college": "Education", "k-12": "Education",
+  // Financial Services
+  "financial services": "Financial Services", "banking": "Financial Services",
+  "finance": "Financial Services", "investment": "Financial Services",
+  "wealth management": "Financial Services", "accounting": "Financial Services",
+  "audit": "Financial Services", "tax": "Financial Services",
+  "real estate": "Real Estate", "property management": "Real Estate",
+  // Operations & Logistics
+  "logistics": "Logistics", "supply chain": "Supply Chain",
+  "transportation": "Transportation", "shipping": "Logistics",
+  "warehouse": "Logistics", "fulfillment": "Logistics",
+  "manufacturing": "Manufacturing", "industrial": "Manufacturing",
+  // Retail & Hospitality
+  "retail": "Retail", "e-commerce": "E-Commerce", "ecommerce": "E-Commerce",
+  "hospitality": "Hospitality", "hotel": "Hospitality", "restaurant": "Hospitality",
+  "food & beverage": "Hospitality", "food service": "Hospitality",
+  "travel": "Travel & Hospitality",
+  // Staffing & HR
+  "staffing": "Staffing & Recruiting", "recruiting": "Staffing & Recruiting",
+  "human resources": "HR & Staffing", "hr": "HR & Staffing",
+  "professional services": "Professional Services", "consulting": "Consulting",
+  // Media & Marketing
+  "media": "Media", "advertising": "Advertising & Marketing",
+  "marketing": "Advertising & Marketing", "public relations": "PR & Communications",
+  "communications": "PR & Communications",
+  // Bicycle & Distribution (for Jennifer Clark type profiles)
+  "distribution": "Distribution", "wholesale": "Distribution",
+  "bicycle": "Distribution", "consumer goods": "Consumer Goods",
+  "retail distribution": "Distribution",
 };
+
 
 function standardizeCategory(raw: string): string {
   const lower = (raw || "").toLowerCase().trim();
