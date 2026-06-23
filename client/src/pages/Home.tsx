@@ -813,6 +813,7 @@ export default function Home() {
                         { label: "Role", field: "role" as SortField, w: "w-56", hide: "" },
                         { label: "Stage", field: "stage" as SortField, w: "w-28", hide: "" },
                         { label: "Priority", field: "priority" as SortField, w: "w-24", hide: "hidden md:table-cell" },
+                        { label: "Added", field: null, w: "w-24", hide: "hidden lg:table-cell" },
                         { label: "Key Contact", field: null, w: "w-44", hide: "hidden lg:table-cell" },
                         { label: "Remote", field: null, w: "w-20", hide: "hidden lg:table-cell" },
                         { label: "Est. Comp.", field: null, w: "w-36", hide: "hidden xl:table-cell" },
@@ -875,6 +876,20 @@ export default function Home() {
                           >
                             {company.priority}
                           </span>
+                        </td>
+                        <td className="px-4 py-3 hidden lg:table-cell">
+                          <div className="text-xs text-slate-500">
+                            {company.createdAt ? (() => {
+                              const d = new Date(company.createdAt);
+                              const now = new Date();
+                              const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+                              if (diffDays === 0) return "Today";
+                              if (diffDays === 1) return "Yesterday";
+                              if (diffDays < 7) return `${diffDays}d ago`;
+                              if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+                              return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                            })() : "—"}
+                          </div>
                         </td>
                         <td className="px-4 py-3 hidden lg:table-cell">
                           <div className="text-xs">
@@ -956,7 +971,7 @@ export default function Home() {
                     ))}
                     {filtered.length === 0 && (
                       <tr>
-                        <td colSpan={10} className="px-4 py-12 text-center text-slate-400 text-sm">
+                        <td colSpan={11} className="px-4 py-12 text-center text-slate-400 text-sm">
                           No companies match your filters.
                         </td>
                       </tr>

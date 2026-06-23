@@ -801,13 +801,27 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
 
   console.log(`[JobResearch] Total raw jobs across all companies: ${allRawJobs.length}`);
 
-  if (allRawJobs.length === 0) {
+  // ── 30-day freshness filter ───────────────────────────────────────────────────
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const freshJobs = allRawJobs.filter(job => {
+    if (!job.postedAt) return true; // keep if no date — can't determine age
+    const posted = new Date(job.postedAt);
+    if (isNaN(posted.getTime())) return true; // keep if invalid date
+    if (posted < cutoff) {
+      console.log(`[JobResearch] Filtered (stale): ${job.companyName} "${job.title}" — posted ${posted.toDateString()}`);
+      return false;
+    }
+    return true;
+  });
+  console.log(`[JobResearch] After 30-day filter: ${freshJobs.length}/${allRawJobs.length} jobs remain`);
+
+  if (freshJobs.length === 0) {
     console.warn("[JobResearch] No jobs fetched from ATS APIs. Check location filter settings and try again.");
     return [];
   }
 
   // ── Phase 2: Score all jobs for fit in one GPT call ─────────────────────────
-  const scored = await scoreJobsForFit(allRawJobs, candidateProfile, targetRoles);
+  const scored = await scoreJobsForFit(freshJobs, candidateProfile, targetRoles);
 
   // Filter to qualifying jobs (score >= 7), then keep best 1 per company
   const qualifying = scored

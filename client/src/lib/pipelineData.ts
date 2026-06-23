@@ -21,6 +21,8 @@ export interface Company {
   remoteOk: boolean;
   estSalary: string;
   companySize: string;
+  createdAt?: string;
+  jobPostedAt?: string;
 }
 
 // Static pipeline data — kept empty, real data comes from TiDB via tRPC
