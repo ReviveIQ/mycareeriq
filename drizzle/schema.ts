@@ -112,6 +112,7 @@ export const companies = mysqlTable("companies", {
   contactName: varchar("contactName", { length: 255 }),
   contactEmail: varchar("contactEmail", { length: 320 }),
   linkedinUrl: varchar("linkedinUrl", { length: 500 }),
+  contactLinkedIn: varchar("contactLinkedIn", { length: 500 }),
   
   // Opportunity details
   remote: boolean("remote").default(false),

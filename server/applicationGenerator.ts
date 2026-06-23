@@ -144,8 +144,11 @@ async function generateCoverLetterFromBrief(
   candidateName: string = ""
 ): Promise<string> {
   const modeDesc = MODE_DESCRIPTIONS[mode];
-  const salutation = hiringManager && hiringManager !== "Hiring Manager"
-    ? `Dear ${hiringManager},`
+  const firstName = hiringManager && hiringManager !== "Hiring Manager"
+    ? hiringManager.trim().split(/\s+/)[0]
+    : null;
+  const salutation = firstName
+    ? `Dear ${firstName},`
     : "Dear Hiring Manager,";
 
   const signoff = candidateName

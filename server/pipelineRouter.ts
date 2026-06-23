@@ -72,7 +72,7 @@ export const pipelineRouter = router({
           jobLink: get("jobLink", "joblink") || get("job_link", "job_link"),
           contactName: get("contactName", "contactname") || get("contact_name", "contact_name"),
           contactTitle: "",
-          contactLinkedIn: get("linkedinUrl", "linkedinurl") || get("contactLinkedIn", "contactlinkedin"),
+          contactLinkedIn: get("contactLinkedIn", "contactlinkedin") || get("linkedinUrl", "linkedinurl"),
           priority: (get("priority", "priority") || "Medium") as "High" | "Medium" | "Low",
           notes: get("notes", "notes") || get("jobDescription", "jobdescription"),
           remoteOk: Boolean(job.remote),
@@ -81,6 +81,7 @@ export const pipelineRouter = router({
           companyId,
           hasCoverLetter: companyId ? companyIdsWithCoverLetters.has(companyId) : false,
           jobPostedAt: job.jobPostedAt || job.jobpostedat || null,
+          createdAt: job.createdAt || job.createdat || null,
         };
       });
 

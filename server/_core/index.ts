@@ -129,6 +129,7 @@ async function runMigrations() {
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS trialStartedAt timestamp NULL`,
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS trialSource varchar(64) NULL`,
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS resumeIQKey varchar(512) NULL`,
+      `ALTER TABLE companies ADD COLUMN IF NOT EXISTS contactLinkedIn varchar(500) NULL`,
       `CREATE TABLE IF NOT EXISTS workspaceMembers (
         id int AUTO_INCREMENT NOT NULL,
         workspaceId int NOT NULL,
