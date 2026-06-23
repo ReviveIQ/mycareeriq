@@ -159,6 +159,10 @@ export async function findJobPoster(
   const email = person?.email || person?.personal_emails?.[0] || "";
   const name = [person.first_name, person.last_name].filter(Boolean).join(" ") || person.name || "";
 
+  // If no LinkedIn URL from Apollo, build a LinkedIn search URL as fallback
+  const linkedinUrl = person.linkedin_url ||
+    (name ? `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(name + " " + companyName)}` : "");
+
   console.log(`[Apollo] Found recruiter: ${name} (${person.title}) at ${companyName}${jobTitle ? ` for ${jobTitle}` : ""}`);
 
   return {
@@ -167,7 +171,7 @@ export async function findJobPoster(
     lastName: person.last_name || "",
     email,
     title: person.title || "",
-    linkedinUrl: person.linkedin_url || "",
+    linkedinUrl,
     confidence: email ? 85 : 45,
   };
 }
@@ -190,13 +194,16 @@ export async function findHiringManager(
 
   console.log(`[Apollo] Found leader: ${name} (${person.title}) at ${companyName}`);
 
+  const linkedinUrl = person.linkedin_url ||
+    (name ? `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(name + " " + companyName)}` : "");
+
   return {
     name,
     firstName: person.first_name || "",
     lastName: person.last_name || "",
     email,
     title: person.title || "",
-    linkedinUrl: person.linkedin_url || "",
+    linkedinUrl,
     confidence: email ? 90 : 50,
   };
 }
