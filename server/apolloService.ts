@@ -1,7 +1,18 @@
 /**
  * Apollo.io Contact Enrichment Service
- * Uses the People Search API to find real hiring managers by title + company
+ * 
+ * CORRECT FLOW (per Apollo docs 2026):
+ * 1. Search: POST /api/v1/mixed_people/api_search (query params, NOT body)
+ *    - Does NOT return emails or last names (obfuscated on Basic plan)
+ *    - Returns person IDs and basic info
+ * 2. Enrich: POST /api/v1/people/match with person ID
+ *    - Returns full profile including email (costs 1 credit)
+ * 
+ * WRONG endpoint: /v1/mixed_people/search → returns 403 on Basic plans
+ * CORRECT endpoint: /api/v1/mixed_people/api_search
  */
+
+const APOLLO_BASE = "https://api.apollo.io";
 
 export interface ApolloContact {
   name: string;
@@ -13,17 +24,7 @@ export interface ApolloContact {
   confidence: number;
 }
 
-// Senior sales leaders — used for general pipeline enrichment
-const SALES_LEADER_TITLES = [
-  "VP of Sales", "VP Sales", "Vice President of Sales",
-  "Director of Sales", "Director of Business Development",
-  "Head of Sales", "Head of Business Development",
-  "Chief Revenue Officer", "CRO", "SVP Sales",
-  "Sales Director", "VP Revenue",
-];
-
-// Recruiters and TA — the people who actually set up job postings
-// These are the best contacts for outreach about a specific open role
+// Recruiters/TA — best contacts for outreach about specific open roles
 const RECRUITER_TITLES = [
   "Recruiter", "Technical Recruiter", "Senior Recruiter",
   "Talent Acquisition", "Talent Acquisition Manager", "Talent Acquisition Partner",
@@ -32,140 +33,170 @@ const RECRUITER_TITLES = [
   "Senior Talent Acquisition", "Lead Recruiter",
 ];
 
-export async function findHiringManager(
-  companyName: string,
-  domain: string
-): Promise<ApolloContact | null> {
+// Senior leaders — fallback when no recruiter found
+const LEADER_TITLES = [
+  "VP of Sales", "VP Sales", "Vice President of Sales",
+  "Director of Sales", "Director of Business Development",
+  "Head of Sales", "Chief Revenue Officer", "CRO",
+  "VP of Human Resources", "VP of People Operations",
+  "Director of Human Resources", "HR Director",
+];
+
+async function searchPeople(
+  domain: string,
+  titles: string[],
+  companyName: string
+): Promise<any[]> {
   const apiKey = process.env.APOLLO_API_KEY;
-  if (!apiKey) { console.warn("[Apollo] APOLLO_API_KEY not set"); return null; }
+  if (!apiKey) return [];
 
   try {
-    const res = await fetch("https://api.apollo.io/v1/mixed_people/search", {
+    // Build query string — Apollo api_search uses query params not body
+    const params = new URLSearchParams();
+    params.set("page", "1");
+    params.set("per_page", "5");
+    params.append("q_organization_domains_list[]", domain);
+    titles.forEach(t => params.append("person_titles[]", t));
+
+    const url = `${APOLLO_BASE}/api/v1/mixed_people/api_search?${params.toString()}`;
+    const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Cache-Control": "no-cache", "X-Api-Key": apiKey },
-      body: JSON.stringify({
-        q_organization_domains: [domain],
-        person_titles: SALES_LEADER_TITLES,
-        page: 1,
-        per_page: 5,
-      }),
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
+        "X-Api-Key": apiKey,
+      },
       signal: AbortSignal.timeout(10000),
     });
 
     if (!res.ok) {
-      console.warn(`[Apollo] findHiringManager failed for ${companyName}: HTTP ${res.status}`);
-      if (res.status === 429) console.warn("[Apollo] Rate limited — slow down enrichment calls");
-      if (res.status === 401) console.warn("[Apollo] Invalid API key");
+      const errText = await res.text().catch(() => "");
+      console.warn(`[Apollo] Search failed for ${companyName} (${domain}): HTTP ${res.status} — ${errText.slice(0, 200)}`);
+      return [];
+    }
+
+    const data = await res.json() as any;
+    if (data?.error) {
+      console.warn(`[Apollo] API error for ${companyName}:`, data.error);
+      return [];
+    }
+
+    const people = data?.people || [];
+    console.log(`[Apollo] Search ${companyName} (${domain}): ${people.length} results`);
+    return people;
+  } catch (err: any) {
+    console.warn(`[Apollo] Search error for ${companyName}:`, err.message);
+    return [];
+  }
+}
+
+async function enrichPerson(personId: string, companyName: string): Promise<any | null> {
+  const apiKey = process.env.APOLLO_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const res = await fetch(`${APOLLO_BASE}/api/v1/people/match?id=${personId}&reveal_personal_emails=false`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
+        "X-Api-Key": apiKey,
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!res.ok) {
+      console.warn(`[Apollo] Enrich failed for person ${personId} at ${companyName}: HTTP ${res.status}`);
       return null;
     }
 
     const data = await res.json() as any;
-    if (data?.error) { console.warn(`[Apollo] API error for ${companyName}:`, data.error); return null; }
-    const people = data?.people || [];
-    console.log(`[Apollo] findHiringManager ${companyName} (${domain}): ${people.length} results`);
-    if (people.length === 0) return null;
-
-    const ranked = people.sort((a: any, b: any) => {
-      const score = (t: string) => {
-        const tl = (t || "").toLowerCase();
-        if (tl.includes("cro") || tl.includes("chief revenue")) return 10;
-        if (tl.includes("vp") || tl.includes("vice president")) return 8;
-        if (tl.includes("svp") || tl.includes("evp")) return 7;
-        if (tl.includes("director")) return 5;
-        if (tl.includes("head of")) return 4;
-        return 1;
-      };
-      return score(b.title) - score(a.title);
-    });
-
-    const best = ranked[0];
-    const email = best?.email || best?.personal_emails?.[0] || "";
-    console.log(`[Apollo] Found sales leader: ${best.name} (${best.title}) at ${companyName}`);
-
-    return {
-      name: best.name || "",
-      firstName: best.first_name || "",
-      lastName: best.last_name || "",
-      email,
-      title: best.title || "",
-      linkedinUrl: best.linkedin_url || "",
-      confidence: email ? 90 : 50,
-    };
-  } catch (err) {
-    console.warn(`[Apollo] Error for ${companyName}:`, err);
+    return data?.person || null;
+  } catch (err: any) {
+    console.warn(`[Apollo] Enrich error for ${companyName}:`, err.message);
     return null;
   }
 }
 
-/**
- * Find the recruiter or TA person most likely to have posted a specific job.
- * These are better outreach targets than sales leaders for job-specific messages
- * because they own the requisition and are actively working the role.
- *
- * Strategy: search for TA/recruiter titles at the company, rank by seniority.
- * The outreach message ("can you point me to the hiring manager?") lands better
- * with a recruiter than a cold VP who didn't post the role.
- */
+function rankPeople(people: any[], preferRecruiter: boolean): any {
+  return people.sort((a: any, b: any) => {
+    const score = (t: string) => {
+      const tl = (t || "").toLowerCase();
+      if (preferRecruiter) {
+        if (tl.includes("head of") || tl.includes("director") || tl.includes("vp")) return 10;
+        if (tl.includes("senior") || tl.includes("lead") || tl.includes("manager")) return 7;
+        if (tl.includes("partner")) return 5;
+        if (tl.includes("recruit") || tl.includes("talent")) return 3;
+      } else {
+        if (tl.includes("cro") || tl.includes("chief revenue")) return 10;
+        if (tl.includes("vp") || tl.includes("vice president")) return 8;
+        if (tl.includes("director")) return 5;
+        if (tl.includes("head of")) return 4;
+      }
+      return 1;
+    };
+    return score(b.title) - score(a.title);
+  })[0];
+}
+
 export async function findJobPoster(
   companyName: string,
   domain: string,
   jobTitle?: string
 ): Promise<ApolloContact | null> {
-  const apiKey = process.env.APOLLO_API_KEY;
-  if (!apiKey) return null;
-
-  try {
-    const res = await fetch("https://api.apollo.io/v1/mixed_people/search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Cache-Control": "no-cache", "X-Api-Key": apiKey },
-      body: JSON.stringify({
-        q_organization_domains: [domain],
-        person_titles: RECRUITER_TITLES,
-        page: 1,
-        per_page: 5,
-      }),
-      signal: AbortSignal.timeout(10000),
-    });
-
-    if (!res.ok) {
-      console.warn(`[Apollo] Recruiter search failed for ${companyName}: ${res.status}`);
-      return null;
-    }
-
-    const data = await res.json() as any;
-    const people = data?.people || [];
-    if (people.length === 0) {
-      console.log(`[Apollo] No recruiter found at ${companyName} — will use sales leader instead`);
-      return null;
-    }
-
-    // Rank: prefer Senior/Lead/Manager over generic Recruiter
-    const ranked = people.sort((a: any, b: any) => {
-      const score = (t: string) => {
-        const tl = (t || "").toLowerCase();
-        if (tl.includes("head of") || tl.includes("director") || tl.includes("vp")) return 10;
-        if (tl.includes("senior") || tl.includes("lead") || tl.includes("manager")) return 7;
-        if (tl.includes("partner")) return 5;
-        return 3;
-      };
-      return score(b.title) - score(a.title);
-    });
-
-    const best = ranked[0];
-    const email = best?.email || best?.personal_emails?.[0] || "";
-    console.log(`[Apollo] Found job poster: ${best.name} (${best.title}) at ${companyName}${jobTitle ? ` for ${jobTitle}` : ""}`);
-
-    return {
-      name: best.name || "",
-      firstName: best.first_name || "",
-      lastName: best.last_name || "",
-      email,
-      title: best.title || "",
-      linkedinUrl: best.linkedin_url || "",
-      confidence: email ? 85 : 45,
-    };
-  } catch (err) {
-    console.warn(`[Apollo] findJobPoster error for ${companyName}:`, err);
+  const people = await searchPeople(domain, RECRUITER_TITLES, companyName);
+  if (!people.length) {
+    console.log(`[Apollo] No recruiter found at ${companyName} — will try leader fallback`);
     return null;
   }
+
+  const best = rankPeople(people, true);
+  if (!best) return null;
+
+  // Enrich to get email — costs 1 credit
+  const enriched = await enrichPerson(best.id, companyName);
+  const person = enriched || best;
+  const email = person?.email || person?.personal_emails?.[0] || "";
+  const name = [person.first_name, person.last_name].filter(Boolean).join(" ") || person.name || "";
+
+  console.log(`[Apollo] Found recruiter: ${name} (${person.title}) at ${companyName}${jobTitle ? ` for ${jobTitle}` : ""}`);
+
+  return {
+    name,
+    firstName: person.first_name || "",
+    lastName: person.last_name || "",
+    email,
+    title: person.title || "",
+    linkedinUrl: person.linkedin_url || "",
+    confidence: email ? 85 : 45,
+  };
+}
+
+export async function findHiringManager(
+  companyName: string,
+  domain: string
+): Promise<ApolloContact | null> {
+  const people = await searchPeople(domain, LEADER_TITLES, companyName);
+  if (!people.length) return null;
+
+  const best = rankPeople(people, false);
+  if (!best) return null;
+
+  // Enrich to get email
+  const enriched = await enrichPerson(best.id, companyName);
+  const person = enriched || best;
+  const email = person?.email || person?.personal_emails?.[0] || "";
+  const name = [person.first_name, person.last_name].filter(Boolean).join(" ") || person.name || "";
+
+  console.log(`[Apollo] Found leader: ${name} (${person.title}) at ${companyName}`);
+
+  return {
+    name,
+    firstName: person.first_name || "",
+    lastName: person.last_name || "",
+    email,
+    title: person.title || "",
+    linkedinUrl: person.linkedin_url || "",
+    confidence: email ? 90 : 50,
+  };
 }
