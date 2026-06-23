@@ -93,7 +93,7 @@ export default function InboxIQ({ token }: { token: string }) {
   }
 
   function connectGmail() {
-    window.location.href = "/api/inbox/oauth/start";
+    window.location.href = `/api/inbox/oauth/start?token=${encodeURIComponent(token)}`;
   }
 
   function formatDate(dateStr: string) {

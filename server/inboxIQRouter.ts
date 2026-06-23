@@ -66,13 +66,21 @@ router.get("/status", requireAuth, async (req: any, res: any) => {
 
 // ── GET /api/inbox/oauth/start ───────────────────────────────────────────────
 // Redirects user to Google OAuth consent screen
-router.get("/oauth/start", requireAuth, async (req: any, res: any) => {
+// Token passed as query param since browser can't send Bearer headers on redirect
+router.get("/oauth/start", async (req: any, res: any) => {
   if (!GOOGLE_CLIENT_ID) {
     res.status(503).json({ error: "Google OAuth not configured — add GOOGLE_CLIENT_ID to Railway" });
     return;
   }
 
-  const state = Buffer.from(JSON.stringify({ userId: req.userId, ts: Date.now() })).toString("base64url");
+  // Accept token as query param from frontend
+  const token = (req.query.token as string) || (req.headers.authorization || "").replace("Bearer ", "").trim();
+  if (!token) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const user = await verifySessionToken(token);
+  if (!user) { res.status(401).json({ error: "Invalid session" }); return; }
+
+  const state = Buffer.from(JSON.stringify({ userId: user.userId, ts: Date.now() })).toString("base64url");
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: GOOGLE_REDIRECT_URI,
