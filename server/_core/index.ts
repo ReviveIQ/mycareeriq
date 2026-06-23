@@ -12,6 +12,7 @@ import { sendDigestEmailHandler } from "../digestHandler";
 import { jobResearchHandler } from "../jobResearchHandler";
 import { registerResumeIQRoutes } from "../resumeIQRouter";
 import { getDb } from "../db";
+import inboxIQRouter from "../inboxIQRouter";
 
 async function runMigrations() {
   try {
@@ -130,6 +131,12 @@ async function runMigrations() {
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS trialSource varchar(64) NULL`,
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS resumeIQKey varchar(512) NULL`,
       `ALTER TABLE companies ADD COLUMN IF NOT EXISTS contactLinkedIn varchar(500) NULL`,
+      // InboxIQ columns on users table
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS gmailConnected tinyint(1) DEFAULT 0`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS gmailEmail varchar(320) NULL`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS gmailAccessToken text NULL`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS gmailRefreshToken text NULL`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS inboxLastScanned timestamp NULL`,
       `CREATE TABLE IF NOT EXISTS workspaceMembers (
         id int AUTO_INCREMENT NOT NULL,
         workspaceId int NOT NULL,
@@ -223,7 +230,25 @@ async function runMigrations() {
       }
     }
 
-    console.log("[Migrations] All migrations complete ✓");
+    // InboxIQ events table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS inbox_events (
+        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+        userId INT NOT NULL,
+        companyId BIGINT NOT NULL,
+        companyName VARCHAR(255) NOT NULL,
+        eventType VARCHAR(32) NOT NULL,
+        subject VARCHAR(512),
+        fromAddress VARCHAR(320),
+        emailDate TIMESTAMP,
+        snippet TEXT,
+        newStage VARCHAR(64),
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_event (userId, companyId, emailDate, eventType),
+        INDEX idx_userId (userId)
+      )
+    `).catch(() => {});
+    console.log("[Migrations] inbox_events ready ✓");
   } catch (error: any) {
     console.warn("[Migrations] Error:", error?.message);
   }
@@ -579,6 +604,8 @@ async function startServer() {
       res.status(500).json({ error: err.message });
     }
   });
+
+  app.use("/api/inbox", inboxIQRouter);
 
   app.post("/api/auth/cross-app-token", async (req: any, res: any) => {
     try {

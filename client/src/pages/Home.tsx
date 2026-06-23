@@ -52,11 +52,13 @@ import {
   FileText,
   Settings,
   Play,
+  Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 import GenerateApplication from "./GenerateApplication";
 import ApplicationHistory from "./ApplicationHistory";
 import ResearchSettings from "./ResearchSettings";
+import InboxIQ from "./InboxIQ";
 import PricingPage from "./PricingPage";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
@@ -106,7 +108,7 @@ export default function Home() {
   const [sortField, setSortField] = useState<SortField>("priority");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-  const [activeTab, setActiveTab] = useState<"pipeline" | "analytics" | "generate" | "history" | "settings" | "pricing">("pipeline");
+  const [activeTab, setActiveTab] = useState<"pipeline" | "analytics" | "generate" | "history" | "settings" | "pricing" | "inbox">("pipeline");
   const [isRunning, setIsRunning] = useState(false);
   const [generatePrefill, setGeneratePrefill] = useState<{
     companyName: string; jobTitle: string; jobDescription: string; contactName?: string; companyId: string;
@@ -610,7 +612,7 @@ export default function Home() {
         {/* Tab Navigation */}
         <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
           <div className="flex gap-1 bg-slate-100 p-1 rounded-lg w-max sm:w-fit min-w-full sm:min-w-0">
-          {(["pipeline", "analytics", "generate", "history", "settings", "pricing"] as const).filter(tab => tab !== "pricing" || rateLimitStatus?.monthlyLimit !== 100).map((tab) => (
+          {(["pipeline", "analytics", "generate", "history", "inbox", "settings", "pricing"] as const).filter(tab => tab !== "pricing" || rateLimitStatus?.monthlyLimit !== 100).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -626,6 +628,9 @@ export default function Home() {
                 <><FileText className="w-3.5 h-3.5" /><span className="hidden sm:inline">Generate</span></>
               )}
               {tab === "history" && <><span className="sm:hidden">📁</span><span className="hidden sm:inline">History</span></>}
+              {tab === "inbox" && (
+                <><Mail className="w-3.5 h-3.5" /><span className="hidden sm:inline">InboxIQ</span></>
+              )}
               {tab === "settings" && (
                 <><Settings className="w-3.5 h-3.5" /><span className="hidden sm:inline">Settings</span></>
               )}
@@ -1181,6 +1186,10 @@ export default function Home() {
 
         {activeTab === "history" && (
           <ApplicationHistory />
+        )}
+
+        {activeTab === "inbox" && (
+          <InboxIQ token={localStorage.getItem("reviveiq_auth_token") || ""} />
         )}
 
         {activeTab === "settings" && (

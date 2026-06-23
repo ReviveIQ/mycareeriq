@@ -33,6 +33,12 @@ export const users = mysqlTable("users", {
   trialStartedAt: timestamp("trialStartedAt"),
   trialSource: varchar("trialSource", { length: 64 }),
   resumeIQKey: varchar("resumeIQKey", { length: 512 }),
+  // InboxIQ Gmail connection
+  gmailConnected: int("gmailConnected").default(0),
+  gmailEmail: varchar("gmailEmail", { length: 320 }),
+  gmailAccessToken: text("gmailAccessToken"),
+  gmailRefreshToken: text("gmailRefreshToken"),
+  inboxLastScanned: timestamp("inboxLastScanned"),
 });
 
 export type User = typeof users.$inferSelect;
