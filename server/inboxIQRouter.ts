@@ -12,11 +12,11 @@
  */
 
 import express from "express";
-import { getDb } from "../db";
-import { users, companies } from "../../drizzle/schema";
+import { getDb } from "./db";
+import { users, companies } from "../drizzle/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
-import { verifySessionToken } from "./auth";
+import { verifySessionToken } from "./_core/auth";
 
 const router = express.Router();
 
