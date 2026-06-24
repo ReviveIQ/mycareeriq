@@ -333,8 +333,8 @@ router.post("/add-to-pipeline", requireAuth, async (req: any, res: any) => {
       return;
     }
 
-    const validStages = ["Research", "Outreach", "Applied", "Interviewing", "Offer", "Rejected"];
-    const stage = validStages.includes(suggestedStage) ? suggestedStage : "Applied";
+    const validStages = ["Research", "Applied", "Interviewing", "Offer", "Rejected"];
+    const stage = validStages.includes(suggestedStage) ? suggestedStage : "Research";
     const companyId = `inbox-${companyName.toLowerCase().replace(/[^a-z0-9]/g, "")}-${Date.now()}`;
     const contactEmail = from?.includes("@") ? (from.split("<").pop() || "").replace(">", "").trim() : "";
 
@@ -426,10 +426,25 @@ async function extractOpportunity(subject: string, snippet: string, from: string
   "companyName": string,
   "jobTitle": string or "",
   "type": "recruiter_outreach" | "interview_request" | "panel_interview" | "rejection" | "offer" | "follow_up",
-  "suggestedStage": "Research" | "Outreach" | "Applied" | "Interviewing" | "Offer" | "Rejected"
+  "suggestedStage": "Research" | "Applied" | "Interviewing" | "Offer" | "Rejected"
 }
 
-Infer companyName from the sender domain or email body.
+IMPORTANT stage definitions — from the CANDIDATE'S perspective:
+- Research: recruiter reached out to you, or you're evaluating an inbound opportunity (NOT Outreach)
+- Applied: you have responded or submitted an application
+- Interviewing: interview has been scheduled or is in progress
+- Offer: offer received
+- Rejected: rejection received
+- NEVER use "Outreach" — that stage means the candidate reached out first, not inbound contact
+
+Stage rules by email type:
+- recruiter_outreach → Research (they came to you, you haven't responded yet)
+- follow_up → Research (still evaluating)
+- interview_request → Interviewing
+- panel_interview → Interviewing
+- offer → Offer
+- rejection → Rejected
+
 Return null if this is not a job-related email.`,
           },
           { role: "user", content: `From: ${from}\nSubject: ${subject}\nPreview: ${snippet}` },
