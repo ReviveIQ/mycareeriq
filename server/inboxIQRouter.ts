@@ -269,6 +269,14 @@ router.post("/scan", requireAuth, async (req: any, res: any) => {
       console.log(`[InboxIQ] New opportunity: ${extracted.companyName} — ${extracted.type} (${extracted.suggestedStage})`);
     }
 
+    // Save new opportunities to inbox_events so they persist after refresh
+    for (const opp of newOpportunities) {
+      await db.execute(sql`
+        INSERT IGNORE INTO inbox_events (userId, companyId, companyName, eventType, subject, fromAddress, emailDate, snippet, newStage, createdAt)
+        VALUES (${req.userId}, 0, ${opp.companyName}, 'inbound_opportunity', ${opp.subject}, ${opp.from}, ${new Date(opp.date)}, ${JSON.stringify({ jobTitle: opp.jobTitle, type: opp.type, suggestedStage: opp.suggestedStage, snippet: opp.snippet })}, ${opp.suggestedStage || null}, NOW())
+      `).catch(() => {});
+    }
+
     // Update last scanned time
     await db.update(users).set({ inboxLastScanned: new Date() } as any).where(eq(users.id, req.userId));
 
@@ -445,13 +453,41 @@ router.get("/events", requireAuth, async (req: any, res: any) => {
     const db = await getDb();
     if (!db) { res.json({ events: [], stale: [] }); return; }
 
-    // Get inbox events
+    // Get inbox events (not inbound opportunities)
     const events = await db.execute(sql`
       SELECT * FROM inbox_events
       WHERE userId = ${req.userId}
+      AND eventType != 'inbound_opportunity'
       ORDER BY emailDate DESC
       LIMIT 50
     `).catch(() => ({ rows: [] })) as any;
+
+    // Get saved inbound opportunities
+    const savedOpportunities = await db.execute(sql`
+      SELECT * FROM inbox_events
+      WHERE userId = ${req.userId}
+      AND eventType = 'inbound_opportunity'
+      ORDER BY createdAt DESC
+      LIMIT 30
+    `).catch(() => ({ rows: [] })) as any;
+
+    // Parse snippet JSON back to opportunity fields
+    const opportunities = (savedOpportunities.rows || []).map((row: any) => {
+      try {
+        const meta = JSON.parse(row.snippet || "{}");
+        return {
+          id: row.id,
+          companyName: row.companyName,
+          jobTitle: meta.jobTitle || "",
+          type: meta.type || "recruiter_outreach",
+          subject: row.subject,
+          from: row.fromAddress,
+          date: row.emailDate,
+          snippet: meta.snippet || "",
+          suggestedStage: row.newStage || "Applied",
+        };
+      } catch { return null; }
+    }).filter(Boolean);
 
     // Get stale applications (Applied > 7 days, no inbox event)
     const stale = await db.execute(sql`
@@ -471,6 +507,7 @@ router.get("/events", requireAuth, async (req: any, res: any) => {
     res.json({
       events: events.rows || [],
       stale: stale.rows || [],
+      newOpportunities: opportunities,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

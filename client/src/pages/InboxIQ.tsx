@@ -70,6 +70,9 @@ export default function InboxIQ({ token }: { token: string }) {
       const data = await res.json();
       setEvents(data.events || []);
       setStale(data.stale || []);
+      if (data.newOpportunities?.length) {
+        setNewOpportunities(data.newOpportunities);
+      }
     } catch { /* silent */ }
   }
 
@@ -108,8 +111,12 @@ export default function InboxIQ({ token }: { token: string }) {
     setEvents(prev => prev.filter((e: InboxEvent) => e.id !== eventId));
   }
 
-  async function dismissOpportunity(companyName: string) {
-    setNewOpportunities(prev => prev.filter((o: any) => o.companyName !== companyName));
+  async function dismissOpportunity(opp: any) {
+    // Delete from DB if it has an id (persisted)
+    if (opp.id) {
+      await fetch(`/api/inbox/events/${opp.id}`, { method: "DELETE", headers });
+    }
+    setNewOpportunities(prev => prev.filter((o: any) => o.companyName !== opp.companyName));
   }
 
   async function addToPipeline(opportunity: any) {
@@ -122,7 +129,7 @@ export default function InboxIQ({ token }: { token: string }) {
       });
       const data = await res.json();
       if (res.ok) {
-        setNewOpportunities(prev => prev.filter((o: any) => o.companyName !== opportunity.companyName));
+        dismissOpportunity(opportunity);
       } else {
         alert(`Could not add ${opportunity.companyName}: ${data.error}`);
       }
@@ -262,7 +269,7 @@ export default function InboxIQ({ token }: { token: string }) {
                       {addingToPipeline === opp.companyName ? "Adding..." : "Add to Pipeline"}
                     </button>
                     <button
-                      onClick={() => dismissOpportunity(opp.companyName)}
+                      onClick={() => dismissOpportunity(opp)}
                       className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                       title="Dismiss"
                     >
