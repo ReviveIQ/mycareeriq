@@ -82,9 +82,19 @@ export default function InboxIQ({ token }: { token: string }) {
         await loadEvents();
         if (data.newOpportunities?.length) {
           setNewOpportunities(prev => {
-            const existing = new Set(prev.map((o: any) => o.companyName));
-            const fresh = data.newOpportunities.filter((o: any) => !existing.has(o.companyName));
-            return [...prev, ...fresh];
+            const existing = new Set(prev.map((o: any) => o.companyName.toLowerCase()));
+            const fresh = (data.newOpportunities as any[]).filter((o: any) =>
+              !existing.has(o.companyName.toLowerCase())
+            );
+            // Also deduplicate within the new batch by companyName
+            const seen = new Set<string>();
+            const deduped = fresh.filter((o: any) => {
+              const key = o.companyName.toLowerCase();
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            });
+            return [...prev, ...deduped];
           });
         }
       }
@@ -101,6 +111,8 @@ export default function InboxIQ({ token }: { token: string }) {
   async function dismissOpportunity(companyName: string) {
     setNewOpportunities(prev => prev.filter((o: any) => o.companyName !== companyName));
   }
+
+  async function addToPipeline(opportunity: any) {
     setAddingToPipeline(opportunity.companyName);
     try {
       const res = await fetch("/api/inbox/add-to-pipeline", {
@@ -108,8 +120,11 @@ export default function InboxIQ({ token }: { token: string }) {
         headers: { ...headers, "Content-Type": "application/json" },
         body: JSON.stringify(opportunity),
       });
+      const data = await res.json();
       if (res.ok) {
         setNewOpportunities(prev => prev.filter((o: any) => o.companyName !== opportunity.companyName));
+      } else {
+        alert(`Could not add ${opportunity.companyName}: ${data.error}`);
       }
     } catch { /* silent */ }
     finally { setAddingToPipeline(null); }

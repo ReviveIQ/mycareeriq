@@ -312,29 +312,41 @@ router.post("/add-to-pipeline", requireAuth, async (req: any, res: any) => {
     if (!db) { res.status(500).json({ error: "DB unavailable" }); return; }
 
     const { companies: companiesTable } = await import("../drizzle/schema");
-    const domain = extractDomain(`x@${from?.split("@")[1] || ""}`);
+    const { eq, and } = await import("drizzle-orm");
+
+    // Deduplication — skip if company already in pipeline for this user
+    const existing = await db.select({ id: companiesTable.id })
+      .from(companiesTable)
+      .where(and(eq(companiesTable.userId, req.userId), eq(companiesTable.companyName, companyName)))
+      .limit(1);
+
+    if (existing.length > 0) {
+      res.json({ ok: true, duplicate: true });
+      return;
+    }
+
+    const validStages = ["Research", "Outreach", "Applied", "Interviewing", "Offer", "Rejected"];
+    const stage = validStages.includes(suggestedStage) ? suggestedStage : "Applied";
+    const companyId = `inbox-${companyName.toLowerCase().replace(/[^a-z0-9]/g, "")}-${Date.now()}`;
+    const contactEmail = from?.includes("@") ? (from.split("<").pop() || "").replace(">", "").trim() : "";
 
     await db.insert(companiesTable).values({
       userId: req.userId,
-      companyId: `inbox-${companyName.toLowerCase().replace(/[^a-z0-9]/g, "")}-${Date.now()}`,
+      companyId,
       companyName,
       jobTitle: jobTitle || "",
       category: "Inbound",
-      stage: suggestedStage || "Applied",
+      stage,
       priority: "Medium",
-      linkedinUrl: "",
-      contactEmail: from || "",
+      contactEmail,
       notes: "Added via InboxIQ inbox scan",
       remote: false,
-      salary: "",
-      companySize: "",
-      jobDescription: "",
-      jobLink: "",
     } as any);
 
-    console.log(`[InboxIQ] Added to pipeline: ${companyName} (${suggestedStage})`);
-    res.json({ ok: true });
+    console.log(`[InboxIQ] Added to pipeline: ${companyName} (${stage})`);
+    res.json({ ok: true, duplicate: false });
   } catch (err: any) {
+    console.error("[InboxIQ] add-to-pipeline error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
