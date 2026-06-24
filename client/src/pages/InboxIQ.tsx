@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Mail, RefreshCw, CheckCircle, XCircle, Calendar, AlertCircle, ExternalLink, Unplug } from "lucide-react";
+import { Mail, RefreshCw, CheckCircle, XCircle, Calendar, AlertCircle, ExternalLink, Unplug, X } from "lucide-react";
 
 interface InboxEvent {
   id: number;
@@ -93,7 +93,14 @@ export default function InboxIQ({ token }: { token: string }) {
     finally { setScanning(false); }
   }
 
-  async function addToPipeline(opportunity: any) {
+  async function dismissEvent(eventId: number) {
+    await fetch(`/api/inbox/events/${eventId}`, { method: "DELETE", headers });
+    setEvents(prev => prev.filter((e: InboxEvent) => e.id !== eventId));
+  }
+
+  async function dismissOpportunity(companyName: string) {
+    setNewOpportunities(prev => prev.filter((o: any) => o.companyName !== companyName));
+  }
     setAddingToPipeline(opportunity.companyName);
     try {
       const res = await fetch("/api/inbox/add-to-pipeline", {
@@ -231,13 +238,22 @@ export default function InboxIQ({ token }: { token: string }) {
                     {opp.jobTitle && <p className="text-xs text-slate-500 mt-0.5">{opp.jobTitle}</p>}
                     <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{opp.subject}</p>
                   </div>
-                  <button
-                    onClick={() => addToPipeline(opp)}
-                    disabled={addingToPipeline === opp.companyName}
-                    className="flex-shrink-0 text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors whitespace-nowrap"
-                  >
-                    {addingToPipeline === opp.companyName ? "Adding..." : "Add to Pipeline"}
-                  </button>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => addToPipeline(opp)}
+                      disabled={addingToPipeline === opp.companyName}
+                      className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors whitespace-nowrap"
+                    >
+                      {addingToPipeline === opp.companyName ? "Adding..." : "Add to Pipeline"}
+                    </button>
+                    <button
+                      onClick={() => dismissOpportunity(opp.companyName)}
+                      className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                      title="Dismiss"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -298,7 +314,16 @@ export default function InboxIQ({ token }: { token: string }) {
                   <p className="text-sm text-slate-700 mt-0.5 truncate">{event.subject}</p>
                   <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{event.snippet}</p>
                 </div>
-                <div className="text-xs text-slate-400 flex-shrink-0">{formatDate(event.emailDate)}</div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="text-xs text-slate-400">{formatDate(event.emailDate)}</div>
+                  <button
+                    onClick={() => dismissEvent(event.id)}
+                    className="p-1.5 text-slate-300 hover:text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                    title="Dismiss"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             );
           })}

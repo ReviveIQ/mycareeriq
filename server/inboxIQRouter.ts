@@ -289,7 +289,19 @@ router.post("/scan", requireAuth, async (req: any, res: any) => {
   }
 });
 
-// ── POST /api/inbox/add-to-pipeline ─────────────────────────────────────────
+// ── DELETE /api/inbox/events/:id ────────────────────────────────────────────
+router.delete("/events/:id", requireAuth, async (req: any, res: any) => {
+  try {
+    const db = await getDb();
+    if (!db) { res.status(500).json({ error: "DB unavailable" }); return; }
+    await db.execute(sql`
+      DELETE FROM inbox_events WHERE id = ${parseInt(req.params.id)} AND userId = ${req.userId}
+    `).catch(() => {});
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 // Adds an inbound opportunity detected by InboxIQ to the pipeline
 router.post("/add-to-pipeline", requireAuth, async (req: any, res: any) => {
   try {
