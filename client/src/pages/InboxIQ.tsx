@@ -36,8 +36,10 @@ export default function InboxIQ({ token }: { token: string }) {
   const [status, setStatus] = useState<InboxStatus | null>(null);
   const [events, setEvents] = useState<InboxEvent[]>([]);
   const [stale, setStale] = useState<StaleApplication[]>([]);
+  const [newOpportunities, setNewOpportunities] = useState<any[]>([]);
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [addingToPipeline, setAddingToPipeline] = useState<string | null>(null);
 
   const headers = { Authorization: `Bearer ${token}` };
 
@@ -76,12 +78,34 @@ export default function InboxIQ({ token }: { token: string }) {
     try {
       const res = await fetch("/api/inbox/scan", { method: "POST", headers });
       const data = await res.json();
-      if (data.events?.length) {
+      if (data.events?.length || data.newOpportunities?.length) {
         await loadEvents();
+        if (data.newOpportunities?.length) {
+          setNewOpportunities(prev => {
+            const existing = new Set(prev.map((o: any) => o.companyName));
+            const fresh = data.newOpportunities.filter((o: any) => !existing.has(o.companyName));
+            return [...prev, ...fresh];
+          });
+        }
       }
       await loadStatus();
     } catch { /* silent */ }
     finally { setScanning(false); }
+  }
+
+  async function addToPipeline(opportunity: any) {
+    setAddingToPipeline(opportunity.companyName);
+    try {
+      const res = await fetch("/api/inbox/add-to-pipeline", {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify(opportunity),
+      });
+      if (res.ok) {
+        setNewOpportunities(prev => prev.filter((o: any) => o.companyName !== opportunity.companyName));
+      }
+    } catch { /* silent */ }
+    finally { setAddingToPipeline(null); }
   }
 
   async function disconnect() {
@@ -182,6 +206,44 @@ export default function InboxIQ({ token }: { token: string }) {
           </button>
         </div>
       </div>
+
+      {/* New inbound opportunities */}
+      {newOpportunities.length > 0 && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Mail className="w-4 h-4 text-indigo-600" />
+            <h3 className="text-sm font-semibold text-indigo-800">
+              {newOpportunities.length} new opportunit{newOpportunities.length !== 1 ? "ies" : "y"} found in your inbox
+            </h3>
+          </div>
+          <div className="space-y-2">
+            {newOpportunities.map((opp: any) => (
+              <div key={opp.companyName} className="bg-white rounded-lg px-3 py-3 border border-indigo-100">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-semibold text-slate-900">{opp.companyName}</p>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-medium capitalize">
+                        {opp.type?.replace(/_/g, " ")}
+                      </span>
+                      <span className="text-xs text-slate-400">→ {opp.suggestedStage}</span>
+                    </div>
+                    {opp.jobTitle && <p className="text-xs text-slate-500 mt-0.5">{opp.jobTitle}</p>}
+                    <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{opp.subject}</p>
+                  </div>
+                  <button
+                    onClick={() => addToPipeline(opp)}
+                    disabled={addingToPipeline === opp.companyName}
+                    className="flex-shrink-0 text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors whitespace-nowrap"
+                  >
+                    {addingToPipeline === opp.companyName ? "Adding..." : "Add to Pipeline"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Stale applications */}
       {stale.length > 0 && (

@@ -208,15 +208,14 @@ router.post("/scan", requireAuth, async (req: any, res: any) => {
     );
 
     if (!pipeline.length) {
-      res.json({ scanned: 0, events: [] }); return;
+      res.json({ scanned: 0, events: [], newOpportunities: [] }); return;
     }
 
-    // Build domain list from company names
+    // ── Phase 1: Pipeline company emails ─────────────────────────────────────
     const companyDomains = await buildDomainMap(pipeline);
-
-    // Fetch emails targeted at pipeline companies
+    const pipelineCompanyNames = new Set(pipeline.map((c: any) => c.companyName.toLowerCase()));
     const emails = await fetchGmailMessages(accessToken, pipeline, 50);
-    console.log(`[InboxIQ] Fetched ${emails.length} recent emails for userId ${req.userId}`);
+    console.log(`[InboxIQ] Fetched ${emails.length} pipeline-matched emails for userId ${req.userId}`);
 
     const events: any[] = [];
 
@@ -225,7 +224,6 @@ router.post("/scan", requireAuth, async (req: any, res: any) => {
       const matchedCompany = companyDomains.get(fromDomain);
       if (!matchedCompany) continue;
 
-      // Classify the email
       const classification = await classifyEmail(email.subject, email.snippet, matchedCompany.companyName);
       if (!classification || classification.type === "other") continue;
 
@@ -240,12 +238,35 @@ router.post("/scan", requireAuth, async (req: any, res: any) => {
         newStage: classification.newStage,
       });
 
-      // Auto-advance pipeline stage
       if (classification.newStage && classification.newStage !== matchedCompany.stage) {
         await db.update(companies).set({ stage: classification.newStage } as any)
           .where(and(eq(companies.id, matchedCompany.id), eq(companies.userId, req.userId)));
         console.log(`[InboxIQ] Auto-advanced ${matchedCompany.companyName}: ${matchedCompany.stage} → ${classification.newStage}`);
       }
+    }
+
+    // ── Phase 2: Inbound opportunities not yet in pipeline ───────────────────
+    const inboundEmails = await fetchInboundOpportunities(accessToken, 30);
+    console.log(`[InboxIQ] Scanning ${inboundEmails.length} potential inbound opportunities`);
+
+    const newOpportunities: any[] = [];
+
+    for (const email of inboundEmails) {
+      const extracted = await extractOpportunity(email.subject, email.snippet, email.from);
+      if (!extracted) continue;
+      if (pipelineCompanyNames.has(extracted.companyName.toLowerCase())) continue;
+
+      newOpportunities.push({
+        companyName: extracted.companyName,
+        jobTitle: extracted.jobTitle,
+        type: extracted.type,
+        subject: email.subject,
+        from: email.from,
+        date: email.date,
+        snippet: email.snippet,
+        suggestedStage: extracted.suggestedStage,
+      });
+      console.log(`[InboxIQ] New opportunity: ${extracted.companyName} — ${extracted.type} (${extracted.suggestedStage})`);
     }
 
     // Update last scanned time
@@ -261,12 +282,137 @@ router.post("/scan", requireAuth, async (req: any, res: any) => {
       }
     }
 
-    res.json({ scanned: emails.length, events });
+    res.json({ scanned: emails.length, events, newOpportunities });
   } catch (err: any) {
     console.error("[InboxIQ] Scan error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
+
+// ── POST /api/inbox/add-to-pipeline ─────────────────────────────────────────
+// Adds an inbound opportunity detected by InboxIQ to the pipeline
+router.post("/add-to-pipeline", requireAuth, async (req: any, res: any) => {
+  try {
+    const { companyName, jobTitle, suggestedStage, from } = req.body;
+    if (!companyName) { res.status(400).json({ error: "companyName required" }); return; }
+
+    const db = await getDb();
+    if (!db) { res.status(500).json({ error: "DB unavailable" }); return; }
+
+    const { companies: companiesTable } = await import("../drizzle/schema");
+    const domain = extractDomain(`x@${from?.split("@")[1] || ""}`);
+
+    await db.insert(companiesTable).values({
+      userId: req.userId,
+      companyId: `inbox-${companyName.toLowerCase().replace(/[^a-z0-9]/g, "")}-${Date.now()}`,
+      companyName,
+      jobTitle: jobTitle || "",
+      category: "Inbound",
+      stage: suggestedStage || "Applied",
+      priority: "Medium",
+      linkedinUrl: "",
+      contactEmail: from || "",
+      notes: "Added via InboxIQ inbox scan",
+      remote: false,
+      salary: "",
+      companySize: "",
+      jobDescription: "",
+      jobLink: "",
+    } as any);
+
+    console.log(`[InboxIQ] Added to pipeline: ${companyName} (${suggestedStage})`);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Inbound opportunity helpers ──────────────────────────────────────────────
+
+async function fetchInboundOpportunities(accessToken: string, maxResults = 30): Promise<any[]> {
+  try {
+    // Broad job-related Gmail query to catch inbound recruiter/interview emails
+    const query = [
+      "in:inbox",
+      "(",
+      "subject:(interview OR \"phone screen\" OR \"we'd like to\" OR \"schedule a call\" OR \"job opportunity\" OR \"exciting opportunity\" OR \"your application\" OR \"we went with\" OR \"another candidate\" OR \"panel interview\" OR \"next steps\" OR \"offer\" OR \"position\" OR \"role\" OR \"recruiter\")",
+      ")",
+    ].join(" ");
+
+    const listRes = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${maxResults}&q=${encodeURIComponent(query)}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const listData = await listRes.json() as any;
+    const messages = listData.messages || [];
+
+    if (!messages.length) return [];
+
+    const details = await Promise.all(
+      messages.slice(0, 20).map(async (msg: any) => {
+        const msgRes = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        return msgRes.json();
+      })
+    );
+
+    return details.map((d: any) => {
+      const headers = d.payload?.headers || [];
+      const get = (name: string) => headers.find((h: any) => h.name === name)?.value || "";
+      return { id: d.id, from: get("From"), subject: get("Subject"), date: get("Date"), snippet: d.snippet || "" };
+    });
+  } catch (err: any) {
+    console.error("[InboxIQ] Inbound fetch error:", err.message);
+    return [];
+  }
+}
+
+async function extractOpportunity(subject: string, snippet: string, from: string): Promise<{
+  companyName: string;
+  jobTitle: string;
+  type: string;
+  suggestedStage: string;
+} | null> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        max_tokens: 150,
+        temperature: 0,
+        messages: [
+          {
+            role: "system",
+            content: `Extract job opportunity details from this email. Return JSON only or null if not job-related.
+{
+  "companyName": string,
+  "jobTitle": string or "",
+  "type": "recruiter_outreach" | "interview_request" | "panel_interview" | "rejection" | "offer" | "follow_up",
+  "suggestedStage": "Research" | "Outreach" | "Applied" | "Interviewing" | "Offer" | "Rejected"
+}
+
+Infer companyName from the sender domain or email body.
+Return null if this is not a job-related email.`,
+          },
+          { role: "user", content: `From: ${from}\nSubject: ${subject}\nPreview: ${snippet}` },
+        ],
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+
+    const data = await res.json() as any;
+    const text = (data.choices?.[0]?.message?.content || "").trim();
+    if (text === "null" || !text) return null;
+    const clean = text.replace(/```json?|```/g, "").trim();
+    return JSON.parse(clean);
+  } catch { return null; }
+}
 
 // ── GET /api/inbox/events ────────────────────────────────────────────────────
 // Returns recent inbox events for this user
