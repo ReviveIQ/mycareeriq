@@ -214,8 +214,8 @@ router.post("/scan", requireAuth, async (req: any, res: any) => {
     // Build domain list from company names
     const companyDomains = await buildDomainMap(pipeline);
 
-    // Fetch recent emails from Gmail
-    const emails = await fetchGmailMessages(accessToken, 50);
+    // Fetch emails targeted at pipeline companies
+    const emails = await fetchGmailMessages(accessToken, pipeline, 50);
     console.log(`[InboxIQ] Fetched ${emails.length} recent emails for userId ${req.userId}`);
 
     const events: any[] = [];
@@ -326,17 +326,36 @@ async function refreshGmailToken(refreshToken: string): Promise<string | null> {
   } catch { return null; }
 }
 
-async function fetchGmailMessages(accessToken: string, maxResults = 50): Promise<any[]> {
+async function fetchGmailMessages(accessToken: string, pipeline: any[], maxResults = 50): Promise<any[]> {
   try {
-    // Fetch message list
+    // Build targeted query from pipeline company names — Gmail does the filtering
+    // Use company name keywords so we catch zoominfo-mail.com, mail.hubspot.com etc.
+    const companyKeywords = pipeline
+      .map((c: any) => c.companyName.toLowerCase().replace(/[^a-z0-9]/g, ""))
+      .filter(Boolean)
+      .slice(0, 20); // Gmail query has length limits
+
+    // Build OR query: "from:zoominfo OR from:hubspot OR from:gainsight"
+    const fromQuery = companyKeywords.map(k => `from:${k}`).join(" OR ");
+    const query = `in:inbox (${fromQuery})`;
+
+    console.log(`[InboxIQ] Gmail query: ${query.slice(0, 200)}`);
+
     const listRes = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${maxResults}&q=in:inbox`,
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${maxResults}&q=${encodeURIComponent(query)}`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     const listData = await listRes.json() as any;
     const messages = listData.messages || [];
 
-    // Fetch each message (in parallel, batched)
+    if (!messages.length) {
+      console.log("[InboxIQ] No matching emails found in inbox");
+      return [];
+    }
+
+    console.log(`[InboxIQ] Found ${messages.length} matching emails`);
+
+    // Fetch metadata for each message
     const details = await Promise.all(
       messages.slice(0, 30).map(async (msg: any) => {
         const msgRes = await fetch(
