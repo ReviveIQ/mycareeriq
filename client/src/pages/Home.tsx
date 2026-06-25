@@ -173,37 +173,46 @@ export default function Home() {
       toast.error("No LinkedIn profile found for this contact");
       return;
     }
+    // Open LinkedIn — then confirm before advancing stage
     window.open(company.contactLinkedIn, "_blank");
-    try {
-      await markOutreachSent.mutateAsync({ companyId: company.id });
-      await utils.pipeline.getCompanies.invalidate();
-      toast.success(`Stage updated to Outreach — message sent to ${company.contactName || "contact"} on LinkedIn`);
-      setSelectedCompany(null);
-      // Nudge to generate cover letter while role is fresh
-      setTimeout(() => {
-        toast(`Ready to apply to ${(company as any).companyName || company.name}?`, {
-          description: "Generate a tailored cover letter while the role is fresh.",
-          action: {
-            label: "Generate →",
-            onClick: () => {
-              const rawDesc = (company as any).jobDescription || company.role || "";
-              const decoded = rawDesc.replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g," ").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim().slice(0,3000);
-              setGeneratePrefill({
-                companyName: (company as any).companyName || company.name,
-                jobTitle: company.role || (company as any).jobTitle || "",
-                jobDescription: decoded,
-                contactName: company.contactName || "Hiring Manager",
-                companyId: String(company.id),
+    toast("Did you send a message?", {
+      description: `Click below only if you reached out to ${company.contactName || "this contact"} on LinkedIn.`,
+      duration: 12000,
+      action: {
+        label: "Yes — mark as Outreach",
+        onClick: async () => {
+          try {
+            await markOutreachSent.mutateAsync({ companyId: company.id });
+            await utils.pipeline.getCompanies.invalidate();
+            toast.success("Stage updated to Outreach");
+            setSelectedCompany(null);
+            setTimeout(() => {
+              toast(`Ready to apply to ${(company as any).companyName || company.name}?`, {
+                description: "Generate a tailored cover letter while the role is fresh.",
+                action: {
+                  label: "Generate →",
+                  onClick: () => {
+                    const rawDesc = (company as any).jobDescription || company.role || "";
+                    const decoded = rawDesc.replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g," ").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim().slice(0,3000);
+                    setGeneratePrefill({
+                      companyName: (company as any).companyName || company.name,
+                      jobTitle: company.role || (company as any).jobTitle || "",
+                      jobDescription: decoded,
+                      contactName: company.contactName || "Hiring Manager",
+                      companyId: String(company.id),
+                    });
+                    setActiveTab("generate");
+                  }
+                },
+                duration: 8000,
               });
-              setActiveTab("generate");
-            }
-          },
-          duration: 8000,
-        });
-      }, 1500);
-    } catch (err) {
-      console.error("Failed to update stage:", err);
-    }
+            }, 1000);
+          } catch (err) {
+            console.error("Failed to update stage:", err);
+          }
+        },
+      },
+    });
   };
 
   const handleMarkApplied = async (company: Company) => {
