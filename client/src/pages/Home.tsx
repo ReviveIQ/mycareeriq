@@ -59,6 +59,7 @@ import GenerateApplication from "./GenerateApplication";
 import ApplicationHistory from "./ApplicationHistory";
 import ResearchSettings from "./ResearchSettings";
 import InboxIQ from "./InboxIQ";
+import GettingStarted from "@/components/GettingStarted";
 import PricingPage from "./PricingPage";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
@@ -423,7 +424,14 @@ export default function Home() {
     }
   };
 
-  const trialDaysRemaining = parseInt(localStorage.getItem("mciq_trial_days") || "-1");
+  const [onboardingDismissed, setOnboardingDismissed] = useState(() =>
+    localStorage.getItem("mciq_onboarding_dismissed") === "1"
+  );
+
+  const dismissOnboarding = () => {
+    localStorage.setItem("mciq_onboarding_dismissed", "1");
+    setOnboardingDismissed(true);
+  };
   const trialActive = localStorage.getItem("mciq_trial_active") === "true";
   const isPaidUser = user?.plan === "pro" || user?.plan === "enterprise";
   const showTrialBanner = trialActive && trialDaysRemaining >= 0 && !isPaidUser;
@@ -651,6 +659,25 @@ export default function Home() {
 
         {activeTab === "pipeline" && (
           <>
+            {/* Getting Started — show for new users who haven't dismissed */}
+            {!onboardingDismissed && (
+              <GettingStarted
+                hasResume={!!(user as any)?.resumeIQKey || pipelineData.length > 0}
+                hasRoles={pipelineData.length > 0}
+                hasLocation={pipelineData.length > 0}
+                hasPipeline={pipelineData.length > 0}
+                hasInbox={localStorage.getItem("mciq_trial_active") !== null && (user as any)?.gmailConnected === true}
+                onGoToSettings={() => setActiveTab("settings")}
+                onRunScan={async () => {
+                  try {
+                    await runResearch.mutateAsync();
+                    await utils.pipeline.getCompanies.invalidate();
+                  } catch { /* silent */ }
+                }}
+                onGoToInbox={() => setActiveTab("inbox")}
+                onDismiss={dismissOnboarding}
+              />
+            )}
             {/* Timeline panel — shown only when pipeline is empty */}
             {pipelineData.length === 0 && !isLoading && (
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -814,6 +841,14 @@ export default function Home() {
               </div>
             </div>
 
+            {/* Priority legend — shown once above table */}
+            <div className="flex items-center gap-4 px-1 mb-2 flex-wrap">
+              <span className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Priority:</span>
+              <span className="text-[11px] text-slate-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span>High = strong role + location match</span>
+              <span className="text-[11px] text-slate-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-400 inline-block"></span>Medium = partial match</span>
+              <span className="text-[11px] text-slate-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300 inline-block"></span>Low = stretch opportunity</span>
+            </div>
+
             {/* Table */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
@@ -883,20 +918,13 @@ export default function Home() {
                           </span>
                         </td>
                         <td className="px-4 py-3 hidden md:table-cell">
-                          <div className="relative group">
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border cursor-help ${
-                                priorityColors[company.priority]
-                              }`}
-                            >
-                              {company.priority}
-                            </span>
-                            <div className="absolute bottom-full left-0 mb-2 w-52 bg-slate-900 text-white text-xs rounded-lg p-2.5 hidden group-hover:block z-50 shadow-xl">
-                              <p className="font-semibold mb-1">Priority ranking</p>
-                              <p className="text-slate-300 leading-relaxed">Based on role match to your target titles, location alignment, company size, and posting recency.</p>
-                              <p className="text-slate-400 mt-1.5"><span className="text-green-400 font-medium">High</span> = strong match · <span className="text-yellow-400 font-medium">Medium</span> = partial · <span className="text-slate-400 font-medium">Low</span> = stretch</p>
-                            </div>
-                          </div>
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border ${
+                              priorityColors[company.priority]
+                            }`}
+                          >
+                            {company.priority}
+                          </span>
                         </td>
                         <td className="px-4 py-3 hidden lg:table-cell">
                           <div className="text-xs text-slate-500">
