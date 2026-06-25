@@ -871,7 +871,7 @@ export default function Home() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-slate-700 max-w-[220px]">
-                          <span className="line-clamp-2 text-xs leading-relaxed">{company.role}</span>
+                          <span className="text-xs leading-relaxed break-words">{company.role}</span>
                         </td>
                         <td className="px-4 py-3">
                           <span
@@ -883,13 +883,20 @@ export default function Home() {
                           </span>
                         </td>
                         <td className="px-4 py-3 hidden md:table-cell">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border ${
-                              priorityColors[company.priority]
-                            }`}
-                          >
-                            {company.priority}
-                          </span>
+                          <div className="relative group">
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border cursor-help ${
+                                priorityColors[company.priority]
+                              }`}
+                            >
+                              {company.priority}
+                            </span>
+                            <div className="absolute bottom-full left-0 mb-2 w-52 bg-slate-900 text-white text-xs rounded-lg p-2.5 hidden group-hover:block z-50 shadow-xl">
+                              <p className="font-semibold mb-1">Priority ranking</p>
+                              <p className="text-slate-300 leading-relaxed">Based on role match to your target titles, location alignment, company size, and posting recency.</p>
+                              <p className="text-slate-400 mt-1.5"><span className="text-green-400 font-medium">High</span> = strong match · <span className="text-yellow-400 font-medium">Medium</span> = partial · <span className="text-slate-400 font-medium">Low</span> = stretch</p>
+                            </div>
+                          </div>
                         </td>
                         <td className="px-4 py-3 hidden lg:table-cell">
                           <div className="text-xs text-slate-500">

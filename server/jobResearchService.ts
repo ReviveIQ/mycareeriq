@@ -764,10 +764,27 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
       console.log(`[JobResearch] ${company.name} (${company.ats}): ${raw.length} jobs fetched`);
     }
     for (const job of raw) {
-      // Apply country/state filter
+      // Apply country/state filter on location
       const jobLocation = (job as any).location || "";
       if (!matchesCountryFilter(jobLocation, targetCountries)) {
         console.log(`[JobResearch] Filtered: ${company.name} "${job.title}" — "${jobLocation}" not in [${targetCountries}]`);
+        continue;
+      }
+
+      // Also filter on title — catches "Account Executive - India", "Sales Manager - APAC", etc.
+      const titleLower = (job.title || "").toLowerCase();
+      const TITLE_GEO_INDICATORS = [
+        "india","apac","emea","latam","japan","china","singapore","australia",
+        "uk","united kingdom","germany","france","mexico","brazil","canada",
+        "europe","asia","pacific","middle east","africa","latin america",
+      ];
+      const titleHasGeo = TITLE_GEO_INDICATORS.some(g => {
+        // Match as whole word or after dash/space to avoid "indiana" matching "india"
+        const re = new RegExp(`(^|[-\\s–—])${g}(\\s|$)`, "i");
+        return re.test(titleLower);
+      });
+      if (titleHasGeo && !titleLower.includes("united states") && !titleLower.includes("us ") && !titleLower.includes("usa")) {
+        console.log(`[JobResearch] Filtered (geo title): ${company.name} "${job.title}"`);
         continue;
       }
 
