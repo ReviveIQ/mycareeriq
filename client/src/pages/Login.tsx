@@ -1,7 +1,4 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 const TOKEN_KEY = "reviveiq_auth_token";
@@ -30,30 +27,26 @@ const GemLogo = ({ size = 32 }: { size?: number }) => (
   </svg>
 );
 
-const steps = [
+const features = [
   {
-    number: "01",
-    product: "ResumeIQ",
-    productUrl: "https://resumeiq.reviveiqi.com",
-    headline: "Transform your resume",
-    body: "Upload your resume and ResumeIQ transforms every bullet with measurable impact — ATS-optimized, ready to get callbacks.",
-    accent: "#60a5fa",
+    icon: "🎯",
+    headline: "Find jobs that actually fit",
+    body: "We research live openings across 30+ companies, score every role for match, and surface only the opportunities worth your time.",
   },
   {
-    number: "02",
-    product: "MyCareerIQ",
-    productUrl: null,
-    headline: "Build your pipeline",
-    body: "Your optimized resume drives targeted job research across hundreds of companies. Fit-scored roles, real contacts, outreach ready to send.",
-    accent: "#3b82f6",
+    icon: "✉️",
+    headline: "Cover letters written in seconds",
+    body: "Every letter is built around your career story — not a generic template. Tailored to the role, the company, and the hiring manager.",
   },
   {
-    number: "03",
-    product: "ReviveIQI",
-    productUrl: "https://reviveiqi.com",
-    headline: "Land the right role",
-    body: "Cover letters, tailored applications, and pipeline diagnostics — everything you need to move from search to offer.",
-    accent: "#2563eb",
+    icon: "🔗",
+    headline: "Real contacts, not just job boards",
+    body: "We find the right person inside each company and give you their LinkedIn profile so you can reach out directly.",
+  },
+  {
+    icon: "📬",
+    headline: "Your inbox updates your pipeline",
+    body: "Connect Gmail once. We automatically detect replies, interview invites, and rejections — and update your pipeline without you lifting a finger.",
   },
 ];
 
@@ -124,7 +117,7 @@ export default function Login({ onSuccess }: LoginProps) {
     }}>
       <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
 
-      {/* ── Left panel — product story ─────────────────────────── */}
+      {/* ── Left panel ─────────────────────────────────────────── */}
       <div style={{
         flex: "1",
         display: "flex",
@@ -150,94 +143,57 @@ export default function Login({ onSuccess }: LoginProps) {
         }} />
 
         {/* Brand */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "56px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "48px" }}>
           <GemLogo size={40} />
           <div>
             <div style={{
               fontFamily: "'Montserrat', sans-serif", fontWeight: 800,
-              fontSize: "22px", letterSpacing: "-0.5px",
-              color: "white",
+              fontSize: "20px", letterSpacing: "-0.5px", color: "white",
             }}>
-              ReviveIQ<span style={{ color: "#60a5fa" }}>I</span>
+              MyCareer<span style={{ color: "#60a5fa" }}>IQ</span>
             </div>
             <div style={{ fontSize: "11px", color: "#475569", letterSpacing: "0.5px", marginTop: "1px" }}>
-              WHERE REVENUE INTELLIGENCE MEETS REAL EXECUTION
+              BY REVIVEIQI
             </div>
           </div>
         </div>
 
         {/* Headline */}
-        <div style={{ marginBottom: "48px" }}>
+        <div style={{ marginBottom: "40px" }}>
           <h2 style={{
             fontFamily: "'Montserrat', sans-serif", fontWeight: 800,
-            fontSize: "32px", lineHeight: "1.15", color: "white",
-            letterSpacing: "-0.5px", margin: 0,
+            fontSize: "30px", lineHeight: "1.2", color: "white",
+            letterSpacing: "-0.5px", margin: "0 0 14px 0",
           }}>
-            From polished resume<br />
-            to targeted pipeline.<br />
-            <span style={{ color: "#60a5fa" }}>In one system.</span>
+            Your AI job search pipeline.<br />
+            <span style={{ color: "#60a5fa" }}>Do less. Land faster.</span>
           </h2>
+          <p style={{
+            fontSize: "15px", color: "#94a3b8", lineHeight: "1.65",
+            fontWeight: 300, margin: 0, maxWidth: "440px",
+          }}>
+            MyCareerIQ researches live roles, writes tailored cover letters, finds hiring managers, and tracks every application — automatically.
+          </p>
         </div>
 
-        {/* Steps */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "28px", position: "relative" }}>
-          {/* Connecting line */}
-          <div style={{
-            position: "absolute", left: "18px", top: "28px", bottom: "28px",
-            width: "1px",
-            background: "linear-gradient(to bottom, rgba(37,99,235,0.5), rgba(96,165,250,0.2), rgba(37,99,235,0.1))",
-          }} />
-
-          {steps.map((step) => (
-            <div key={step.number} style={{ display: "flex", gap: "20px", alignItems: "flex-start" }}>
-              {/* Node */}
+        {/* Feature grid */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          {features.map((f) => (
+            <div key={f.headline} style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
               <div style={{
-                width: "36px", height: "36px", borderRadius: "50%",
-                background: `radial-gradient(circle, rgba(37,99,235,0.3), rgba(8,15,30,0.9))`,
-                border: `1px solid ${step.accent}40`,
+                width: "36px", height: "36px", borderRadius: "10px", flexShrink: 0,
+                background: "rgba(37,99,235,0.12)", border: "1px solid rgba(37,99,235,0.2)",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                flexShrink: 0, zIndex: 1,
+                fontSize: "16px",
               }}>
-                <span style={{ fontSize: "11px", fontWeight: 700, color: step.accent, fontFamily: "'Montserrat',sans-serif" }}>
-                  {step.number}
-                </span>
+                {f.icon}
               </div>
-
-              <div style={{ paddingTop: "6px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                  {step.productUrl ? (
-                    <a
-                      href={step.productUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        fontSize: "12px", fontWeight: 600, letterSpacing: "0.8px",
-                        color: step.accent, textTransform: "uppercase",
-                        textDecoration: "none", fontFamily: "'Montserrat',sans-serif",
-                        borderBottom: `1px solid ${step.accent}40`,
-                        paddingBottom: "1px",
-                      }}
-                    >
-                      {step.product} ↗
-                    </a>
-                  ) : (
-                    <span style={{
-                      fontSize: "12px", fontWeight: 600, letterSpacing: "0.8px",
-                      color: step.accent, textTransform: "uppercase",
-                      fontFamily: "'Montserrat',sans-serif",
-                    }}>
-                      {step.product}
-                    </span>
-                  )}
+              <div>
+                <div style={{ fontSize: "14px", fontWeight: 600, color: "white", marginBottom: "3px" }}>
+                  {f.headline}
                 </div>
-                <div style={{
-                  fontSize: "15px", fontWeight: 600, color: "white",
-                  marginBottom: "4px", lineHeight: "1.3",
-                }}>
-                  {step.headline}
-                </div>
-                <div style={{ fontSize: "13px", color: "#94a3b8", lineHeight: "1.6", fontWeight: 300 }}>
-                  {step.body}
+                <div style={{ fontSize: "13px", color: "#64748b", lineHeight: "1.55", fontWeight: 300 }}>
+                  {f.body}
                 </div>
               </div>
             </div>
@@ -245,12 +201,12 @@ export default function Login({ onSuccess }: LoginProps) {
         </div>
 
         {/* Footer */}
-        <div style={{ marginTop: "48px", paddingTop: "24px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-          <p style={{ fontSize: "12px", color: "#334155", margin: 0 }}>
-            New to ReviveIQI?{" "}
+        <div style={{ marginTop: "44px", paddingTop: "24px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+          <p style={{ fontSize: "13px", color: "#475569", margin: 0 }}>
+            Need to transform your resume first?{" "}
             <a href="https://resumeiq.reviveiqi.com" target="_blank" rel="noopener noreferrer"
-              style={{ color: "#60a5fa", textDecoration: "none" }}>
-              Start with ResumeIQ →
+              style={{ color: "#60a5fa", textDecoration: "none", fontWeight: 500 }}>
+              Start with ResumeIQ — it's free →
             </a>
           </p>
         </div>
@@ -265,19 +221,18 @@ export default function Login({ onSuccess }: LoginProps) {
         justifyContent: "center",
         padding: "64px 40px",
       }}>
-        {/* Form header */}
         <div style={{ marginBottom: "32px" }}>
           <h1 style={{
             fontFamily: "'Montserrat', sans-serif", fontWeight: 800,
             fontSize: "24px", color: "white", margin: "0 0 6px 0",
             letterSpacing: "-0.3px",
           }}>
-            {mode === "login" ? "Welcome back" : "Get started"}
+            {mode === "login" ? "Welcome back" : "Start your search"}
           </h1>
           <p style={{ fontSize: "14px", color: "#64748b", margin: 0, fontWeight: 300 }}>
             {mode === "login"
               ? "Sign in to your job search pipeline"
-              : "Build your pipeline in minutes"}
+              : "Set up your pipeline in minutes — free to try"}
           </p>
         </div>
 
@@ -289,8 +244,7 @@ export default function Login({ onSuccess }: LoginProps) {
             gap: "10px", background: "#0077B5", color: "white",
             border: "none", borderRadius: "8px", padding: "11px 16px",
             fontSize: "14px", fontWeight: 600, cursor: "pointer",
-            fontFamily: "'DM Sans', sans-serif",
-            transition: "background 0.15s",
+            fontFamily: "'DM Sans', sans-serif", transition: "background 0.15s",
           }}
           onMouseEnter={e => (e.currentTarget.style.background = "#006097")}
           onMouseLeave={e => (e.currentTarget.style.background = "#0077B5")}
@@ -304,7 +258,7 @@ export default function Login({ onSuccess }: LoginProps) {
         {/* Divider */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px", margin: "20px 0" }}>
           <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.08)" }} />
-          <span style={{ fontSize: "12px", color: "#475569", fontWeight: 400 }}>or email</span>
+          <span style={{ fontSize: "12px", color: "#475569" }}>or email</span>
           <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.08)" }} />
         </div>
 
@@ -363,17 +317,17 @@ export default function Login({ onSuccess }: LoginProps) {
               transition: "all 0.15s",
             }}
           >
-            {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
+            {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Free Account"}
           </button>
         </div>
 
-        {/* Toggle login/register */}
+        {/* Toggle */}
         <p style={{ fontSize: "13px", color: "#475569", textAlign: "center", marginTop: "24px" }}>
           {mode === "login" ? (
             <>Don't have an account?{" "}
               <button onClick={() => setMode("register")}
                 style={{ background: "none", border: "none", color: "#60a5fa", cursor: "pointer", fontSize: "13px", fontWeight: 500, padding: 0 }}>
-                Sign up
+                Sign up free
               </button>
             </>
           ) : (
