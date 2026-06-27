@@ -13,7 +13,14 @@ function getTransporter() {
   const user = process.env.GMAIL_USER || process.env.GMAIL_APP_EMAIL;
   const pass = process.env.GMAIL_APP_PASSWORD;
   if (!user || !pass) return null;
-  return nodemailer.createTransport({ service: "gmail", auth: { user, pass }, family: 4 } as any);
+  // Use port 587 (STARTTLS) explicitly — Railway blocks 465 (SSL)
+  return nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    auth: { user, pass },
+    family: 4,
+  });
 }
 
 export async function notifyOwner(payload: NotificationPayload): Promise<boolean> {
