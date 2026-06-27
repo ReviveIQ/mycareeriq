@@ -434,6 +434,10 @@ export default function Home() {
   };
   const trialActive = localStorage.getItem("mciq_trial_active") === "true";
   const isPaidUser = user?.plan === "pro" || user?.plan === "enterprise";
+  const trialStart = localStorage.getItem("mciq_trial_start");
+  const trialDaysRemaining = trialStart
+    ? Math.max(0, 7 - Math.floor((Date.now() - new Date(trialStart).getTime()) / (1000 * 60 * 60 * 24)))
+    : 7;
   const showTrialBanner = trialActive && trialDaysRemaining >= 0 && !isPaidUser;
 
   return (
