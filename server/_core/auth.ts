@@ -139,7 +139,7 @@ export function registerAuthRoutes(app: Express) {
       res.status(401).json({ error: "Not authenticated" });
       return;
     }
-    res.json({ id: user.id, email: user.email, name: user.name, plan: (user as any).plan || "free" });
+    res.json({ id: user.id, email: user.email, name: user.name, plan: (user as any).plan || "free", gmailConnected: !!(user as any).gmailConnected, gmailEmail: (user as any).gmailEmail || null });
   });
 
   // ── LinkedIn OAuth ────────────────────────────────────────────────────────
