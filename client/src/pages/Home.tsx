@@ -670,7 +670,7 @@ export default function Home() {
                 hasRoles={pipelineData.length > 0}
                 hasLocation={pipelineData.length > 0}
                 hasPipeline={pipelineData.length > 0}
-                hasInbox={localStorage.getItem("mciq_trial_active") !== null && (user as any)?.gmailConnected === true}
+                hasInbox={!!(user as any)?.gmailConnected}
                 onGoToSettings={() => setActiveTab("settings")}
                 onRunScan={async () => {
                   try {
