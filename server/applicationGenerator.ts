@@ -423,17 +423,3 @@ Format as plain text. Emphasize experience and skills most relevant to this spec
 
   return String(response.choices?.[0]?.message?.content || "").trim();
 }
-
-// ── Generate both documents ───────────────────────────────────────────────────> {
-  const [letterResult, tailoredResume] = await Promise.all([
-    generateCoverLetter(companyName, jobTitle, jobDescription, contactName, userId),
-    generateTailoredResume(jobTitle, jobDescription, companyName, userId),
-  ]);
-  return {
-    coverLetter: letterResult.coverLetter,
-    tailoredResume,
-    scores: letterResult.scores,
-    mode: letterResult.mode,
-    brief: letterResult.brief,
-  };
-}
