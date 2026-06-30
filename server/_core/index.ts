@@ -8,7 +8,6 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { sendDigestEmailHandler } from "../digestHandler";
 import { jobResearchHandler } from "../jobResearchHandler";
 import { registerResumeIQRoutes } from "../resumeIQRouter";
 import { getDb } from "../db";
@@ -633,7 +632,6 @@ async function startServer() {
     }
   });
 
-  app.post("/api/scheduled/sendDigest", sendDigestEmailHandler);
   app.post("/api/scheduled/jobResearch", jobResearchHandler);
 
 
