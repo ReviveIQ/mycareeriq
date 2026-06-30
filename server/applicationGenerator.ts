@@ -423,3 +423,24 @@ Format as plain text. Emphasize experience and skills most relevant to this spec
 
   return String(response.choices?.[0]?.message?.content || "").trim();
 }
+
+// ── Generate both documents ───────────────────────────────────────────────────
+export async function generateApplicationDocuments(
+  companyName: string,
+  jobTitle: string,
+  jobDescription: string,
+  contactName: string,
+  userId?: number
+): Promise<{ coverLetter: string; tailoredResume: string; scores?: any; mode?: string; brief?: any }> {
+  const [letterResult, tailoredResume] = await Promise.all([
+    generateCoverLetter(companyName, jobTitle, jobDescription, contactName, userId),
+    generateTailoredResume(jobTitle, jobDescription, companyName, userId),
+  ]);
+  return {
+    coverLetter: letterResult.coverLetter,
+    tailoredResume,
+    scores: letterResult.scores,
+    mode: letterResult.mode,
+    brief: letterResult.brief,
+  };
+}
