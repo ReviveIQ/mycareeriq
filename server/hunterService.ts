@@ -172,3 +172,20 @@ export function extractDomain(companyName: string): string {
 
   return `${cleaned}.com`;
 }
+export async function verifyEmail(email: string) {
+  const apiKey = process.env.HUNTER_API_KEY;
+  if (!apiKey) return { status: "unknown", score: 0, reason: "No API key" };
+  try {
+    const url = `https://api.hunter.io/v2/email-verifier?email=${encodeURIComponent(email)}&api_key=${apiKey}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) return { status: "unknown", score: 0, reason: `HTTP ${res.status}` };
+    const data = await res.json() as any;
+    return {
+      status: data.data?.status || "unknown",
+      score: data.data?.score || 0,
+      reason: data.data?.result || "",
+    };
+  } catch (err: any) {
+    return { status: "unknown", score: 0, reason: err.message };
+  }
+}
