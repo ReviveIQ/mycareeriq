@@ -172,7 +172,8 @@ export function extractDomain(companyName: string): string {
 
   return `${cleaned}.com`;
 }
-export async function verifyEmail(email: string) {
+
+export async function verifyEmail(email: string): Promise<{ status: string; score: number; reason: string }> {
   const apiKey = process.env.HUNTER_API_KEY;
   if (!apiKey) return { status: "unknown", score: 0, reason: "No API key" };
   try {
