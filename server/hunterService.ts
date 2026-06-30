@@ -106,74 +106,12 @@ export async function searchEmailsWithHunter(
  * @param domain Company domain (e.g., "gong.io")
  * @returns Domain information including company name and type
  */
-export async function getDomainInfo(domain: string) {
-  const apiKey = process.env.HUNTER_API_KEY;
-  if (!apiKey) {
-    throw new Error("HUNTER_API_KEY not configured");
-  }
-
-  try {
-    const params = new URLSearchParams({
-      domain,
-      api_key: apiKey,
-    });
-
-    const response = await fetch(`https://api.hunter.io/v2/domain-search?${params}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      signal: AbortSignal.timeout(AXIOS_TIMEOUT_MS),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Hunter.io domain search error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.data;
-  } catch (error) {
-    console.error("[HunterService] Domain search error:", error);
-    throw error;
-  }
-}
 
 /**
  * Verify if an email is valid using Hunter.io
  * @param email Email address to verify
  * @returns Verification result
  */
-export async function verifyEmail(email: string) {
-  const apiKey = process.env.HUNTER_API_KEY;
-  if (!apiKey) {
-    throw new Error("HUNTER_API_KEY not configured");
-  }
-
-  try {
-    const params = new URLSearchParams({
-      email,
-      api_key: apiKey,
-    });
-
-    const response = await fetch(`https://api.hunter.io/v2/email-verifier?${params}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      signal: AbortSignal.timeout(AXIOS_TIMEOUT_MS),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Hunter.io email verification error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.data;
-  } catch (error) {
-    console.error("[HunterService] Email verification error:", error);
-    throw error;
-  }
-}
 
 /**
  * Extract domain from company name or URL
