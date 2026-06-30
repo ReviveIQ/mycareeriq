@@ -146,14 +146,3 @@ bryan.greer1@gmail.com`;
     };
   }
 }
-
-export async function testEmailConnection() {
-  try {
-    const transporter = getTransporter();
-    await transporter.verify();
-    return { success: true, message: "Email connection verified" };
-  } catch (error) {
-    console.error("[EmailService] Failed to verify email connection:", error);
-    throw error;
-  }
-}
