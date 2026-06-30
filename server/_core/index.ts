@@ -230,7 +230,7 @@ async function runMigrations() {
     }
 
     // InboxIQ events table
-    await db.execute(sql`
+    await db.execute(`
       CREATE TABLE IF NOT EXISTS inbox_events (
         id BIGINT PRIMARY KEY AUTO_INCREMENT,
         userId INT NOT NULL,
