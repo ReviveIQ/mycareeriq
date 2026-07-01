@@ -856,21 +856,21 @@ export default function Home() {
             {/* Table */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm min-w-[960px]">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50">
                       {[
-                        { label: "#", field: null, w: "w-10" },
-                        { label: "Company", field: "name" as SortField, w: "w-40" },
-                        { label: "Category", field: "category" as SortField, w: "w-44", hide: "hidden sm:table-cell" },
-                        { label: "Role", field: "role" as SortField, w: "w-56", hide: "" },
+                        { label: "#", field: null, w: "w-8" },
+                        { label: "Company", field: "name" as SortField, w: "w-36" },
+                        { label: "Category", field: "category" as SortField, w: "w-36", hide: "hidden md:table-cell" },
+                        { label: "Role", field: "role" as SortField, w: "w-48", hide: "" },
                         { label: "Stage", field: "stage" as SortField, w: "w-28", hide: "" },
-                        { label: "Priority", field: "priority" as SortField, w: "w-24", hide: "hidden md:table-cell" },
-                        { label: "Added", field: null, w: "w-24", hide: "hidden lg:table-cell" },
-                        { label: "Key Contact", field: null, w: "w-44", hide: "hidden lg:table-cell" },
-                        { label: "Remote", field: null, w: "w-20", hide: "hidden lg:table-cell" },
-                        { label: "Est. Comp.", field: null, w: "w-36", hide: "hidden xl:table-cell" },
-                        { label: "Links", field: null, w: "w-24", hide: "hidden md:table-cell" },
+                        { label: "Priority", field: "priority" as SortField, w: "w-20", hide: "hidden lg:table-cell" },
+                        { label: "Added", field: null, w: "w-20", hide: "hidden lg:table-cell" },
+                        { label: "Key Contact", field: null, w: "w-40", hide: "hidden xl:table-cell" },
+                        { label: "Remote", field: null, w: "w-20", hide: "hidden xl:table-cell" },
+                        { label: "Est. Comp.", field: null, w: "w-32", hide: "hidden xl:table-cell" },
+                        { label: "Links", field: null, w: "w-20", hide: "hidden md:table-cell" },
                       ].map((col) => (
                         <th
                           key={col.label}
@@ -900,7 +900,7 @@ export default function Home() {
                             {company.name}
                           </span>
                         </td>
-                        <td className="px-4 py-3 hidden sm:table-cell">
+                        <td className="px-4 py-3 hidden md:table-cell">
                           <span
                             className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium ${
                               categoryColors[company.category as CompanyCategory] || "bg-slate-100 text-slate-700"
@@ -909,8 +909,8 @@ export default function Home() {
                             {company.category}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-slate-700 max-w-[220px]">
-                          <span className="text-xs leading-relaxed break-words">{company.role}</span>
+                        <td className="px-4 py-3 text-slate-700 max-w-[192px]">
+                          <span className="text-xs block truncate" title={company.role}>{company.role}</span>
                         </td>
                         <td className="px-4 py-3">
                           <span
@@ -921,7 +921,7 @@ export default function Home() {
                             {company.stage}
                           </span>
                         </td>
-                        <td className="px-4 py-3 hidden md:table-cell">
+                        <td className="px-4 py-3 hidden lg:table-cell">
                           <span
                             className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border ${
                               priorityColors[company.priority]
@@ -944,7 +944,7 @@ export default function Home() {
                             })() : "—"}
                           </div>
                         </td>
-                        <td className="px-4 py-3 hidden lg:table-cell">
+                        <td className="px-4 py-3 hidden xl:table-cell">
                           <div className="text-xs">
                             <p className="font-medium text-slate-800">{company.contactName}</p>
                             <p className="text-slate-500 text-[11px] leading-tight mt-0.5 max-w-[160px] truncate">
@@ -952,7 +952,7 @@ export default function Home() {
                             </p>
                           </div>
                         </td>
-                        <td className="px-4 py-3 hidden lg:table-cell">
+                        <td className="px-4 py-3 hidden xl:table-cell">
                           {company.remoteOk ? (
                             <span className="inline-flex items-center gap-1 text-emerald-700 text-xs font-medium">
                               <MapPin className="w-3 h-3" /> Remote
