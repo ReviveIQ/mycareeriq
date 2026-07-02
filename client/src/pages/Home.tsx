@@ -650,7 +650,7 @@ export default function Home() {
               )}
               {tab === "history" && <><span className="sm:hidden">📁</span><span className="hidden sm:inline">History</span></>}
               {tab === "inbox" && (
-                <><Mail className="w-3.5 h-3.5" /><span className="hidden sm:inline">InboxIQ</span></>
+                <><Mail className="w-3.5 h-3.5" /><span className="hidden sm:inline">InboxIQ</span><span className="ml-1.5 text-[9px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full hidden sm:inline">Soon</span></>
               )}
               {tab === "settings" && (
                 <><Settings className="w-3.5 h-3.5" /><span className="hidden sm:inline">Settings</span></>
