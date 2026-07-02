@@ -167,16 +167,20 @@ export default function InboxIQ({ token }: { token: string }) {
     );
   }
 
-  // ── Not connected ────────────────────────────────────────────────────────
+  // ── Not connected — Coming Soon (CASA assessment in progress) ───────────
   if (!status?.connected) {
     return (
       <div className="max-w-lg mx-auto py-16 text-center px-4">
-        <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-          <Mail className="w-8 h-8 text-indigo-600" />
+        <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+          <Mail className="w-8 h-8 text-amber-500" />
         </div>
-        <h2 className="text-xl font-bold text-slate-900 mb-3">Connect your inbox</h2>
+        <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-full px-3 py-1 mb-4">
+          <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+          <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Coming Soon</span>
+        </div>
+        <h2 className="text-xl font-bold text-slate-900 mb-3">InboxIQ — Inbox Intelligence</h2>
         <p className="text-slate-500 text-sm leading-relaxed mb-8">
-          InboxIQ watches your Gmail for replies, rejections, and interview invites — then automatically updates your pipeline so you never lose track of where things stand.
+          InboxIQ will watch your Gmail for replies, rejections, and interview invites — then automatically update your pipeline so you never lose track of where things stand. We're completing a Google security certification (CASA) required for Gmail access and will have this live shortly.
         </p>
         <div className="bg-slate-50 rounded-xl p-4 mb-8 text-left space-y-3">
           {[
@@ -192,13 +196,13 @@ export default function InboxIQ({ token }: { token: string }) {
           ))}
         </div>
         <button
-          onClick={connectGmail}
-          className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors"
+          disabled
+          className="inline-flex items-center gap-2 px-6 py-3 bg-slate-200 text-slate-400 rounded-xl font-semibold text-sm cursor-not-allowed"
         >
           <Mail className="w-4 h-4" />
-          Connect Gmail
+          Connect Gmail — Coming Soon
         </button>
-        <p className="text-xs text-slate-400 mt-4">Read-only access. We never send emails on your behalf.</p>
+        <p className="text-xs text-slate-400 mt-4">Read-only access only. We never send emails on your behalf.</p>
       </div>
     );
   }
