@@ -833,7 +833,11 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
   console.log(`[JobResearch] After 30-day filter: ${freshJobs.length}/${allRawJobs.length} jobs remain`);
 
   if (freshJobs.length === 0) {
-    console.warn("[JobResearch] No jobs fetched from ATS APIs. Check location filter settings and try again.");
+    console.warn("[JobResearch] 0 jobs after all filters. Diagnostics:");
+    console.warn(`  • Raw jobs fetched: ${allRawJobs.length}`);
+    console.warn(`  • Target countries config: ${targetCountries}`);
+    console.warn(`  • Work arrangement filter: ${workArrangement || "none (accept all)"}`);
+    console.warn(`  • Target roles: ${targetRoles}`);
     return [];
   }
 
@@ -842,13 +846,13 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
 
   // Filter to qualifying jobs (score >= 7), then keep best 1 per company
   const qualifying = scored
-    .filter(j => j.fitScore >= 7)
+    .filter(j => j.fitScore >= 5)  // lowered from 7 — let user decide what's worth reviewing
     .sort((a, b) => b.fitScore - a.fitScore);
 
   // Best 1 per company
   const seenCompanies = new Set<string>();
   const selected: typeof qualifying = [];
-  for (const job of qualifying) {
+  for (const job of finalQualifying) {
     if (selected.length >= requestedCount) break;
     const key = job.companyName.toLowerCase();
     if (seenCompanies.has(key)) continue;
@@ -856,6 +860,13 @@ export async function researchNewJobs(count?: number, userId: number = 1): Promi
     selected.push(job);
   }
 
+  // If fit scoring filtered everything, fall back to top-scored jobs regardless of threshold
+  const finalQualifying = qualifying.length > 0 ? qualifying : scored
+    .sort((a, b) => b.fitScore - a.fitScore)
+    .slice(0, 5);
+  if (qualifying.length === 0 && scored.length > 0) {
+    console.warn(`[JobResearch] 0 jobs scored >= 5 — falling back to top ${finalQualifying.length} by score regardless`);
+  }
   console.log(`[JobResearch] ${qualifying.length} qualifying jobs → ${selected.length} selected (1 per company, best fit)`);
 
   // ── Phase 3: Enrich contacts for top jobs only ───────────────────────────────
